@@ -9,4 +9,4 @@ bl_info = {
     "wiki_url": "",
     "category": "STEM"}
 
-import mbdyn
+from . import mbdyn
