@@ -87,6 +87,9 @@ classes = dict()
 for t in types:
     class DefaultOperator(Base):
         bl_label = t
+        @classmethod
+        def poll(cls, context):
+            return False
         def defaults(self, context):
             pass
         def assign(self, context):
@@ -103,6 +106,9 @@ class UnitDrive(Entity):
 
 class UnitDriveOperator(Base):
     bl_label = "Unit drive"
+    @classmethod
+    def poll(cls, context):
+        return True
     def defaults(self, context):
         pass
     def assign(self, context):

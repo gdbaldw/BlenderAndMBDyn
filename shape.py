@@ -60,6 +60,9 @@ class Base(Operator):
 for t in types:
     class Tester(Base):
         bl_label = t
+        @classmethod
+        def poll(cls, context):
+            return False
         def defaults(self, context):
             pass
         def assign(self, context):

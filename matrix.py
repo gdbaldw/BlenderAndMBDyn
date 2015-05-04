@@ -229,10 +229,25 @@ classes[Matrix3x3Operator.bl_label] = Matrix3x3Operator
 
 class Matrix6x6(Entity):
     ...
+
 class Matrix6x6Operator(MatrixBase):
     N = 36
+    bl_label = "6x6"
+    @classmethod
+    def poll(cls, context):
+        return False
+
+classes[Matrix6x6Operator.bl_label] = Matrix6x6Operator
+
 class Matrix6xN(Entity):
     ...
+
 class Matrix6xNOperator(MatrixBase):
     N = 30
+    bl_label = "6xN"
+    @classmethod
+    def poll(cls, context):
+        return False
+
+classes[Matrix6xNOperator.bl_label] = Matrix6xNOperator
 
