@@ -17,7 +17,7 @@
 #    GNU General Public License for more details.
 #
 #    You should have received a copy of the GNU General Public License
-#    along with Foobar.  If not, see <http://www.gnu.org/licenses/>.
+#    along with BlenderAndMBDyn.  If not, see <http://www.gnu.org/licenses/>.
 #
 # ***** END GPL LICENCE BLOCK *****
 # -------------------------------------------------------------------------- 
@@ -72,6 +72,10 @@ def enum_constitutive_6D(self, context):
     return enum_constitutive(self, context, "6D")
 def enum_drive(self, context):
     return [(d.name, d.name, "") for d in context.scene.drive_uilist]
+def enum_function(self, context):
+    return [(f.name, f.name, "") for f in context.scene.function_uilist]
+def enum_friction(self, context):
+    return [(f.name, f.name, "") for f in context.scene.friction_uilist]
 
 class Entity(Common):
     database = database
@@ -109,6 +113,12 @@ class Operator:
     def drive_exists(self, context):
         if not enum_drive(self, context):
             exec("bpy.ops."+root_dot+"c_unit_drive()")
+    def function_exists(self, context):
+        if not enum_function(self, context):
+            exec("bpy.ops."+root_dot+"c_const()")
+    def friction_exists(self, context):
+        if not enum_friction(self, context):
+            exec("bpy.ops."+root_dot+"c_modlugre()")
     def link_matrix(self, context, matrix_name):
         context.scene.matrix_index = next(i for i, x in enumerate(context.scene.matrix_uilist)
             if x.name == matrix_name)
@@ -127,6 +137,18 @@ class Operator:
         drive = self.database.drive[context.scene.drive_index]
         exec("bpy.ops."+root_dot+"e_"+"_".join(drive.type.lower().split())+"('INVOKE_DEFAULT')")
         self.entity.links.append(drive)
+    def link_function(self, context, function_name):
+        context.scene.function_index = next(i for i, x in enumerate(context.scene.function_uilist)
+            if x.name == function_name)
+        function = self.database.function[context.scene.function_index]
+        exec("bpy.ops."+root_dot+"e_"+"_".join(function.type.lower().split())+"('INVOKE_DEFAULT')")
+        self.entity.links.append(function)
+    def link_friction(self, context, friction_name):
+        context.scene.friction_index = next(i for i, x in enumerate(context.scene.friction_uilist)
+            if x.name == friction_name)
+        friction = self.database.friction[context.scene.friction_index]
+        exec("bpy.ops."+root_dot+"e_"+"_".join(friction.type.lower().split())+"('INVOKE_DEFAULT')")
+        self.entity.links.append(friction)
 
 class TreeMenu(list):
     def __init__(self, entity_tree):

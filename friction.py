@@ -17,7 +17,7 @@
 #    GNU General Public License for more details.
 #
 #    You should have received a copy of the GNU General Public License
-#    along with Foobar.  If not, see <http://www.gnu.org/licenses/>.
+#    along with BlenderAndMBDyn.  If not, see <http://www.gnu.org/licenses/>.
 #
 # ***** END GPL LICENCE BLOCK *****
 # -------------------------------------------------------------------------- 
@@ -28,7 +28,7 @@ if "bpy" in locals():
     imp.reload(Operator)
     imp.reload(Entity)
 else:
-    from .base import bpy, Operator, Entity
+    from .base import bpy, Operator, Entity, enum_function
 
 types = ["Modlugre", "Discrete Coulomb"]
 
@@ -68,4 +68,71 @@ for t in types:
         def create_entity(self):
             return Entity(self.name)
     classes[t] = Tester
+
+class Modlugre(Entity):
+	def string(self):
+		string = ("modlugre, "+str(self.sigma0)+", "+str(self.sigma1)+", "+str(self.sigma2)+", "+str(self.kappa)+",\n"+
+		"\t\t\t\""+self.links[0].name+"\", ")
+		if self.plane_hinge:
+			string += "simple plane hinge, "+str(self.radius)
+		else:
+			string += "simple"
+		return string
+
+class ModlugreOperator(Base):
+    bl_label = "Modlugre"
+    sigma0 = bpy.props.FloatProperty(name="Sigma 0", description="", min=-9.9e10, max=9.9e10, precision=6)
+    sigma1 = bpy.props.FloatProperty(name="Sigma 1", description="", min=-9.9e10, max=9.9e10, precision=6)
+    sigma2 = bpy.props.FloatProperty(name="Sigma 2", description="", min=-9.9e10, max=9.9e10, precision=6)
+    kappa = bpy.props.FloatProperty(name="Kappa", description="", min=-9.9e10, max=9.9e10, precision=6)
+    plane_hinge = bpy.props.BoolProperty(name="Plane hinge", description="Simple plane hinge (else just simple shape function)")
+    radius = bpy.props.FloatProperty(name="Radius", description="", min=0.0, max=9.9e10, precision=6)
+    function_name = bpy.props.EnumProperty(items=enum_function, name="Shape Function")
+    @classmethod
+    def poll(cls, context):
+        return True
+    def defaults(self, context):
+        self.sigma0 = 1.0
+        self.sigma1 = 1.0
+        self.sigma2 = 1.0
+        self.kappa = 1.0
+        self.plane_hinge = False
+        self.radius = 1.0
+        self.function_exists(context)
+    def assign(self, context):
+        self.entity = self.database.friction[context.scene.friction_index]
+        self.sigma0 = self.entity.sigma0
+        self.sigma1 = self.entity.sigma1
+        self.sigma2 = self.entity.sigma2
+        self.kappa = self.entity.kappa
+        self.plane_hinge = self.entity.plane_hinge
+        self.radius = self.entity.radius
+        self.function_name = self.entity.links[0].name
+    def store(self, context):
+        self.entity = self.database.friction[context.scene.friction_index]
+        self.entity.sigma0 = self.sigma0
+        self.entity.sigma1 = self.sigma1
+        self.entity.sigma2 = self.sigma2
+        self.entity.kappa = self.kappa
+        self.entity.plane_hinge = self.plane_hinge
+        self.entity.radius = self.radius
+        self.entity.unlink_all()
+        self.link_function(context, self.function_name)
+        self.entity.increment_links()
+    def draw(self, context):
+        self.basis = self.plane_hinge
+        layout = self.layout
+        layout.prop(self, "sigma0")
+        layout.prop(self, "sigma1")
+        layout.prop(self, "sigma2")
+        layout.prop(self, "kappa")
+        row = layout.row()
+        row.prop(self, "plane_hinge")
+        if self.plane_hinge:
+            row.prop(self, "radius")
+        layout.prop(self, "function_name")
+    def create_entity(self):
+        return Modlugre(self.name)
+
+classes[ModlugreOperator.bl_label] = ModlugreOperator
 

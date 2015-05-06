@@ -17,7 +17,7 @@
 #    GNU General Public License for more details.
 #
 #    You should have received a copy of the GNU General Public License
-#    along with Foobar.  If not, see <http://www.gnu.org/licenses/>.
+#    along with BlenderAndMBDyn.  If not, see <http://www.gnu.org/licenses/>.
 #
 # ***** END GPL LICENCE BLOCK *****
 # -------------------------------------------------------------------------- 
@@ -324,7 +324,7 @@ class Database(Common):
                     text.write('\tstructural: '+str(i)+', static,\n')
                 else:
                     continue
-                rot = node.matrix_world.to_quaternion().to_matrix().transposed()
+                rot = node.matrix_world.to_quaternion().to_matrix()
                 if node in frame_dict:
                     frame_label = frame_dict[node]
                 else:

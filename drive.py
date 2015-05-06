@@ -17,7 +17,7 @@
 #    GNU General Public License for more details.
 #
 #    You should have received a copy of the GNU General Public License
-#    along with Foobar.  If not, see <http://www.gnu.org/licenses/>.
+#    along with BlenderAndMBDyn.  If not, see <http://www.gnu.org/licenses/>.
 #
 # ***** END GPL LICENCE BLOCK *****
 # -------------------------------------------------------------------------- 
@@ -102,7 +102,7 @@ for t in types:
 
 class UnitDrive(Entity):
     def string(self, indent=False):
-        return "unit"
+        return self.database.indent_drives*"\t"+"unit"
 
 class UnitDriveOperator(Base):
     bl_label = "Unit drive"

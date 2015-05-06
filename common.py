@@ -17,7 +17,7 @@
 #    GNU General Public License for more details.
 #
 #    You should have received a copy of the GNU General Public License
-#    along with Foobar.  If not, see <http://www.gnu.org/licenses/>.
+#    along with BlenderAndMBDyn.  If not, see <http://www.gnu.org/licenses/>.
 #
 # ***** END GPL LICENCE BLOCK *****
 # -------------------------------------------------------------------------- 
@@ -125,6 +125,28 @@ class Common:
         rot = ob.matrix_world.to_quaternion().to_matrix()
         globalV = self.objects[i].matrix_world.translation - ob.matrix_world.translation
         return rot, globalV, self.database.node.index(ob)
+    def write_hinge(self, text, name, V1=True, V2=True, M1=True, M2=True):
+        rot_0, globalV_0, Node_0 = self.rigid_offset(0)
+        localV_0 = rot_0*globalV_0
+        rot_1, globalV_1, Node_1 = self.rigid_offset(1)
+        to_hinge = rot_1*(globalV_1 + self.objects[0].matrix_world.translation - self.objects[1].matrix_world.translation)
+        rotT = self.objects[0].matrix_world.to_quaternion().to_matrix().transposed()
+        text.write(
+        '\tjoint: '+str(self.database.element.index(self))+', '+name+',\n'+
+        '\t\t'+str(Node_0))
+        if V1:
+            text.write(', ')
+            self.locationVector_write(localV_0, text)
+        if M1:
+            text.write(',\n\t\t\thinge, matr,\n')
+            self.rotationMatrix_write(rot_0*rotT, text, '\t\t\t\t')
+        text.write(', \n\t\t'+str(Node_1))
+        if V2:
+            text.write(', ')
+            self.locationVector_write(to_hinge, text)
+        if M2:
+            text.write(',\n\t\t\thinge, matr,\n')
+            self.rotationMatrix_write(rot_1*rotT, text, '\t\t\t\t')
 
 def subsurf(obj):
     if not [m for m in obj.modifiers if m.type == 'SUBSURF']:
@@ -146,6 +168,16 @@ def Ellipsoid(obj, mass, mat):
     crease = bm.edges.layers.crease.new()
     for e in bm.edges:
         e[crease] = 0.184
+    bm.to_mesh(obj.data)
+    subsurf(obj)
+    bm.free()
+
+def Sphere(obj):
+    bm = bmesh.new()
+    for v in [(x, y, z) for z in [-0.5, 0.5] for y in [-0.5, 0.5] for x in [-0.5, 0.5]]:
+        bm.verts.new(v)
+    for f in [(1,0,2,3),(4,5,7,6),(0,1,5,4),(1,3,7,5),(3,2,6,7),(2,0,4,6)]:
+        bm.faces.new([bm.verts[i] for i in f])
     bm.to_mesh(obj.data)
     subsurf(obj)
     bm.free()
@@ -172,6 +204,22 @@ def Teardrop(obj):
     crease = bm.edges.layers.crease.new()
     for i in range(4,8):
         bm.edges[i][crease] = 1.0
+    bm.to_mesh(obj.data)
+    bm.free()
+    subsurf(obj)
+
+def Cylinder(obj):
+    bm = bmesh.new()
+    scale = .5
+    for z in [-1., 1.]:
+        for y in [-1., 1.]:
+            for x in [-1., 1.]:
+                bm.verts.new((scale*x,scale*y,scale*z))
+    for q in [(1,0,2,3),(4,5,7,6),(0,1,5,4),(1,3,7,5),(3,2,6,7),(2,0,4,6)]:
+        bm.faces.new([bm.verts[i] for i in q])
+    crease = bm.edges.layers.crease.new()
+    for v0, v1 in ([(0,1),(0,2),(2,3),(3,1),(4,5),(4,6),(6,7),(7,5)]):
+        bm.edges.get((bm.verts[v0], bm.verts[v1]))[crease] = 1.0
     bm.to_mesh(obj.data)
     bm.free()
     subsurf(obj)

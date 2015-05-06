@@ -17,7 +17,7 @@
 #    GNU General Public License for more details.
 #
 #    You should have received a copy of the GNU General Public License
-#    along with Foobar.  If not, see <http://www.gnu.org/licenses/>.
+#    along with BlenderAndMBDyn.  If not, see <http://www.gnu.org/licenses/>.
 #
 # ***** END GPL LICENCE BLOCK *****
 # -------------------------------------------------------------------------- 
@@ -161,4 +161,99 @@ for t in types:
         def create_entity(self):
             return Entity(self.name)
     classes[t] = Tester
+
+class LinearElastic_1D(Entity):
+    def string(self, indent=False):
+        return "linear elastic, "+str(self.stiffness)
+
+class LinearElasticOperator(Base):
+    stiffness = bpy.props.FloatProperty(name="Stiffness", description="", min=0.000001, max=9.9e10, precision=6)
+    @classmethod
+    def poll(cls, context):
+        return True
+    def defaults(self, context):
+        self.stiffness = 1.0
+    def assign(self, context):
+        self.entity = self.database.constitutive[context.scene.constitutive_index]
+        self.stiffness = self.entity.stiffness
+    def store(self, context):
+        self.entity = self.database.constitutive[context.scene.constitutive_index]
+        self.entity.stiffness = self.stiffness
+
+class LinearElastic_1D_Operator(LinearElasticOperator):
+    bl_label = "Linear elastic 1D"
+    def create_entity(self):
+        return LinearElastic_1D(self.name)
+
+classes[LinearElastic_1D_Operator.bl_label] = LinearElastic_1D_Operator
+
+class LinearElastic_3D(Entity):
+    def string(self, indent=False):
+        return "linear elastic isotropic, "+str(self.stiffness)
+
+class LinearElastic_3D_Operator(LinearElasticOperator):
+    bl_label = "Linear elastic 3D"
+    def create_entity(self):
+        return LinearElastic_3D(self.name)
+
+classes[LinearElastic_3D_Operator.bl_label] = LinearElastic_3D_Operator
+
+class LinearElastic_6D(Entity):
+    def string(self, indent=False):
+        return "linear elastic isotropic, "+str(self.stiffness)
+
+class LinearElastic_6D_Operator(LinearElasticOperator):
+    bl_label = "Linear elastic 6D"
+    def create_entity(self):
+        return LinearElastic_6D(self.name)
+
+classes[LinearElastic_6D_Operator.bl_label] = LinearElastic_6D_Operator
+
+class LinearViscous_1D(Entity):
+    def string(self, indent=False):
+        return "linear viscous, "+str(self.viscosity)
+
+class LinearViscousOperator(Base):
+    viscosity = bpy.props.FloatProperty(name="Viscosity", description="", min=0.000001, max=9.9e10, precision=6)
+    @classmethod
+    def poll(cls, context):
+        return True
+    def defaults(self, context):
+        self.viscosity = 1.0
+    def assign(self, context):
+        self.entity = self.database.constitutive[context.scene.constitutive_index]
+        self.viscosity = self.entity.viscosity
+    def store(self, context):
+        self.entity = self.database.constitutive[context.scene.constitutive_index]
+        self.entity.viscosity = self.viscosity
+
+class LinearViscous_1D_Operator(LinearViscousOperator):
+    bl_label = "Linear viscous 1D"
+    def create_entity(self):
+        return LinearViscous_1D(self.name)
+
+classes[LinearViscous_1D_Operator.bl_label] = LinearViscous_1D_Operator
+
+class LinearViscous_3D(Entity):
+    def string(self, indent=False):
+        return "linear viscous isotropic, "+str(self.viscosity)
+
+class LinearViscous_3D_Operator(LinearViscousOperator):
+    bl_label = "Linear viscous 3D"
+    def create_entity(self):
+        return LinearViscous_3D(self.name)
+
+classes[LinearViscous_3D_Operator.bl_label] = LinearViscous_3D_Operator
+
+class LinearViscous_6D(Entity):
+    def string(self, indent=False):
+        return "linear viscous isotropic, "+str(self.viscosity)
+
+class LinearViscous_6D_Operator(LinearViscousOperator):
+    bl_label = "Linear viscous 6D"
+    def create_entity(self):
+        return LinearViscous_6D(self.name)
+
+classes[LinearViscous_6D_Operator.bl_label] = LinearViscous_6D_Operator
+
 
