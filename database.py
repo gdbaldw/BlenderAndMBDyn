@@ -373,13 +373,11 @@ class Database(Common):
             text.write('end: drivers;\n')
 
         self.indent_drives = 1
-        """
         if drive_callers:
             text.write('\n')
         for drive in drive_callers:
             name = drive.name.replace(' ', '').replace('.', '__')
             text.write('set: integer '+name+' = '+str(self.drive.index(drive))+';\n\tdrive caller: '+name+', '+drive.string()+';\n')
-        """
         if self.function:
             text.write('\n')
         for function in self.function:

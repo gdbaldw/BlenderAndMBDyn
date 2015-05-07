@@ -36,16 +36,6 @@ category = "MBDyn"
 root_dot = "_".join(category.lower().split())+"."
 database = Database()
 
-class Props:
-    class Floats(bpy.types.PropertyGroup):
-        value = bpy.props.FloatProperty(min=-9.9e10, max=9.9e10, step=100, precision=6)
-    @classmethod
-    def register(self):
-        bpy.utils.register_class(Props.Floats)
-    @classmethod
-    def unregister(self):
-        bpy.utils.unregister_class(Props.Floats)
-
 def enum_objects(self, context):
     return [(o.name, o.name, "") for o in context.scene.objects if o.type == 'MESH']
 def enum_matrix(self, context, matrix_type):
@@ -72,10 +62,26 @@ def enum_constitutive_6D(self, context):
     return enum_constitutive(self, context, "6D")
 def enum_drive(self, context):
     return [(d.name, d.name, "") for d in context.scene.drive_uilist]
+def enum_element(self, context):
+    return [(e.name, e.name, "") for e in context.scene.element_uilist]
 def enum_function(self, context):
     return [(f.name, f.name, "") for f in context.scene.function_uilist]
 def enum_friction(self, context):
     return [(f.name, f.name, "") for f in context.scene.friction_uilist]
+
+class Props:
+    class Floats(bpy.types.PropertyGroup):
+        value = bpy.props.FloatProperty(min=-9.9e10, max=9.9e10, step=100, precision=6)
+    class DriveNames(bpy.types.PropertyGroup):
+        value = bpy.props.EnumProperty(items=enum_drive, name="Drive")
+    @classmethod
+    def register(self):
+        bpy.utils.register_class(Props.Floats)
+        bpy.utils.register_class(Props.DriveNames)
+    @classmethod
+    def unregister(self):
+        bpy.utils.unregister_class(Props.Floats)
+        bpy.utils.unregister_class(Props.DriveNames)
 
 class Entity(Common):
     database = database
@@ -113,6 +119,9 @@ class Operator:
     def drive_exists(self, context):
         if not enum_drive(self, context):
             exec("bpy.ops."+root_dot+"c_unit_drive()")
+    def element_exists(self, context):
+        if not enum_drive(self, context):
+            exec("bpy.ops."+root_dot+"c_gravity()")
     def function_exists(self, context):
         if not enum_function(self, context):
             exec("bpy.ops."+root_dot+"c_const()")
@@ -137,6 +146,12 @@ class Operator:
         drive = self.database.drive[context.scene.drive_index]
         exec("bpy.ops."+root_dot+"e_"+"_".join(drive.type.lower().split())+"('INVOKE_DEFAULT')")
         self.entity.links.append(drive)
+    def link_element(self, context, element_name):
+        context.scene.element_index = next(i for i, x in enumerate(context.scene.element_uilist)
+            if x.name == element_name)
+        element = self.database.element[context.scene.element_index]
+        exec("bpy.ops."+root_dot+"e_"+"_".join(element.type.lower().split())+"('INVOKE_DEFAULT')")
+        self.entity.links.append(element)
     def link_function(self, context, function_name):
         context.scene.function_index = next(i for i, x in enumerate(context.scene.function_uilist)
             if x.name == function_name)
