@@ -163,6 +163,8 @@ def Ellipsoid(obj, mass, mat):
     bm = bmesh.new()
     for v in [(x*s[0],y*s[1],z*s[2]) for z in [-1., 1.] for y in [-1., 1.] for x in [-1., 1.]]:
         bm.verts.new(v)
+    if hasattr(bm.verts, "ensure_lookup_table"):
+        bm.verts.ensure_lookup_table()
     for f in [(1,0,2,3),(4,5,7,6),(0,1,5,4),(1,3,7,5),(3,2,6,7),(2,0,4,6)]:
         bm.faces.new([bm.verts[i] for i in f])
     crease = bm.edges.layers.crease.new()
@@ -176,6 +178,8 @@ def Sphere(obj):
     bm = bmesh.new()
     for v in [(x, y, z) for z in [-0.5, 0.5] for y in [-0.5, 0.5] for x in [-0.5, 0.5]]:
         bm.verts.new(v)
+    if hasattr(bm.verts, "ensure_lookup_table"):
+        bm.verts.ensure_lookup_table()
     for f in [(1,0,2,3),(4,5,7,6),(0,1,5,4),(1,3,7,5),(3,2,6,7),(2,0,4,6)]:
         bm.faces.new([bm.verts[i] for i in f])
     bm.to_mesh(obj.data)
@@ -186,6 +190,8 @@ def RhombicPyramid(obj):
     bm = bmesh.new()
     for v in [(.333,0.,0.),(0.,.666,0.),(-.333,0.,0.),(0.,-.666,0.),(0.,0.,1.)]:
         bm.verts.new(v)
+    if hasattr(bm.verts, "ensure_lookup_table"):
+        bm.verts.ensure_lookup_table()
     for f in [(3,2,1,0),(0,1,4),(1,2,4),(2,3,4),(3,0,4)]:
         bm.faces.new([bm.verts[i] for i in f])
     crease = bm.edges.layers.crease.new()
@@ -199,6 +205,8 @@ def Teardrop(obj):
     bm = bmesh.new()
     for v in [(x, y, -.5) for y in [-.5, .5] for x in [-.5, .5]] + [(0.,0.,0.)]:
         bm.verts.new(v)
+    if hasattr(bm.verts, "ensure_lookup_table"):
+        bm.verts.ensure_lookup_table()
     for q in [(2,3,1,0),(0,1,4),(1,3,4),(3,2,4),(2,0,4)]:
         bm.faces.new([bm.verts[i] for i in q])
     crease = bm.edges.layers.crease.new()
@@ -215,6 +223,8 @@ def Cylinder(obj):
         for y in [-1., 1.]:
             for x in [-1., 1.]:
                 bm.verts.new((scale*x,scale*y,scale*z))
+    if hasattr(bm.verts, "ensure_lookup_table"):
+        bm.verts.ensure_lookup_table()
     for q in [(1,0,2,3),(4,5,7,6),(0,1,5,4),(1,3,7,5),(3,2,6,7),(2,0,4,6)]:
         bm.faces.new([bm.verts[i] for i in q])
     crease = bm.edges.layers.crease.new()
