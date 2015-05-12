@@ -30,7 +30,6 @@ if "bpy" in locals():
     imp.reload(enum_matrix_3x1)
     imp.reload(bmesh)
     imp.reload(subsurf)
-    imp.reload(select_and_activate)
 else:
     from .base import bpy, root_dot, Operator, Entity, enum_matrix_3x1, SelectedObjects
     from .common import RhombicPyramid
@@ -49,11 +48,13 @@ class Base(Operator):
     def make_list(self, ListItem):
         bpy.types.Scene.frame_uilist = bpy.props.CollectionProperty(type = ListItem)
         def select_and_activate(self, context):
-            if Operator.database.frame and hasattr(Operator.database.frame[self.frame_index], "objects"):
+            if Operator.database.frame  and self.frame_index < len(Operator.database.frame):
                 bpy.ops.object.select_all(action='DESELECT')
-                for ob in Operator.database.frame[self.frame_index].objects:
+                frame = Operator.database.frame[self.frame_index]
+                for ob in frame.objects:
                     ob.select = True
-                context.scene.objects.active = Operator.database.frame[self.frame_index].objects[0]
+                context.scene.objects.active = frame.objects[0]
+                frame.remesh()
         bpy.types.Scene.frame_index = bpy.props.IntProperty(default=-1, update=select_and_activate)
     @classmethod
     def delete_list(self):
@@ -90,11 +91,13 @@ class Frame(Entity):
         text.write(", "+self.links[0].string())
         self.write_node(text, 0, orientation=True, o_label="inertial")
         text.write(";\n")
+    def remesh(self):
+        RhombicPyramid(self.objects[0])
 
 class FrameOperator(Base):
     bl_label = "Reference frame"
-    linear_velocity_name = bpy.props.EnumProperty(items=enum_matrix_3x1, name="Frame linear velocity vector")
-    angular_velocity_name = bpy.props.EnumProperty(items=enum_matrix_3x1, name="Frame angular velocity vector")
+    linear_velocity_name = bpy.props.EnumProperty(items=enum_matrix_3x1, name="Linear velocity vector")
+    angular_velocity_name = bpy.props.EnumProperty(items=enum_matrix_3x1, name="Angular velocity vector")
     @classmethod
     def poll(self, context):
         if self.bl_idname.startswith(root_dot+"e_"):
@@ -126,7 +129,6 @@ class FrameOperator(Base):
         self.link_matrix(context, self.linear_velocity_name)
         self.link_matrix(context, self.angular_velocity_name)
         self.entity.increment_links()
-        RhombicPyramid(self.entity.objects[0])
     def draw(self, context):
         layout = self.layout
         layout.prop(self, "linear_velocity_name")

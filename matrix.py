@@ -119,13 +119,13 @@ class MatrixBase(Base):
 class Matrix3x1(Entity):
     def string(self):
         if self.subtype == "null":
-            ret = '\n\t\t\tnull'
+            ret = "\n\t\t\tnull"
         elif self.subtype == "default":
-            ret = '\n\t\t\tdefault'
+            ret = "\n\t\t\tdefault"
         else:
-            ret = '\n\t\t\t'+str(self.floats).strip('[]')
+            ret = "\n\t\t\t"+str(self.floats).strip("[]")
             if self.scale:
-                ret += ', scale, '+str(self.factor)
+                ret += ", scale, "+str(self.factor)
         return ret
 
 class Matrix3x1Operator(MatrixBase):
@@ -168,25 +168,25 @@ classes[Matrix6x1Operator.bl_label] = Matrix6x1Operator
 class Matrix3x3(Entity):
     def string(self):
         if self.subtype == "matr":
-            ret = ('\n\t\t\tmatr,\n'+
-            '\t'*4+str(self.floats[0:3]).strip('[]')+',\n'+
-            '\t'*4+str(self.floats[3:6]).strip('[]')+',\n'+
-            '\t'*4+str(self.floats[6:9]).strip('[]'))
+            ret = ("\n\t\t\tmatr,\n"+
+            "\t"*4+str(self.floats[0:3]).strip("[]")+",\n"+
+            "\t"*4+str(self.floats[3:6]).strip("[]")+",\n"+
+            "\t"*4+str(self.floats[6:9]).strip("[]"))
         elif self.subtype == "sym":
-            ret = ('\n\t\t\tsym,\n'+
-            '\t'*4+str(self.floats[0:3]).strip('[]')+',\n'+
-            '\t'*5+str(self.floats[4:6]).strip('[]')+',\n'+
-            '\t'*6+str(self.floats[8]))
+            ret = ("\n\t\t\tsym,\n"+
+            "\t"*4+str(self.floats[0:3]).strip("[]")+",\n"+
+            "\t"*5+str(self.floats[4:6]).strip("[]")+",\n"+
+            "\t"*6+str(self.floats[8]))
         elif self.subtype == "skew":
-            ret = '\n\t\t\tskew, '+str([self.floats[i] for i in [7, 2, 3]]).strip('[]')
+            ret = "\n\t\t\tskew, "+str([self.floats[i] for i in [7, 2, 3]]).strip("[]")
         elif self.subtype == "diag":
-            ret = '\n\t\t\tdiag, '+str([self.floats[i] for i in [0, 4, 8]]).strip('[]')
+            ret = "\n\t\t\tdiag, "+str([self.floats[i] for i in [0, 4, 8]]).strip("[]")
         elif self.subtype == "eye":
-            ret = '\n\t\t\teye'
+            ret = "\n\t\t\teye"
         elif self.subtype == "null":
-            ret = '\n\t\t\tnull'
+            ret = "\n\t\t\tnull"
         if self.scale:
-            ret += ', scale, '+str(self.factor)
+            ret += ", scale, " + str(self.factor)
         return ret
 
 class Matrix3x3Operator(MatrixBase):
@@ -228,14 +228,69 @@ class Matrix3x3Operator(MatrixBase):
 classes[Matrix3x3Operator.bl_label] = Matrix3x3Operator
 
 class Matrix6x6(Entity):
-    ...
+    def string(self):
+        if self.subtype == "matr":
+            ret = ("\n\t\t\tmatr,\n"+
+            "\t"*4+str(self.floats[0:6]).strip("[]")+",\n"+
+            "\t"*4+str(self.floats[6:12]).strip("[]")+",\n"+
+            "\t"*4+str(self.floats[12:18]).strip("[]")+",\n"+
+            "\t"*4+str(self.floats[18:24]).strip("[]")+",\n"+
+            "\t"*4+str(self.floats[24:30]).strip("[]")+",\n"+
+            "\t"*4+str(self.floats[30:36]).strip("[]"))
+        elif self.subtype == "sym":
+            ret = ("\n\t\t\tsym,\n"+
+            "\t"*4+str(self.floats[0:6]).strip("[]")+",\n"+
+            "\t"*5+str(self.floats[7:12]).strip("[]")+",\n"+
+            "\t"*6+str(self.floats[14:18]).strip("[]")+",\n"+
+            "\t"*7+str(self.floats[21:24]).strip("[]")+",\n"+
+            "\t"*8+str(self.floats[28:30]).strip("[]")+",\n"+
+            "\t"*9+str(self.floats[35]))
+        elif self.subtype == "diag":
+            ret = "\n\t\t\tdiag, "+str([self.floats[i] for i in [0,7,14,21,28,35]]).strip("[]")
+        elif self.subtype == "eye":
+            ret = "\n\t\t\teye"
+        elif self.subtype == "null":
+            ret = "\n\t\t\tnull"
+        if self.scale:
+            ret += ", scale, "+str(self.factor)
+        return ret
 
 class Matrix6x6Operator(MatrixBase):
     N = 36
     bl_label = "6x6"
+    subtype = bpy.props.EnumProperty(items=[
+        ("matr", "General", "General matrix"),
+        ("null", "Null", "Null matrix"),
+        ("sym", "Symmetric", "Symmetrix matrix"),
+        ("diag", "Diagonal", "Diagonal matrix"),
+        ("eye", "Identity", "Identity matrix"),
+        ], name="Subtype", default="eye")
     @classmethod
     def poll(cls, context):
-        return False
+        return True
+    def draw(self, context):
+        self.basis = [self.subtype, self.scale]
+        layout = self.layout
+        layout.label(self.entity_name)
+        layout.prop(self, "subtype")
+        if self.subtype != "null":
+            row = layout.row()
+            rowrow = row.row()
+            rowrow.enabled = self.scale
+            rowrow.prop(self, "factor")
+            row.prop(self, "scale")
+            if self.subtype != "eye":
+                for i in range(6):
+                    row = layout.row()
+                    for j in range(6):
+                        k = 6*i+j
+                        if ((self.subtype == "sym" and k in [6,12,13,18,19,20,24,25,26,27,30,31,32,33,34])
+                        or (self.subtype == "diag" and k not in [0,7,14,21,28,35])):
+                            row.label("")
+                        else:
+                            row.prop(self.floats[k], "value", text="x"+str(k+1))
+    def create_entity(self):
+        return Matrix6x6(self.name)
 
 classes[Matrix6x6Operator.bl_label] = Matrix6x6Operator
 

@@ -51,9 +51,9 @@ def enum_matrix_6x6(self, context):
     return enum_matrix(self, context, "6x6")
 def enum_matrix_6xN(self, context):
     return enum_matrix(self, context, "6xN")
-def enum_constitutive(self, context, constitutive_dimension):
+def enum_constitutive(self, context, dimension):
     return [(c.name, c.name, "") for i, c in enumerate(context.scene.constitutive_uilist)
-        if database.constitutive[i].type.split()[-1] == constitutive_dimension]
+        if dimension in database.constitutive[i].dimensions]
 def enum_constitutive_1D(self, context):
     return enum_constitutive(self, context, "1D")
 def enum_constitutive_3D(self, context):
@@ -74,14 +74,18 @@ class Props:
         value = bpy.props.FloatProperty(min=-9.9e10, max=9.9e10, step=100, precision=6)
     class DriveNames(bpy.types.PropertyGroup):
         value = bpy.props.EnumProperty(items=enum_drive, name="Drive")
+    class FunctionNames(bpy.types.PropertyGroup):
+        value = bpy.props.EnumProperty(items=enum_function, name="Function")
     @classmethod
     def register(self):
         bpy.utils.register_class(Props.Floats)
         bpy.utils.register_class(Props.DriveNames)
+        bpy.utils.register_class(Props.FunctionNames)
     @classmethod
     def unregister(self):
         bpy.utils.unregister_class(Props.Floats)
         bpy.utils.unregister_class(Props.DriveNames)
+        bpy.utils.unregister_class(Props.FunctionNames)
 
 class Entity(Common):
     database = database
@@ -98,6 +102,8 @@ class Entity(Common):
             link.users += 1
     def write(self, text):
         text.write("\t"+self.type+".write(): FIXME please\n")
+    def remesh(self):
+        pass
 
 class SelectedObjects(list):
     def __init__(self, context):
@@ -113,9 +119,12 @@ class Operator:
     def matrix_exists(self, context, matrix_type):
         if not enum_matrix(self, context, matrix_type):
             exec("bpy.ops."+root_dot+"c_"+matrix_type+"()")
-    def constitutive_exists(self, context, constitutive_dimension):
-        if not enum_constitutive(self, context, constitutive_dimension):
-            exec("bpy.ops."+root_dot+"c_linear_elastic_"+constitutive_dimension.lower()+"()")
+    def constitutive_exists(self, context, dimension):
+        if not enum_constitutive(self, context, dimension):
+            if dimension == "1D":
+                exec("bpy.ops."+root_dot+"c_linear_elastic(dimensions = \"1D\")")
+            else:
+                exec("bpy.ops."+root_dot+"c_linear_elastic(dimensions = \"3D, 6D\")")
     def drive_exists(self, context):
         if not enum_drive(self, context):
             exec("bpy.ops."+root_dot+"c_unit_drive()")
@@ -212,6 +221,7 @@ class Operators(list):
                         for ob in self.entity.objects:
                             ob.select = True
                         context.scene.objects.active = self.entity.objects[0]
+                        self.entity.remesh()
             class Create(bpy.types.Operator, klass, Op):
                 bl_idname = root_dot+"c_"+"_".join(name.lower().split())
                 bl_options = {'REGISTER', 'INTERNAL'}
@@ -294,7 +304,7 @@ class UI(list):
                 for link in self.entity_list[index].links:
                     link.users -= 1
                 self.entity_list.pop(index)
-                self.set_index(context, index-1)
+                self.set_index(context, 0 if index == 0 and 0 < len(uilist) else index-1)
                 return{'FINISHED'}
         class Panel(bpy.types.Panel, klass):
             bl_space_type = "VIEW_3D"

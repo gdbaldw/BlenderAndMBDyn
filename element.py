@@ -70,9 +70,11 @@ class Base(Operator):
             if Operator.database.element and self.element_index < len(Operator.database.element):
                 if hasattr(Operator.database.element[self.element_index], "objects"):
                     bpy.ops.object.select_all(action='DESELECT')
-                    for ob in Operator.database.element[self.element_index].objects:
+                    element = Operator.database.element[self.element_index]
+                    for ob in element.objects:
                         ob.select = True
-                    context.scene.objects.active = Operator.database.element[self.element_index].objects[0]
+                    context.scene.objects.active = element.objects[0]
+                    element.remesh()
                 elif Operator.database.element[self.element_index].type in ["Gravity", "Air properties"]:
                     bpy.ops.object.select_all(action='DESELECT')
         bpy.types.Scene.element_index = bpy.props.IntProperty(default=-1, update=select_and_activate)
@@ -125,6 +127,8 @@ class StructuralForce(Entity):
         self.locationVector_write(relative_arm_0, text, ",\n\t\t\t")
         self.locationVector_write(relative_dir, text, ",\n\t\t")
         text.write(self.links[0].string(self)+";\n")
+    def remesh(self):
+        RhombicPyramid(self.objects[0])
 
 class StructuralForceOperator(Base):
     bl_label = "Structural force"
@@ -147,7 +151,6 @@ class StructuralForceOperator(Base):
         self.entity.unlink_all()
         self.link_drive(context, self.drive_name)
         self.entity.increment_links()
-        RhombicPyramid(self.entity.objects[0])
     def create_entity(self):
         return StructuralForce(self.name)
 
@@ -174,6 +177,8 @@ class StructuralInternalForce(Entity):
         text.write(str(Node_1)+",\n\t\t\t")
         self.locationVector_write(relative_arm_1, text, ",\n\t\t")
         text.write(self.links[0].string(self)+";\n")
+    def remesh(self):
+        RhombicPyramid(self.objects[0])
 
 class StructuralInternalForceOperator(Base):
     bl_label = "Structural internal force"
@@ -196,7 +201,6 @@ class StructuralInternalForceOperator(Base):
         self.entity.unlink_all()
         self.link_drive(context, self.drive_name)
         self.entity.increment_links()
-        RhombicPyramid(self.entity.objects[0])
     def create_entity(self):
         return StructuralInternalForce(self.name)
 
@@ -217,6 +221,8 @@ class StructuralCouple(Entity):
         ",\n\t\t"+str(Node_0)+",\n\t\t\t")
         self.locationVector_write(relative_dir, text, ",\n\t\t")
         text.write(self.links[0].string(self)+";\n")
+    def remesh(self):
+        RhombicPyramid(self.objects[0])
 
 class StructuralCoupleOperator(Base):
     bl_label = "Structural couple"
@@ -239,7 +245,6 @@ class StructuralCoupleOperator(Base):
         self.entity.unlink_all()
         self.link_drive(context, self.drive_name)
         self.entity.increment_links()
-        RhombicPyramid(self.entity.objects[0])
     def create_entity(self):
         return StructuralCouple(self.name)
 
@@ -261,6 +266,8 @@ class StructuralInternalCouple(Entity):
         ",\n\t\t"+str(Node_0)+",\n\t\t\t")
         self.locationVector_write(relative_dir, text, ",\n\t\t")
         text.write(str(Node_1)+",\n"+self.links[0].string(True)+";\n")
+    def remesh(self):
+        RhombicPyramid(self.objects[0])
 
 class StructuralInternalCoupleOperator(Base):
     bl_label = "Structural internal couple"
@@ -283,7 +290,6 @@ class StructuralInternalCoupleOperator(Base):
         self.entity.unlink_all()
         self.link_drive(context, self.drive_name)
         self.entity.increment_links()
-        RhombicPyramid(self.entity.objects[0])
     def create_entity(self):
         return StructuralInternalCouple(self.name)
 
@@ -293,6 +299,8 @@ class AxialRotation(Entity):
     def write(self, text):
         self.write_hinge(text, "axial rotation")
         text.write(",\n"+self.links[0].string(True)+";\n")
+    def remesh(self):
+        Cylinder(self.objects[0])
 
 class AxialRotationOperator(Base):
     bl_label = "Axial rotation"
@@ -311,7 +319,6 @@ class AxialRotationOperator(Base):
         self.entity.unlink_all()
         self.link_drive(context, self.drive_name)
         self.entity.increment_links()
-        Cylinder(self.entity.objects[0])
     def create_entity(self):
         return AxialRotation(self.name)
 
@@ -322,6 +329,8 @@ class Clamp(Entity):
         text.write(
         "\tjoint: "+str(self.database.element.index(self))+", clamp,\n"+
         "\t\t"+str(self.database.node.index(self.objects[0]))+", node, node;\n")
+    def remesh(self):
+        Teardrop(self.objects[0])
 
 class ClampOperator(Base):
     bl_label = "Clamp"
@@ -335,7 +344,6 @@ class ClampOperator(Base):
     def store(self, context):
         self.entity = self.database.element[context.scene.element_index]
         self.entity.objects = SelectedObjects(context)
-        Teardrop(self.entity.objects[0])
     def create_entity(self):
         return Clamp(self.name)
 
@@ -345,6 +353,8 @@ class DeformableDisplacementJoint(Entity):
     def write(self, text):
         self.write_hinge(text, "deformable displacement joint")
         text.write(",\n\t\t"+self.links[0].string()+";\n")
+    def remesh(self):
+        Cylinder(self.objects[0])
 
 class ConstitutiveOperator(Base):
     def assign(self, context):
@@ -356,11 +366,10 @@ class ConstitutiveOperator(Base):
         self.entity.unlink_all()
         self.link_constitutive(context, self.constitutive_name)
         self.entity.increment_links()
-        Cylinder(self.entity.objects[0])
 
 class DeformableDisplacementJointOperator(ConstitutiveOperator):
     bl_label = "Deformable displacement joint"
-    constitutive_name = bpy.props.EnumProperty(items=enum_constitutive_3D, name="Constitutive")
+    constitutive_name = bpy.props.EnumProperty(items=enum_constitutive_3D, name="Constitutive 3D")
     @classmethod
     def poll(cls, context):
         return super().base_poll(cls, context, 2)
@@ -375,10 +384,12 @@ class DeformableHinge(Entity):
     def write(self, text):
         self.write_hinge(text, "deformable hinge", V1=False, V2=False)
         text.write(",\n\t\t"+self.links[0].string()+";\n")
+    def remesh(self):
+        Cylinder(self.objects[0])
 
 class DeformableHingeOperator(ConstitutiveOperator):
     bl_label = "Deformable joint"
-    constitutive_name = bpy.props.EnumProperty(items=enum_constitutive_3D, name="Constitutive")
+    constitutive_name = bpy.props.EnumProperty(items=enum_constitutive_3D, name="Constitutive 3D")
     @classmethod
     def poll(cls, context):
         return super().base_poll(cls, context, 2)
@@ -393,10 +404,12 @@ class DeformableJoint(Entity):
     def write(self, text):
         self.write_hinge(text, "deformable joint")
         text.write(",\n\t\t"+self.links[0].string()+";\n")
+    def remesh(self):
+        Cylinder(self.objects[0])
 
 class DeformableJointOperator(ConstitutiveOperator):
     bl_label = "Deformable joint"
-    constitutive_name = bpy.props.EnumProperty(items=enum_constitutive_3D, name="Constitutive")
+    constitutive_name = bpy.props.EnumProperty(items=enum_constitutive_3D, name="Constitutive 3D")
     @classmethod
     def poll(cls, context):
         return super().base_poll(cls, context, 2)
@@ -466,6 +479,8 @@ class InLine(Entity):
         text.write(",\n\t\t"+str(Node_1))
         text.write(",\n\t\t\toffset, ")
         self.locationVector_write(to_point, text, ";\n")
+    def remesh(self):
+        RhombicPyramid(self.objects[0])
 
 class InLineOperator(Base):
     bl_label = "In line"
@@ -479,7 +494,6 @@ class InLineOperator(Base):
     def store(self, context):
         self.entity = self.database.element[context.scene.element_index]
         self.entity.objects = SelectedObjects(context)
-        RhombicPyramid(self.entity.objects[0])
     def create_entity(self):
         return InLine(self.name)
 
@@ -499,6 +513,8 @@ class InPlane(Entity):
         self.locationVector_write(localV0, text, ",\n\t\t\t")
         self.locationVector_write(normal, text, ",\n\t\t")
         text.write(str(iNode1)+",\n\t\t\toffset, "+str(to_point[0])+", "+str(to_point[1])+", "+str(to_point[2])+";\n")
+    def remesh(self):
+        RhombicPyramid(self.objects[0])
 
 class InPlaneOperator(Base):
     bl_label = "In plane"
@@ -512,7 +528,6 @@ class InPlaneOperator(Base):
     def store(self, context):
         self.entity = self.database.element[context.scene.element_index]
         self.entity.objects = SelectedObjects(context)
-        RhombicPyramid(self.entity.objects[0])
     def create_entity(self):
         return InPlane(self.name)
 
@@ -529,6 +544,8 @@ class RevoluteHinge(Entity):
                 text.write(",\n\t\t\tpreload, "+str(self.preload))
             text.write(",\n\t\t\t"+self.links[0].string())
         text.write(";\n")
+    def remesh(self):
+        Cylinder(self.objects[0])
 
 class RevoluteHingeOperator(Base):
     bl_label = "Revolute hinge"
@@ -572,7 +589,6 @@ class RevoluteHingeOperator(Base):
             self.entity.unlink_all()
             self.link_friction(context, self.friction_name)
             self.entity.increment_links()
-        Cylinder(self.entity.objects[0])
     def draw(self, context):
         self.basis = (self.enable_theta, self.enable_friction, self.enable_preload)
         layout = self.layout
@@ -606,7 +622,7 @@ class Rod(Entity):
 
 class RodOperator(ConstitutiveOperator):
     bl_label = "Rod"
-    constitutive_name = bpy.props.EnumProperty(items=enum_constitutive_1D, name="Constitutive")
+    constitutive_name = bpy.props.EnumProperty(items=enum_constitutive_1D, name="Constitutive 1D")
     @classmethod
     def poll(cls, context):
         return super().base_poll(cls, context, 2)
@@ -621,6 +637,8 @@ class SphericalHinge(Entity):
     def write(self, text):
         self.write_hinge(text, "spherical hinge")
         text.write(";\n")
+    def remesh(self):
+        Sphere(self.objects[0])
 
 class SphericalHingeOperator(Base):
     bl_label = "Spherical hinge"
@@ -634,7 +652,6 @@ class SphericalHingeOperator(Base):
     def store(self, context):
         self.entity = self.database.element[context.scene.element_index]
         self.entity.objects = SelectedObjects(context)
-        Sphere(self.entity.objects[0])
     def create_entity(self):
         return SphericalHinge(self.name)
 
@@ -696,6 +713,8 @@ class TotalJoint(Entity):
                 text.write(",\n\t\t\t\tinactive")
         self.database.indent_drives -= 2
         text.write(";\n")
+    def remesh(self):
+        Sphere(self.objects[0])
 
 class TotalJointOperator(Base):
     bl_label = "Total joint"
@@ -757,7 +776,6 @@ class TotalJointOperator(Base):
         self.link_drive(context, self.angular_displacement_y_drive_name)
         self.link_drive(context, self.angular_displacement_z_drive_name)
         self.entity.increment_links()
-        Sphere(self.entity.objects[0])
     def draw(self, context):
         self.basis = (self.displacement_x)
         layout = self.layout
@@ -785,10 +803,12 @@ class ViscousBody(Entity):
         str(self.database.node.index(self.objects[0]))+
         ",\n\t\tposition, reference, node, null"+
         ",\n\t\t"+self.links[0].string()+";\n")
+    def remesh(self):
+        Sphere(self.objects[0])
 
 class ViscousBodyOperator(ConstitutiveOperator):
     bl_label = "Viscous body"
-    constitutive_name = bpy.props.EnumProperty(items=enum_constitutive_6D, name="Constitutive")
+    constitutive_name = bpy.props.EnumProperty(items=enum_constitutive_6D, name="Constitutive 6D")
     @classmethod
     def poll(cls, context):
         return super().base_poll(cls, context, 1)
@@ -808,6 +828,8 @@ class Body(Entity):
         text.write(", "+self.links[0].string())
         self.write_node(text, 0, orientation=True, o_label="inertial")
         text.write(";\n")
+    def remesh(self):
+        Ellipsoid(self.objects[0], self.mass, self.links[0])
 
 class BodyOperator(Base):
     bl_label = "Body"
@@ -830,7 +852,6 @@ class BodyOperator(Base):
         self.entity.unlink_all()
         self.link_matrix(context, self.matrix_name)
         self.entity.increment_links()
-        Ellipsoid(self.entity.objects[0], self.entity.mass, self.entity.links[0])
     def draw(self, context):
         layout = self.layout
         layout.prop(self, "mass")
@@ -841,7 +862,8 @@ class BodyOperator(Base):
 classes[BodyOperator.bl_label] = BodyOperator
 
 class RigidOffset(Entity):
-    pass
+    def remesh(self):
+        RhombicPyramid(self.objects[0])
 
 class RigidOffsetOperator(Base):
     bl_label = "Rigid offset"
@@ -858,14 +880,14 @@ class RigidOffsetOperator(Base):
     def store(self, context):
         self.entity = self.database.element[context.scene.element_index]
         self.entity.objects = SelectedObjects(context)
-        RhombicPyramid(self.entity.objects[0])
     def create_entity(self):
         return RigidOffset(self.name)
 
 classes[RigidOffsetOperator.bl_label] = RigidOffsetOperator
 
 class DummyNode(Entity):
-    pass
+    def remesh(self):
+        RhombicPyramid(self.objects[0])
 
 class DummyNodeOperator(Base):
     bl_label = "Dummy node"
@@ -882,18 +904,17 @@ class DummyNodeOperator(Base):
     def store(self, context):
         self.entity = self.database.element[context.scene.element_index]
         self.entity.objects = SelectedObjects(context)
-        RhombicPyramid(self.entity.objects[0])
     def create_entity(self):
         return DummyNode(self.name)
 
 classes[DummyNodeOperator.bl_label] = DummyNodeOperator
 
 class BeamSegment(Entity):
-    ...
+        ...
 
 class BeamSegmentOperator(Base):
     bl_label = "Beam segment"
-    constitutive_name = bpy.props.EnumProperty(items=enum_constitutive_6D, name="Constitutive")
+    constitutive_name = bpy.props.EnumProperty(items=enum_constitutive_6D, name="Constitutive 6D")
     @classmethod
     def poll(cls, context):
         return super().base_poll(cls, context, 2)

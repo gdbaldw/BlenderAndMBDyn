@@ -117,11 +117,11 @@ class Common:
         elif self.objects[i] in self.database.rigid_dict:
             ob = self.database.rigid_dict[self.objects[i]]
         else:
+            name = self.objects[i].name
             bpy.context.window_manager.popup_menu(lambda self, c: self.layout.label(
-                "Object "+self.objects[i].name+" is not associated with a Node"),
+                "Object " + name + " is not associated with a Node"),
                 title="MBDyn Error", icon='ERROR')
-            print("***Model Error: Object "+self.objects[i].name+" is not associated with a Node")
-            return
+            raise Exception("***Model Error: Object " + name + " is not associated with a Node")
         rot = ob.matrix_world.to_quaternion().to_matrix()
         globalV = self.objects[i].matrix_world.translation - ob.matrix_world.translation
         return rot, globalV, self.database.node.index(ob)

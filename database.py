@@ -388,10 +388,14 @@ class Database(Common):
         self.indent_drives = 2
         text.write('\nbegin: elements;\n')
 
-        for element_type in aerodynamic_types + beam_types + ["Body"] + force_types + genel_types + joint_types + ["Rotor"] + environment_types + ["Driven"]:
-            for element in self.element:
-                if element.type == element_type:
-                    element.write(text)
+        try:
+            for element_type in aerodynamic_types + beam_types + ["Body"] + force_types + genel_types + joint_types + ["Rotor"] + environment_types + ["Driven"]:
+                for element in self.element:
+                    if element.type == element_type:
+                        element.write(text)
+        except Exception as e:
+            print(e)
+            text.write(str(e) + "\n")            
         text.write('end: elements;\n')
 
 

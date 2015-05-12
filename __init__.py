@@ -323,6 +323,10 @@ def scene_update_post(junk):
     if bpy.context.scene != database.scene:
         database.replace()
 
+@bpy.app.handlers.persistent
+def save_pre(junk):
+    database.pickle()
+
 def register():
     Props.register()
     for o in obs:
@@ -331,8 +335,10 @@ def register():
         bpy.utils.register_class(klass)
     bpy.app.handlers.load_post.append(load_post)
     bpy.app.handlers.scene_update_post.append(scene_update_post)
+    bpy.app.handlers.save_pre.append(save_pre)
 
 def unregister():
+    bpy.app.handlers.save_pre.append(save_pre)
     bpy.app.handlers.scene_update_post.remove(scene_update_post)
     bpy.app.handlers.load_post.remove(load_post)
     Props.unregister()
