@@ -1,17 +1,17 @@
 # --------------------------------------------------------------------------
-# Blender MBDyn
+# BlenderAndMBDyn
 # Copyright (C) 2015 G. Douglas Baldwin - http://www.baldwintechnology.com
 # --------------------------------------------------------------------------
 # ***** BEGIN GPL LICENSE BLOCK *****
 #
-#    This file is part of Blender MBDyn.
+#    This file is part of BlenderAndMBDyn.
 #
-#    Blender MBDyn is free software: you can redistribute it and/or modify
+#    BlenderAndMBDyn is free software: you can redistribute it and/or modify
 #    it under the terms of the GNU General Public License as published by
 #    the Free Software Foundation, either version 3 of the License, or
 #    (at your option) any later version.
 #
-#    Blender MBDyn is distributed in the hope that it will be useful,
+#    BlenderAndMBDyn is distributed in the hope that it will be useful,
 #    but WITHOUT ANY WARRANTY; without even the implied warranty of
 #    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 #    GNU General Public License for more details.

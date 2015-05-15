@@ -1,17 +1,17 @@
 # --------------------------------------------------------------------------
-# Blender MBDyn
+# BlenderAndMBDyn
 # Copyright (C) 2015 G. Douglas Baldwin - http://www.baldwintechnology.com
 # --------------------------------------------------------------------------
 # ***** BEGIN GPL LICENSE BLOCK *****
 #
-#    This file is part of Blender MBDyn.
+#    This file is part of BlenderAndMBDyn.
 #
-#    Blender MBDyn is free software: you can redistribute it and/or modify
+#    BlenderAndMBDyn is free software: you can redistribute it and/or modify
 #    it under the terms of the GNU General Public License as published by
 #    the Free Software Foundation, either version 3 of the License, or
 #    (at your option) any later version.
 #
-#    Blender MBDyn is distributed in the hope that it will be useful,
+#    BlenderAndMBDyn is distributed in the hope that it will be useful,
 #    but WITHOUT ANY WARRANTY; without even the implied warranty of
 #    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 #    GNU General Public License for more details.
@@ -25,7 +25,7 @@
 bl_info = {
     "name": "MBDyn Modeling and Simulation",
     "author": "G Douglas Baldwin",
-    "version": (0, 1),
+    "version": (2, 0),
     "blender": (2, 72, 0),
     "location": "View3D",
     "description": "Provides an MBDyn multibody dynamic model design and presentation environment.",
@@ -73,22 +73,6 @@ from subprocess import call, Popen
 from tempfile import TemporaryFile
 from time import sleep, clock
 import os
-
-obs = list()
-for module, entity_list, entity_name in [
-    (element, database.element, "element"),
-    (drive, database.drive, "drive"),
-    (driver, database.driver, "driver"),
-    (friction, database.friction, "friction"),
-    (shape, database.shape, "shape"),
-    (function, database.function, "function"),
-    (ns_node, database.ns_node, "ns_node"),
-    (constitutive, database.constitutive, "constitutive"),
-    (matrix, database.matrix, "matrix"),
-    (frame, database.frame, "frame")]:
-        obs.append(UI(module.tree, module.Base, entity_list, entity_name))
-        obs.append(TreeMenu(module.tree))
-        obs.append(Operators(module.classes, entity_list))
 
 class MBDynFile(bpy.types.Operator, ExportHelper):
     bl_idname = root_dot+"file"
@@ -314,36 +298,19 @@ class Actions(bpy.types.Panel):
 
 klasses = [MBDynFile, RunMBDyn, DisplayResults, ParentRigids, ImportFile, AppendModel, Actions]
 
-@bpy.app.handlers.persistent
-def load_post(junk):
-    database.unpickle()
-
-@bpy.app.handlers.persistent
-def scene_update_post(junk):
-    if bpy.context.scene != database.scene:
-        database.replace()
-
-@bpy.app.handlers.persistent
-def save_pre(junk):
-    database.pickle()
+modules = [element, constitutive, drive, driver, frame, friction, function, matrix, ns_node, shape]
 
 def register():
     Props.register()
-    for o in obs:
-        o.register()
+    for module in modules:
+        module.bundle.register()
     for klass in klasses:
         bpy.utils.register_class(klass)
-    bpy.app.handlers.load_post.append(load_post)
-    bpy.app.handlers.scene_update_post.append(scene_update_post)
-    bpy.app.handlers.save_pre.append(save_pre)
 
 def unregister():
-    bpy.app.handlers.save_pre.append(save_pre)
-    bpy.app.handlers.scene_update_post.remove(scene_update_post)
-    bpy.app.handlers.load_post.remove(load_post)
     Props.unregister()
-    for o in obs:
-        o.unregister()
+    for module in modules:
+        module.bundle.unregister()
     for klass in klasses:
         bpy.utils.unregister_class(klass)
 

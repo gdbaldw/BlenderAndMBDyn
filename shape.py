@@ -1,17 +1,17 @@
 # --------------------------------------------------------------------------
-# Blender MBDyn
+# BlenderAndMBDyn
 # Copyright (C) 2015 G. Douglas Baldwin - http://www.baldwintechnology.com
 # --------------------------------------------------------------------------
 # ***** BEGIN GPL LICENSE BLOCK *****
 #
-#    This file is part of Blender MBDyn.
+#    This file is part of BlenderAndMBDyn.
 #
-#    Blender MBDyn is free software: you can redistribute it and/or modify
+#    BlenderAndMBDyn is free software: you can redistribute it and/or modify
 #    it under the terms of the GNU General Public License as published by
 #    the Free Software Foundation, either version 3 of the License, or
 #    (at your option) any later version.
 #
-#    Blender MBDyn is distributed in the hope that it will be useful,
+#    BlenderAndMBDyn is distributed in the hope that it will be useful,
 #    but WITHOUT ANY WARRANTY; without even the implied warranty of
 #    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 #    GNU General Public License for more details.
@@ -28,7 +28,7 @@ if "bpy" in locals():
     imp.reload(Operator)
     imp.reload(Entity)
 else:
-    from .base import bpy, Operator, Entity
+    from .base import bpy, database, Operator, Entity, Bundle
 
 types = [
 	"Const shape",
@@ -38,7 +38,7 @@ types = [
 
 tree = ["Add Shape", types]
 
-classes = dict()
+klasses = dict()
 
 class Base(Operator):
     bl_label = "Shapes"
@@ -66,10 +66,11 @@ for t in types:
         def defaults(self, context):
             pass
         def assign(self, context):
-            self.entity = self.database.shape[context.scene.shape_index]
+            self.entity = database.shape[context.scene.shape_index]
         def store(self, context):
-            self.entity = self.database.shape[context.scene.shape_index]
+            self.entity = database.shape[context.scene.shape_index]
         def create_entity(self):
             return Entity(self.name)
-    classes[t] = Tester
+    klasses[t] = Tester
 
+bundle = Bundle(tree, Base, klasses, database.shape, "shape")

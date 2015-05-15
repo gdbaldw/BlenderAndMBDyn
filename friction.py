@@ -1,17 +1,17 @@
 # --------------------------------------------------------------------------
-# Blender MBDyn
+# BlenderAndMBDyn
 # Copyright (C) 2015 G. Douglas Baldwin - http://www.baldwintechnology.com
 # --------------------------------------------------------------------------
 # ***** BEGIN GPL LICENSE BLOCK *****
 #
-#    This file is part of Blender MBDyn.
+#    This file is part of BlenderAndMBDyn.
 #
-#    Blender MBDyn is free software: you can redistribute it and/or modify
+#    BlenderAndMBDyn is free software: you can redistribute it and/or modify
 #    it under the terms of the GNU General Public License as published by
 #    the Free Software Foundation, either version 3 of the License, or
 #    (at your option) any later version.
 #
-#    Blender MBDyn is distributed in the hope that it will be useful,
+#    BlenderAndMBDyn is distributed in the hope that it will be useful,
 #    but WITHOUT ANY WARRANTY; without even the implied warranty of
 #    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 #    GNU General Public License for more details.
@@ -28,13 +28,13 @@ if "bpy" in locals():
     imp.reload(Operator)
     imp.reload(Entity)
 else:
-    from .base import bpy, Operator, Entity, enum_function
+    from .base import bpy, database, Operator, Entity, Bundle, enum_function
 
 types = ["Modlugre", "Discrete Coulomb"]
 
 tree = ["Add Friction", types]
 
-classes = dict()
+klasses = dict()
 
 class Base(Operator):
     bl_label = "Frictions"
@@ -62,12 +62,12 @@ for t in types:
         def defaults(self, context):
             pass
         def assign(self, context):
-            self.entity = self.database.friction[context.scene.friction_index]
+            self.entity = database.friction[context.scene.friction_index]
         def store(self, context):
-            self.entity = self.database.friction[context.scene.friction_index]
+            self.entity = database.friction[context.scene.friction_index]
         def create_entity(self):
             return Entity(self.name)
-    classes[t] = Tester
+    klasses[t] = Tester
 
 class Modlugre(Entity):
 	def string(self):
@@ -88,6 +88,7 @@ class ModlugreOperator(Base):
     plane_hinge = bpy.props.BoolProperty(name="Plane hinge", description="Simple plane hinge (else just simple shape function)")
     radius = bpy.props.FloatProperty(name="Radius", description="", min=0.0, max=9.9e10, precision=6)
     function_name = bpy.props.EnumProperty(items=enum_function, name="Shape Function")
+    function_edit = bpy.props.BoolProperty(name="")
     @classmethod
     def poll(cls, context):
         return True
@@ -100,7 +101,7 @@ class ModlugreOperator(Base):
         self.radius = 1.0
         self.function_exists(context)
     def assign(self, context):
-        self.entity = self.database.friction[context.scene.friction_index]
+        self.entity = database.friction[context.scene.friction_index]
         self.sigma0 = self.entity.sigma0
         self.sigma1 = self.entity.sigma1
         self.sigma2 = self.entity.sigma2
@@ -109,7 +110,7 @@ class ModlugreOperator(Base):
         self.radius = self.entity.radius
         self.function_name = self.entity.links[0].name
     def store(self, context):
-        self.entity = self.database.friction[context.scene.friction_index]
+        self.entity = database.friction[context.scene.friction_index]
         self.entity.sigma0 = self.sigma0
         self.entity.sigma1 = self.sigma1
         self.entity.sigma2 = self.sigma2
@@ -117,7 +118,7 @@ class ModlugreOperator(Base):
         self.entity.plane_hinge = self.plane_hinge
         self.entity.radius = self.radius
         self.entity.unlink_all()
-        self.link_function(context, self.function_name)
+        self.link_function(context, self.function_name, self.function_edit)
         self.entity.increment_links()
     def draw(self, context):
         self.basis = self.plane_hinge
@@ -130,9 +131,10 @@ class ModlugreOperator(Base):
         row.prop(self, "plane_hinge")
         if self.plane_hinge:
             row.prop(self, "radius")
-        layout.prop(self, "function_name")
+        self.draw_link(layout, "function_name", "function_edit")
     def create_entity(self):
         return Modlugre(self.name)
 
-classes[ModlugreOperator.bl_label] = ModlugreOperator
+klasses[ModlugreOperator.bl_label] = ModlugreOperator
 
+bundle = Bundle(tree, Base, klasses, database.friction, "friction")

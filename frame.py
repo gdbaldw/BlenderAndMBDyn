@@ -1,17 +1,17 @@
 # --------------------------------------------------------------------------
-# Blender MBDyn
+# BlenderAndMBDyn
 # Copyright (C) 2015 G. Douglas Baldwin - http://www.baldwintechnology.com
 # --------------------------------------------------------------------------
 # ***** BEGIN GPL LICENSE BLOCK *****
 #
-#    This file is part of Blender MBDyn.
+#    This file is part of BlenderAndMBDyn.
 #
-#    Blender MBDyn is free software: you can redistribute it and/or modify
+#    BlenderAndMBDyn is free software: you can redistribute it and/or modify
 #    it under the terms of the GNU General Public License as published by
 #    the Free Software Foundation, either version 3 of the License, or
 #    (at your option) any later version.
 #
-#    Blender MBDyn is distributed in the hope that it will be useful,
+#    BlenderAndMBDyn is distributed in the hope that it will be useful,
 #    but WITHOUT ANY WARRANTY; without even the implied warranty of
 #    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 #    GNU General Public License for more details.
@@ -31,7 +31,7 @@ if "bpy" in locals():
     imp.reload(bmesh)
     imp.reload(subsurf)
 else:
-    from .base import bpy, root_dot, Operator, Entity, enum_matrix_3x1, SelectedObjects
+    from .base import bpy, root_dot, database, Operator, Entity, Bundle, enum_matrix_3x1, SelectedObjects
     from .common import RhombicPyramid
     import bmesh
 
@@ -39,7 +39,7 @@ types = ["Reference frame",]
 
 tree = ["Add Frame", types]
 
-classes = dict()
+klasses = dict()
 
 class Base(Operator):
     bl_label = "Frames"
@@ -48,9 +48,9 @@ class Base(Operator):
     def make_list(self, ListItem):
         bpy.types.Scene.frame_uilist = bpy.props.CollectionProperty(type = ListItem)
         def select_and_activate(self, context):
-            if Operator.database.frame  and self.frame_index < len(Operator.database.frame):
+            if database.frame  and self.frame_index < len(database.frame):
                 bpy.ops.object.select_all(action='DESELECT')
-                frame = Operator.database.frame[self.frame_index]
+                frame = database.frame[self.frame_index]
                 for ob in frame.objects:
                     ob.select = True
                 context.scene.objects.active = frame.objects[0]
@@ -75,16 +75,16 @@ for t in types:
         def defaults(self, context):
             pass
         def assign(self, context):
-            self.entity = self.database.frame[context.scene.frame_index]
+            self.entity = database.frame[context.scene.frame_index]
         def store(self, context):
-            self.entity = self.database.frame[context.scene.frame_index]
+            self.entity = database.frame[context.scene.frame_index]
         def create_entity(self):
             return Entity(self.name)
-    classes[t] = Tester
+    klasses[t] = Tester
 
 class Frame(Entity):
     def write(self, text):
-        text.write("\tbody: "+str(self.database.frame.index(self))+",\n")
+        text.write("\tbody: "+str(database.frame.index(self))+",\n")
         self.write_node(text, 0, node=True)
         text.write("\t\t\t"+str(self.mass)+",\n")
         self.write_node(text, 0, position=True, p_label="")
@@ -97,17 +97,19 @@ class Frame(Entity):
 class FrameOperator(Base):
     bl_label = "Reference frame"
     linear_velocity_name = bpy.props.EnumProperty(items=enum_matrix_3x1, name="Linear velocity vector")
+    linear_velocity_edit = bpy.props.BoolProperty(name="")
     angular_velocity_name = bpy.props.EnumProperty(items=enum_matrix_3x1, name="Angular velocity vector")
+    angular_velocity_edit = bpy.props.BoolProperty(name="")
     @classmethod
     def poll(self, context):
         if self.bl_idname.startswith(root_dot+"e_"):
             return True
         selected = SelectedObjects(context)
-        overlapped = False in [set(selected[1:]).isdisjoint(set(f.objects[1:])) for f in self.database.frame]
-        duplicate = True in [selected[0] == f.objects[0] for f in self.database.frame if hasattr(f, "objects")]
+        overlapped = False in [set(selected[1:]).isdisjoint(set(f.objects[1:])) for f in database.frame]
+        duplicate = True in [selected[0] == f.objects[0] for f in database.frame if hasattr(f, "objects")]
         if len(selected) < 2 or overlapped or duplicate:
             return False
-        frames = [f.objects for f in self.database.frame]
+        frames = [f.objects for f in database.frame]
         head, hold = selected[0], None
         while frames and head != hold:
             hold = head
@@ -119,22 +121,23 @@ class FrameOperator(Base):
     def defaults(self, context):
         self.matrix_exists(context, "3x1")
     def assign(self, context):
-        self.entity = self.database.frame[context.scene.frame_index]
+        self.entity = database.frame[context.scene.frame_index]
         self.linear_velocity_name = self.entity.links[0].name
         self.angular_velocity_name = self.entity.links[1].name
     def store(self, context):
-        self.entity = self.database.frame[context.scene.frame_index]
+        self.entity = database.frame[context.scene.frame_index]
         self.entity.objects = SelectedObjects(context)
         self.entity.unlink_all()
-        self.link_matrix(context, self.linear_velocity_name)
-        self.link_matrix(context, self.angular_velocity_name)
+        self.link_matrix(context, self.linear_velocity_name, self.linear_velocity_edit)
+        self.link_matrix(context, self.angular_velocity_name, self.angular_velocity_edit)
         self.entity.increment_links()
     def draw(self, context):
         layout = self.layout
-        layout.prop(self, "linear_velocity_name")
-        layout.prop(self, "angular_velocity_name")
+        self.draw_link(layout, "linear_velocity_name", "linear_velocity_edit")
+        self.draw_link(layout, "angular_velocity_name", "angular_velocity_edit")
     def create_entity(self):
         return Frame(self.name)
 
-classes[FrameOperator.bl_label] = FrameOperator
+klasses[FrameOperator.bl_label] = FrameOperator
 
+bundle = Bundle(tree, Base, klasses, database.frame, "frame")

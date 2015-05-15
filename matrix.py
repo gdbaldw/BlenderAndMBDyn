@@ -1,17 +1,17 @@
 # --------------------------------------------------------------------------
-# Blender MBDyn
+# BlenderAndMBDyn
 # Copyright (C) 2015 G. Douglas Baldwin - http://www.baldwintechnology.com
 # --------------------------------------------------------------------------
 # ***** BEGIN GPL LICENSE BLOCK *****
 #
-#    This file is part of Blender MBDyn.
+#    This file is part of BlenderAndMBDyn.
 #
-#    Blender MBDyn is free software: you can redistribute it and/or modify
+#    BlenderAndMBDyn is free software: you can redistribute it and/or modify
 #    it under the terms of the GNU General Public License as published by
 #    the Free Software Foundation, either version 3 of the License, or
 #    (at your option) any later version.
 #
-#    Blender MBDyn is distributed in the hope that it will be useful,
+#    BlenderAndMBDyn is distributed in the hope that it will be useful,
 #    but WITHOUT ANY WARRANTY; without even the implied warranty of
 #    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 #    GNU General Public License for more details.
@@ -28,7 +28,7 @@ if "bpy" in locals():
     imp.reload(Operator)
     imp.reload(Entity)
 else:
-    from .base import bpy, Operator, Entity, Props
+    from .base import bpy, database, Operator, Entity, Bundle, Props
 
 types = ["3x1", "6x1", "3x3", "6x6", "6xN"]
 
@@ -51,7 +51,7 @@ class Base(Operator):
     def set_index(self, context, value):
         context.scene.matrix_index = value
 
-classes = dict()
+klasses = dict()
 
 for t in types:
     class DefaultOperator(Base):
@@ -59,12 +59,12 @@ for t in types:
         def defaults(self, context):
             pass
         def assign(self, context):
-            self.entity = self.database.matrix[context.scene.matrix_index]
+            self.entity = database.matrix[context.scene.matrix_index]
         def store(self, context):
-            self.entity = self.database.matrix[context.scene.matrix_index]
+            self.entity = database.matrix[context.scene.matrix_index]
         def create_entity(self):
             return Entity(self.name)
-    classes[t] = DefaultOperator
+    klasses[t] = DefaultOperator
 
 class MatrixBase(Base):
     N = None
@@ -79,15 +79,10 @@ class MatrixBase(Base):
         self.entity_name = ""
     def assign(self, context):
         self.index = context.scene.matrix_index
-        self.entity = self.database.matrix[self.index]
-        self.entity_name = self.database.matrix[self.index].name
+        self.entity = database.matrix[self.index]
+        self.entity_name = database.matrix[self.index].name
         self.subtype = self.entity.subtype
         self.floats.clear()
-        """
-        for value in self.entity.floats:
-            f = self.floats.add()
-            f.value = value
-        """
         for i in range(self.N):
             self.floats.add()
         for i, value in enumerate(self.entity.floats):
@@ -95,7 +90,7 @@ class MatrixBase(Base):
         self.scale = self.entity.scale
         self.factor = self.entity.factor
     def store(self, context):
-        self.entity = self.database.matrix[self.index]
+        self.entity = database.matrix[self.index]
         self.entity.subtype = self.subtype
         self.entity.floats = [f.value for f in self.floats]
         self.entity.scale = self.scale
@@ -152,7 +147,7 @@ class Matrix3x1Operator(MatrixBase):
     def create_entity(self):
         return Matrix3x1(self.name)
 
-classes[Matrix3x1Operator.bl_label] = Matrix3x1Operator
+klasses[Matrix3x1Operator.bl_label] = Matrix3x1Operator
 
 class Matrix6x1(Matrix3x1):
     pass
@@ -163,7 +158,7 @@ class Matrix6x1Operator(Matrix3x1Operator):
     def create_entity(self):
         return Matrix6x1(self.name)
 
-classes[Matrix6x1Operator.bl_label] = Matrix6x1Operator
+klasses[Matrix6x1Operator.bl_label] = Matrix6x1Operator
 
 class Matrix3x3(Entity):
     def string(self):
@@ -225,7 +220,7 @@ class Matrix3x3Operator(MatrixBase):
     def create_entity(self):
         return Matrix3x3(self.name)
 
-classes[Matrix3x3Operator.bl_label] = Matrix3x3Operator
+klasses[Matrix3x3Operator.bl_label] = Matrix3x3Operator
 
 class Matrix6x6(Entity):
     def string(self):
@@ -292,7 +287,7 @@ class Matrix6x6Operator(MatrixBase):
     def create_entity(self):
         return Matrix6x6(self.name)
 
-classes[Matrix6x6Operator.bl_label] = Matrix6x6Operator
+klasses[Matrix6x6Operator.bl_label] = Matrix6x6Operator
 
 class Matrix6xN(Entity):
     ...
@@ -304,5 +299,6 @@ class Matrix6xNOperator(MatrixBase):
     def poll(cls, context):
         return False
 
-classes[Matrix6xNOperator.bl_label] = Matrix6xNOperator
+klasses[Matrix6xNOperator.bl_label] = Matrix6xNOperator
 
+bundle = Bundle(tree, Base, klasses, database.matrix, "matrix")
