@@ -28,7 +28,7 @@ if "bpy" in locals():
     imp.reload(Operator)
     imp.reload(Entity)
 else:
-    from .base import bpy, database, Operator, Entity, Bundle, Props, enum_function
+    from .base import bpy, database, Operator, Entity, Bundle, BPY, enum_function
 
 types = [
     "Const",
@@ -76,7 +76,7 @@ for t in types:
         def assign(self, context):
             self.entity = database.function[context.scene.function_index]
         def store(self, context):
-            self.entity = database.function[context.scene.function_index]
+            self.entity = database.function[self.index]
         def create_entity(self):
             return Entity(self.name)
     klasses[t] = Tester
@@ -99,7 +99,7 @@ class ConstOperator(Base):
         self.entity = database.function[context.scene.function_index]
         self.constant = self.entity.constant
     def store(self, context):
-        self.entity = database.function[context.scene.function_index]
+        self.entity = database.function[self.index]
         self.entity.constant = self.constant
     def create_entity(self):
         return Const(self.name)
@@ -140,7 +140,7 @@ class ExpLogBase(Base):
         self.coefficient = self.entity.coefficient
         self.multiplier = self.entity.multiplier
     def store(self, context):
-        self.entity = database.function[context.scene.function_index]
+        self.entity = database.function[self.index]
         self.entity.default_base = self.default_base
         self.entity.base = self.base
         self.entity.default_coefficient = self.default_coefficient
@@ -204,7 +204,7 @@ class PowOperator(Base):
         self.entity = database.function[context.scene.function_index]
         self.power = self.entity.power
     def store(self, context):
-        self.entity = database.function[context.scene.function_index]
+        self.entity = database.function[self.index]
         self.entity.power = self.power
     def create_entity(self):
         return Pow(self.name)
@@ -240,7 +240,7 @@ class LinearOperator(Base):
         self.y1 = self.entity.y1
         self.y2 = self.entity.y2
     def store(self, context):
-        self.entity = database.function[context.scene.function_index]
+        self.entity = database.function[self.index]
         self.entity.x1 = self.x1
         self.entity.x2 = self.x2
         self.entity.y1 = self.y1
@@ -270,8 +270,8 @@ class CubicNaturalSpline(Entity):
 class MultipleBase(Base):
     extrapolate = bpy.props.BoolProperty(name="Extrapolate")
     N = bpy.props.IntProperty(name="Number of points", min=2, max=50, description="")
-    X = bpy.props.CollectionProperty(name="X", type = Props.Floats)
-    Y = bpy.props.CollectionProperty(name="Y", type = Props.Floats)
+    X = bpy.props.CollectionProperty(name="X", type = BPY.Floats)
+    Y = bpy.props.CollectionProperty(name="Y", type = BPY.Floats)
     @classmethod
     def poll(cls, context):
         return True
@@ -297,7 +297,7 @@ class MultipleBase(Base):
         for i, value in enumerate(self.entity.Y):
             self.Y[i].value = value
     def store(self, context):
-        self.entity = database.function[context.scene.function_index]
+        self.entity = database.function[self.index]
         self.entity.extrapolate = self.extrapolate
         self.entity.N = self.N
         self.entity.X = [x.value for x in self.X]
@@ -364,7 +364,7 @@ class ChebychevOperator(Base):
     upper_bound = bpy.props.FloatProperty(name="Upper bound", description="", min=-9.9e10, max=9.9e10, precision=6)
     extrapolate = bpy.props.BoolProperty(name="Extrapolate")
     N = bpy.props.IntProperty(name="Number of points", min=2, max=50, description="")
-    C = bpy.props.CollectionProperty(name="Coefficients", type = Props.Floats)
+    C = bpy.props.CollectionProperty(name="Coefficients", type = BPY.Floats)
     @classmethod
     def poll(cls, context):
         return True
@@ -388,7 +388,7 @@ class ChebychevOperator(Base):
         for i, value in enumerate(self.entity.C):
             self.C[i].value = value
     def store(self, context):
-        self.entity = database.function[context.scene.function_index]
+        self.entity = database.function[self.index]
         self.entity.lower_bound = self.lower_bound
         self.entity.upper_bound = self.upper_bound
         self.entity.extrapolate = self.extrapolate
@@ -433,7 +433,7 @@ class BinaryOperator(Base):
         self.f1_name = self.entity.links[0].name
         self.f2_name = self.entity.links[1].name
     def store(self, context):
-        self.entity = database.function[context.scene.function_index]
+        self.entity = database.function[self.index]
         self.entity.unlink_all()
         self.link_function(context, self.f1_name, self.f1_edit)
         self.link_function(context, self.f2_name, self.f2_edit)

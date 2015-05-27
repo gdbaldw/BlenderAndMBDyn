@@ -68,7 +68,7 @@ for t in types:
         def assign(self, context):
             self.entity = database.ns_node[context.scene.ns_node_index]
         def store(self, context):
-            self.entity = database.ns_node[context.scene.ns_node_index]
+            self.entity = database.ns_node[self.index]
         def create_entity(self):
             return Entity(self.name)
     klasses[t] = Tester

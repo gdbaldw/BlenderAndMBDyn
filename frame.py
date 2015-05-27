@@ -77,7 +77,7 @@ for t in types:
         def assign(self, context):
             self.entity = database.frame[context.scene.frame_index]
         def store(self, context):
-            self.entity = database.frame[context.scene.frame_index]
+            self.entity = database.frame[self.index]
         def create_entity(self):
             return Entity(self.name)
     klasses[t] = Tester
@@ -125,7 +125,7 @@ class FrameOperator(Base):
         self.linear_velocity_name = self.entity.links[0].name
         self.angular_velocity_name = self.entity.links[1].name
     def store(self, context):
-        self.entity = database.frame[context.scene.frame_index]
+        self.entity = database.frame[self.index]
         self.entity.objects = SelectedObjects(context)
         self.entity.unlink_all()
         self.link_matrix(context, self.linear_velocity_name, self.linear_velocity_edit)

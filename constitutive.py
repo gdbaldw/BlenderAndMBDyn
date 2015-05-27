@@ -28,7 +28,7 @@ if "bpy" in locals():
     imp.reload(Operator)
     imp.reload(Entity)
 else:
-    from .base import bpy, root_dot, database, Operator, Entity, Bundle, Props, enum_drive, enum_function, enum_matrix_3x1, enum_matrix_6x1, enum_matrix_3x3, enum_matrix_6x6, enum_matrix_6xN 
+    from .base import bpy, root_dot, database, Operator, Entity, Bundle, BPY, enum_drive, enum_function, enum_matrix_3x1, enum_matrix_6x1, enum_matrix_3x3, enum_matrix_6x6, enum_matrix_6xN 
 
 types = [
     "Linear elastic",
@@ -103,7 +103,7 @@ for t in types:
         def assign(self, context):
             self.entity = database.constitutive[context.scene.constitutive_index]
         def store(self, context):
-            self.entity = database.constitutive[context.scene.constitutive_index]
+            self.entity = database.constitutive[self.index]
         def create_entity(self):
             return Entity(self.name)
     klasses[t] = Tester
@@ -129,7 +129,7 @@ class LinearElasticOperator(Base):
         self.stiffness = self.entity.stiffness
         self.dimensions = self.entity.dimensions
     def store(self, context):
-        self.entity = database.constitutive[context.scene.constitutive_index]
+        self.entity = database.constitutive[self.index]
         self.entity.stiffness = self.stiffness
         self.entity.dimensions = self.dimensions
     def draw(self, context):
@@ -172,7 +172,7 @@ class LinearElasticGenericOperator(Base):
         else:
             self.stiffness_matrix_6x6_name = self.entity.links[0].name
     def store(self, context):
-        self.entity = database.constitutive[context.scene.constitutive_index]
+        self.entity = database.constitutive[self.index]
         self.entity.dimensions = self.dimensions
         if self.dimensions == "1D":
             self.entity.stiffness = self.stiffness
@@ -222,7 +222,7 @@ class LinearElasticGenericAxialTorsionCouplingOperator(Base):
         self.coupling_coefficient = self.entity.coupling_coefficient
         self.stiffness_matrix_6x1_name = self.entity.links[0].name
     def store(self, context):
-        self.entity = database.constitutive[context.scene.constitutive_index]
+        self.entity = database.constitutive[self.index]
         self.entity.dimensions = self.dimensions
         self.entity.coupling_coefficient = self.coupling_coefficient
         self.entity.unlink_all()
@@ -282,7 +282,7 @@ class CubicElasticGenericOperator(Base):
             self.stiffness_matrix_3x1_2_name = self.entity.links[1].name
             self.stiffness_matrix_3x1_3_name = self.entity.links[2].name
     def store(self, context):
-        self.entity = database.constitutive[context.scene.constitutive_index]
+        self.entity = database.constitutive[self.index]
         self.entity.dimensions = self.dimensions
         if self.dimensions == "1D":
             self.entity.stiffness_1 = self.stiffness_1
@@ -333,7 +333,7 @@ class InverseSquareElasticOperator(Base):
         self.ref_length = self.entity.ref_length
         self.dimensions = self.entity.dimensions
     def store(self, context):
-        self.entity = database.constitutive[context.scene.constitutive_index]
+        self.entity = database.constitutive[self.index]
         self.entity.stiffness = self.stiffness
         self.entity.ref_length = self.ref_length
         self.entity.dimensions = self.dimensions
@@ -365,7 +365,7 @@ class LogElasticOperator(Base):
         self.stiffness = self.entity.stiffness
         self.dimensions = self.entity.dimensions
     def store(self, context):
-        self.entity = database.constitutive[context.scene.constitutive_index]
+        self.entity = database.constitutive[self.index]
         self.entity.stiffness = self.stiffness
         self.entity.dimensions = self.dimensions
     def draw(self, context):
@@ -422,7 +422,7 @@ class LinearElasticBistopOperator(Base):
         else:
             self.stiffness_matrix_6x6_name = self.entity.links[2].name
     def store(self, context):
-        self.entity = database.constitutive[context.scene.constitutive_index]
+        self.entity = database.constitutive[self.index]
         self.entity.dimensions = self.dimensions
         self.entity.initial_status = self.initial_status
         self.entity.unlink_all()
@@ -499,7 +499,7 @@ class DoubleLinearElasticOperator(Base):
             self.stiffness_matrix_3x1_1_name = self.entity.links[0].name
             self.stiffness_matrix_3x1_2_name = self.entity.links[1].name
     def store(self, context):
-        self.entity = database.constitutive[context.scene.constitutive_index]
+        self.entity = database.constitutive[self.index]
         self.entity.dimensions = self.dimensions
         self.entity.upper_strain = self.upper_strain
         self.entity.lower_strain = self.lower_strain
@@ -575,7 +575,7 @@ class IsotropicHardeningElasticOperator(Base):
         else:
             self.stiffness_matrix_6x6_name = self.entity.links[0].name
     def store(self, context):
-        self.entity = database.constitutive[context.scene.constitutive_index]
+        self.entity = database.constitutive[self.index]
         self.entity.dimensions = self.dimensions
         self.entity.reference_strain = self.reference_strain
         self.entity.use_linear_stiffness = self.use_linear_stiffness
@@ -632,7 +632,7 @@ class ScalarFunctionElasticIsotropicOperator(Base):
         self.dimensions = self.entity.dimensions
         self.function_name = self.entity.links[0].name
     def store(self, context):
-        self.entity = database.constitutive[context.scene.constitutive_index]
+        self.entity = database.constitutive[self.index]
         self.entity.dimensions = self.dimensions
         self.entity.unlink_all()
         self.link_function(context, self.function_name, self.function_edit)
@@ -662,7 +662,7 @@ class ScalarFunctionElasticOrthotropicOperator(Base):
     bl_label = "Scalar function elastic orthotropic"
     dimensions = bpy.props.EnumProperty(items=[("1D", "1D", ""), ("3D", "3D", ""), ("6D", "6D", "")], name="Dimension(s)")
     is_null = bpy.props.BoolVectorProperty(size=6, name="Null")
-    function_names = bpy.props.CollectionProperty(type = Props.FunctionNames, name="Functions")
+    function_names = bpy.props.CollectionProperty(type = BPY.FunctionNames, name="Functions")
     @classmethod
     def poll(cls, context):
         return True
@@ -679,7 +679,7 @@ class ScalarFunctionElasticOrthotropicOperator(Base):
         for i, link in enumerate(self.entity.links):
             self.function_names[i].value = link.name
     def store(self, context):
-        self.entity = database.constitutive[context.scene.constitutive_index]
+        self.entity = database.constitutive[self.index]
         self.entity.dimensions = self.dimensions
         self.entity.is_null = [v for v in self.is_null]
         self.entity.unlink_all()
@@ -724,7 +724,7 @@ class LinearViscousOperator(Base):
         self.viscosity = self.entity.viscosity
         self.dimensions = self.entity.dimensions
     def store(self, context):
-        self.entity = database.constitutive[context.scene.constitutive_index]
+        self.entity = database.constitutive[self.index]
         self.entity.viscosity = self.viscosity
         self.entity.dimensions = self.dimensions
     def draw(self, context):
@@ -767,7 +767,7 @@ class LinearViscousGenericOperator(Base):
         else:
             self.viscosity_matrix_6x6_name = self.entity.links[0].name
     def store(self, context):
-        self.entity = database.constitutive[context.scene.constitutive_index]
+        self.entity = database.constitutive[self.index]
         self.entity.dimensions = self.dimensions
         if self.dimensions == "1D":
             self.entity.viscosity = self.viscosity
@@ -831,7 +831,7 @@ class LinearViscoelasticOperator(Base):
         self.factor = self.entity.factor
         self.viscosity = self.entity.viscosity
     def store(self, context):
-        self.entity = database.constitutive[context.scene.constitutive_index]
+        self.entity = database.constitutive[self.index]
         self.entity.dimensions = self.dimensions
         self.entity.stiffness = self.stiffness
         self.entity.proportional = self.proportional
@@ -911,7 +911,7 @@ class LinearViscoelasticGenericOperator(Base):
             if not self.proportional:
                 self.viscosity_matrix_6x6_name = self.entity.links[1].name
     def store(self, context):
-        self.entity = database.constitutive[context.scene.constitutive_index]
+        self.entity = database.constitutive[self.index]
         self.entity.dimensions = self.dimensions
         self.entity.proportional = self.proportional
         self.entity.factor = self.factor
@@ -1022,7 +1022,7 @@ class LinearTimeVariantViscoelasticGenericOperator(Base):
             if not self.proportional:
                 self.viscosity_matrix_6x6_name = self.entity.links[3].name
     def store(self, context):
-        self.entity = database.constitutive[context.scene.constitutive_index]
+        self.entity = database.constitutive[self.index]
         self.entity.dimensions = self.dimensions
         self.entity.proportional = self.proportional
         self.entity.factor = self.factor
@@ -1112,7 +1112,7 @@ class LinearViscoelasticGenericAxialTorsionCouplingOperator(Base):
         if not self.proportional:
             self.stiffness_matrix_6x1_name = self.entity.links[1].name
     def store(self, context):
-        self.entity = database.constitutive[context.scene.constitutive_index]
+        self.entity = database.constitutive[self.index]
         self.entity.dimensions = self.dimensions
         self.entity.coupling_coefficient = self.coupling_coefficient
         self.entity.proportional = self.proportional
@@ -1190,7 +1190,7 @@ class CubicViscoelasticGenericOperator(Base):
             self.stiffness_matrix_3x1_3_name = self.entity.links[2].name
             self.viscosity_matrix_3x1_name = self.entity.links[3].name
     def store(self, context):
-        self.entity = database.constitutive[context.scene.constitutive_index]
+        self.entity = database.constitutive[self.index]
         self.entity.dimensions = self.dimensions
         if self.dimensions == "1D":
             self.entity.stiffness_1 = self.stiffness_1
@@ -1289,7 +1289,7 @@ class DoubleLinearViscoelasticOperator(Base):
             if self.second_damping:
                 self.viscosity_matrix_3x1_2_name = self.entity.links[3].name
     def store(self, context):
-        self.entity = database.constitutive[context.scene.constitutive_index]
+        self.entity = database.constitutive[self.index]
         self.entity.dimensions = self.dimensions
         self.entity.upper_strain = self.upper_strain
         self.entity.lower_strain = self.lower_strain
@@ -1374,7 +1374,7 @@ class TurbulentViscoelasticOperator(Base):
         self.use_linear_viscosity = self.entity.use_linear_viscosity
         self.linear_viscosity = self.entity.linear_viscosity
     def store(self, context):
-        self.entity = database.constitutive[context.scene.constitutive_index]
+        self.entity = database.constitutive[self.index]
         self.entity.dimensions = self.dimensions
         self.entity.stiffness = self.stiffness
         self.entity.parabolic_viscosity = self.parabolic_viscosity
@@ -1454,7 +1454,7 @@ class LinearViscoelasticBistopOperator(Base):
             self.stiffness_matrix_6x6_name = self.entity.links[2].name
             self.viscosity_matrix_6x6_name = self.entity.links[3].name
     def store(self, context):
-        self.entity = database.constitutive[context.scene.constitutive_index]
+        self.entity = database.constitutive[self.index]
         self.entity.dimensions = self.dimensions
         self.entity.initial_status = self.initial_status
         self.entity.unlink_all()

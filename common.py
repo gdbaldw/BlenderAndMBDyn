@@ -76,6 +76,19 @@ structural_static_types = aerodynamic_types + joint_types + ["Rotor"] + beam_typ
 
 structural_dynamic_types = rigid_body_types
 
+method_types = [
+    "Crank Nicolson",
+    "ms",
+    "Hope",
+    "Third order",
+    "bdf",
+    "Implicit Euler"]
+
+nonlinear_solver_types = [
+    "Newton Raphston",
+    "Line search",
+    "Matrix free"]
+
 class Common:
     def round_vector(self, v):
         for i in range(3):
@@ -111,47 +124,11 @@ class Common:
                 text.write(o_label+', ')
             text.write('matr,\n')
             self.rotationMatrix_write(rot_i*rotT, text, '\t\t\t\t')
-    def rigid_offset(self, i):
-        if self.objects[i] in self.database.node:
-            ob = self.objects[i]
-        elif self.objects[i] in self.database.rigid_dict:
-            ob = self.database.rigid_dict[self.objects[i]]
-        else:
-            name = self.objects[i].name
-            bpy.context.window_manager.popup_menu(lambda self, c: self.layout.label(
-                "Object " + name + " is not associated with a Node"),
-                title="MBDyn Error", icon='ERROR')
-            raise Exception("***Model Error: Object " + name + " is not associated with a Node")
-        rot = ob.matrix_world.to_quaternion().to_matrix()
-        globalV = self.objects[i].matrix_world.translation - ob.matrix_world.translation
-        return rot, globalV, self.database.node.index(ob)
-    def write_hinge(self, text, name, V1=True, V2=True, M1=True, M2=True):
-        rot_0, globalV_0, Node_0 = self.rigid_offset(0)
-        localV_0 = rot_0*globalV_0
-        rot_1, globalV_1, Node_1 = self.rigid_offset(1)
-        to_hinge = rot_1*(globalV_1 + self.objects[0].matrix_world.translation - self.objects[1].matrix_world.translation)
-        rotT = self.objects[0].matrix_world.to_quaternion().to_matrix().transposed()
-        text.write(
-        '\tjoint: '+str(self.database.element.index(self))+', '+name+',\n'+
-        '\t\t'+str(Node_0))
-        if V1:
-            text.write(', ')
-            self.locationVector_write(localV_0, text)
-        if M1:
-            text.write(',\n\t\t\thinge, matr,\n')
-            self.rotationMatrix_write(rot_0*rotT, text, '\t\t\t\t')
-        text.write(', \n\t\t'+str(Node_1))
-        if V2:
-            text.write(', ')
-            self.locationVector_write(to_hinge, text)
-        if M2:
-            text.write(',\n\t\t\thinge, matr,\n')
-            self.rotationMatrix_write(rot_1*rotT, text, '\t\t\t\t')
 
 def subsurf(obj):
-    if not [m for m in obj.modifiers if m.type == 'SUBSURF']:
-        obj.modifiers.new("Subsurf", 'SUBSURF')
-        obj.modifiers["Subsurf"].levels = 3
+    subsurf = [m for m in obj.modifiers if m.type == 'SUBSURF']
+    subsurf = subsurf[0] if subsurf else obj.modifiers.new("Subsurf", 'SUBSURF')
+    subsurf.levels = 3
 
 def Ellipsoid(obj, mass, mat):
     if mat.subtype == "eye":

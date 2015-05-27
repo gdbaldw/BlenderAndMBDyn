@@ -64,7 +64,7 @@ for t in types:
         def assign(self, context):
             self.entity = database.driver[context.scene.driver_index]
         def store(self, context):
-            self.entity = database.driver[context.scene.driver_index]
+            self.entity = database.driver[self.index]
         def create_entity(self):
             return Entity(self.name)
     klasses[t] = Tester

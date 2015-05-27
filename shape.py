@@ -68,7 +68,7 @@ for t in types:
         def assign(self, context):
             self.entity = database.shape[context.scene.shape_index]
         def store(self, context):
-            self.entity = database.shape[context.scene.shape_index]
+            self.entity = database.shape[self.index]
         def create_entity(self):
             return Entity(self.name)
     klasses[t] = Tester

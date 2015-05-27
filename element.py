@@ -40,15 +40,15 @@ types = aerodynamic_types + beam_types + ["Body"] + force_types + genel_types + 
 
 tree = ["Add Element",
     ["Aerodynamic", aerodynamic_types,
-    ],["Beam", beam_types,
-    ],["Body",
-    ],["Force", force_types,
-    ],["GENEL", genel_types,
-    ],["Joint", joint_types,
-    ],["Rotor",
-    ],["Environment", environment_types,
-    ],["Driven",
-    ],["Node", node_types,
+    "Beam", beam_types,
+    "Body",
+    "Force", force_types,
+    "GENEL", genel_types,
+    "Joint", joint_types,
+    "Rotor",
+    "Environment", environment_types,
+    "Driven",
+    "Node", node_types,
     ]]
 
 class Base(Operator):
@@ -66,7 +66,7 @@ class Base(Operator):
     def assign(self, context):
         self.entity = database.element[context.scene.element_index]
     def store(self, context):
-        self.entity = database.element[context.scene.element_index]
+        self.entity = database.element[self.index]
         self.entity.objects = SelectedObjects(context)
     @classmethod
     def make_list(self, ListItem):
@@ -106,7 +106,7 @@ for t in types:
         def assign(self, context):
             self.entity = database.element[context.scene.element_index]
         def store(self, context):
-            self.entity = database.element[context.scene.element_index]
+            self.entity = database.element[self.index]
         def create_entity(self):
             return Entity(self.name)
     klasses[t] = Tester
@@ -136,6 +136,9 @@ class StructuralForce(Entity):
         RhombicPyramid(self.objects[0])
 
 class ForceBase(Base):
+    orientation = bpy.props.EnumProperty(items=[("follower", "Follower", ""), ("absolute", "Absolute", "")], name="Orientation")
+    drive_name = bpy.props.EnumProperty(items=enum_drive, name="Drive")
+    drive_edit = bpy.props.BoolProperty(name="")
     def defaults(self, context):
         self.orientation = "follower"
         self.drive_exists(context)
@@ -144,7 +147,7 @@ class ForceBase(Base):
         self.orientation = self.entity.orientation
         self.drive_name = self.entity.links[0].name
     def store(self, context):
-        self.entity = database.element[context.scene.element_index]
+        self.entity = database.element[self.index]
         self.entity.objects = SelectedObjects(context)
         self.entity.orientation = self.orientation
         self.entity.unlink_all()
@@ -155,18 +158,15 @@ class ForceBase(Base):
         layout.prop(self, "orientation")
         self.draw_link(layout, "drive_name", "drive_edit")
 
-class StructuralForceBase(ForceBase):
+class StructuralForceOperator(ForceBase):
     bl_label = "Structural force"
-    orientation = bpy.props.EnumProperty(items=[("follower", "Follower", ""), ("absolute", "Absolute", "")], name="Force orientation")
-    drive_name = bpy.props.EnumProperty(items=enum_drive, name="Drive")
-    drive_edit = bpy.props.BoolProperty(name="")
     @classmethod
     def poll(cls, context):
         return super().base_poll(cls, context, 1)
     def create_entity(self):
         return StructuralForce(self.name)
 
-klasses[StructuralForceBase.bl_label] = StructuralForceBase
+klasses[StructuralForceOperator.bl_label] = StructuralForceOperator
 
 class StructuralInternalForce(Entity):
     def write(self, text):
@@ -192,18 +192,15 @@ class StructuralInternalForce(Entity):
     def remesh(self):
         RhombicPyramid(self.objects[0])
 
-class StructuralInternalForceBase(ForceBase):
+class StructuralInternalForceOperator(ForceBase):
     bl_label = "Structural internal force"
-    orientation = bpy.props.EnumProperty(items=[("follower", "Follower", ""), ("absolute", "Absolute", "")], name="Force orientation")
-    drive_name = bpy.props.EnumProperty(items=enum_drive, name="Drive")
-    drive_edit = bpy.props.BoolProperty(name="")
     @classmethod
     def poll(cls, context):
         return super().base_poll(cls, context, 2)
     def create_entity(self):
         return StructuralInternalForce(self.name)
 
-klasses[StructuralInternalForceBase.bl_label] = StructuralInternalForceBase
+klasses[StructuralInternalForceOperator.bl_label] = StructuralInternalForceOperator
 
 class StructuralCouple(Entity):
     def write(self, text):
@@ -225,9 +222,6 @@ class StructuralCouple(Entity):
 
 class StructuralCoupleOperator(ForceBase):
     bl_label = "Structural couple"
-    orientation = bpy.props.EnumProperty(items=[("follower", "Follower", ""), ("absolute", "Absolute", "")], name="Force orientation")
-    drive_name = bpy.props.EnumProperty(items=enum_drive, name="Drive")
-    drive_edit = bpy.props.BoolProperty(name="")
     @classmethod
     def poll(cls, context):
         return super().base_poll(cls, context, 1)
@@ -257,9 +251,6 @@ class StructuralInternalCouple(Entity):
 
 class StructuralInternalCoupleOperator(ForceBase):
     bl_label = "Structural internal couple"
-    orientation = bpy.props.EnumProperty(items=[("follower", "Follower", ""), ("absolute", "Absolute", "")], name="Couple orientation")
-    drive_name = bpy.props.EnumProperty(items=enum_drive, name="Drive")
-    drive_edit = bpy.props.BoolProperty(name="")
     @classmethod
     def poll(cls, context):
         return super().base_poll(cls, context, 2)
@@ -288,7 +279,7 @@ class AxialRotationOperator(Base):
         self.entity = database.element[context.scene.element_index]
         self.drive_name = self.entity.links[0].name
     def store(self, context):
-        self.entity = database.element[context.scene.element_index]
+        self.entity = database.element[self.index]
         self.entity.objects = SelectedObjects(context)
         self.entity.unlink_all()
         self.link_drive(context, self.drive_name, self.drive_edit)
@@ -331,7 +322,7 @@ class ConstitutiveBase(Base):
         self.entity = database.element[context.scene.element_index]
         self.constitutive_name = self.entity.links[0].name
     def store(self, context):
-        self.entity = database.element[context.scene.element_index]
+        self.entity = database.element[self.index]
         self.entity.objects = SelectedObjects(context)
         self.entity.unlink_all()
         self.link_constitutive(context, self.constitutive_name, self.constitutive_edit)
@@ -424,7 +415,7 @@ class DistanceOperator(Base):
         if self.entity.links:
             self.drive_name = self.entity.links[0].name
     def store(self, context):
-        self.entity = database.element[context.scene.element_index]
+        self.entity = database.element[self.index]
         self.entity.objects = SelectedObjects(context)
         self.entity.from_nodes = self.from_nodes
         if not self.from_nodes:
@@ -541,7 +532,7 @@ class RevoluteHingeOperator(Base):
         self.enable_preload = self.entity.enable_preload
         self.preload = self.entity.preload
     def store(self, context):
-        self.entity = database.element[context.scene.element_index]
+        self.entity = database.element[self.index]
         self.entity.objects = SelectedObjects(context)
         self.entity.enable_theta = self.enable_theta
         self.entity.theta = self.theta
@@ -651,7 +642,7 @@ class TotalJoint(Entity):
             else:
                 text.write(", inactive")
         text.write(", component")
-        database.indent_drives += 2
+        super().indent_drives += 2
         for i, b in enumerate([self.displacement_x, self.displacement_y, self.displacement_z]):
             if b:
                 text.write(",\n"+self.links[i].string(True))
@@ -669,7 +660,7 @@ class TotalJoint(Entity):
                 text.write(",\n"+self.links[3+i].string(True))
             else:
                 text.write(",\n\t\t\t\tinactive")
-        database.indent_drives -= 2
+        super().indent_drives -= 2
         text.write(";\n")
     def remesh(self):
         Sphere(self.objects[0])
@@ -723,7 +714,7 @@ class TotalJointOperator(Base):
         self.angular_displacement_y_drive_name = self.entity.links[4].name
         self.angular_displacement_z_drive_name = self.entity.links[5].name
     def store(self, context):
-        self.entity = database.element[context.scene.element_index]
+        self.entity = database.element[self.index]
         self.entity.objects = SelectedObjects(context)
         self.entity.first = self.first
         self.entity.displacement_x = self.displacement_x
@@ -805,7 +796,7 @@ class BodyOperator(Base):
         self.mass = self.entity.mass
         self.matrix_name = self.entity.links[0].name
     def store(self, context):
-        self.entity = database.element[context.scene.element_index]
+        self.entity = database.element[self.index]
         self.entity.objects = SelectedObjects(context)
         self.entity.mass = self.mass
         self.entity.unlink_all()
@@ -893,7 +884,7 @@ class GravityOperator(Base):
         self.matrix_name = self.entity.links[0].name
         self.drive_name = self.entity.links[1].name
     def store(self, context):
-        self.entity = database.element[context.scene.element_index]
+        self.entity = database.element[self.index]
         self.entity.unlink_all()
         self.link_matrix(context, self.matrix_name, self.matrix_edit)
         self.link_drive(context, self.drive_name, self.drive_edit)

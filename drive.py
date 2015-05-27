@@ -28,7 +28,7 @@ if "bpy" in locals():
     imp.reload(Operator)
     imp.reload(Entity)
 else:
-    from .base import bpy, root_dot, database, Operator, Entity, Bundle, Props, enum_drive, enum_element, SelectedObjects
+    from .base import bpy, root_dot, database, Operator, Entity, Bundle, BPY, enum_drive, enum_element, SelectedObjects
 
 types = [
     "Array drive",
@@ -95,14 +95,14 @@ for t in types:
         def assign(self, context):
             self.entity = database.drive[context.scene.drive_index]
         def store(self, context):
-            self.entity = database.drive[context.scene.drive_index]
+            self.entity = database.drive[self.index]
         def create_entity(self):
             return Entity(self.name)
     klasses[t] = DefaultOperator
 
 class NullDrive(Entity):
     def string(self, indent=False):
-        ret = database.indent_drives*"\t" if indent else ""
+        ret = super().indent_drives*"\t" if indent else ""
         ret += "null"
         return ret
 
@@ -115,7 +115,7 @@ class DriveOperator(Base):
     def assign(self, context):
         self.entity = database.drive[context.scene.drive_index]
     def store(self, context):
-        self.entity = database.drive[context.scene.drive_index]
+        self.entity = database.drive[self.index]
 
 class NullDriveOperator(DriveOperator):
     bl_label = "Null drive"
@@ -126,7 +126,7 @@ klasses[NullDriveOperator.bl_label] = NullDriveOperator
 
 class DirectDrive(Entity):
     def string(self, indent=False):
-        ret = database.indent_drives*"\t" if indent else ""
+        ret = super().indent_drives*"\t" if indent else ""
         ret += "direct"
         return ret
 
@@ -139,7 +139,7 @@ klasses[DirectDriveOperator.bl_label] = DirectDriveOperator
 
 class UnitDrive(Entity):
     def string(self, indent=False):
-        ret = database.indent_drives*"\t" if indent else ""
+        ret = super().indent_drives*"\t" if indent else ""
         ret += "unit"
         return ret
 
@@ -152,7 +152,7 @@ klasses[UnitDriveOperator.bl_label] = UnitDriveOperator
 
 class ConstantDrive(Entity):
     def string(self, indent=False):
-        ret = database.indent_drives*"\t" if indent else ""
+        ret = super().indent_drives*"\t" if indent else ""
         ret += str(round(self.constant, 5))
         return ret
 
@@ -168,7 +168,7 @@ class ConstantDriveOperator(Base):
         self.entity = database.drive[context.scene.drive_index]
         self.constant = self.entity.constant
     def store(self, context):
-        self.entity = database.drive[context.scene.drive_index]
+        self.entity = database.drive[self.index]
         self.entity.constant = self.constant
     def create_entity(self):
         return ConstantDrive(self.name)
@@ -177,7 +177,7 @@ klasses[ConstantDriveOperator.bl_label] = ConstantDriveOperator
 
 class TimeDrive(Entity):
     def string(self, indent=False):
-        ret = database.indent_drives*"\t" if indent else ""
+        ret = super().indent_drives*"\t" if indent else ""
         ret += "time"
         return ret
 
@@ -190,7 +190,7 @@ klasses[TimeDriveOperator.bl_label] = TimeDriveOperator
 
 class LinearDrive(Entity):
     def string(self, indent=False):
-        ret = database.indent_drives*"\t" if indent else ""
+        ret = super().indent_drives*"\t" if indent else ""
         ret += "cubic"
         for v in [self.constant, self.linear]:
             ret += ", " + str(v)
@@ -211,7 +211,7 @@ class LinearDriveOperator(Base):
         self.constant = self.entity.constant
         self.linear = self.entity.linear
     def store(self, context):
-        self.entity = database.drive[context.scene.drive_index]
+        self.entity = database.drive[self.index]
         self.entity.constant = self.constant
         self.entity.linear = self.linear
     def draw(self, context):
@@ -225,7 +225,7 @@ klasses[LinearDriveOperator.bl_label] = LinearDriveOperator
 
 class ParabolicDrive(Entity):
     def string(self, indent=False):
-        ret = database.indent_drives*"\t" if indent else ""
+        ret = super().indent_drives*"\t" if indent else ""
         ret += "parabolic"
         for v in [self.constant, self.linear, self.parabolic]:
             ret += ", " + str(v)
@@ -249,7 +249,7 @@ class ParabolicDriveOperator(Base):
         self.linear = self.entity.linear
         self.parabolic = self.entity.parabolic
     def store(self, context):
-        self.entity = database.drive[context.scene.drive_index]
+        self.entity = database.drive[self.index]
         self.entity.constant = self.constant
         self.entity.linear = self.linear
         self.entity.parabolic = self.parabolic
@@ -265,7 +265,7 @@ klasses[ParabolicDriveOperator.bl_label] = ParabolicDriveOperator
 
 class CubicDrive(Entity):
     def string(self, indent=False):
-        ret = database.indent_drives*"\t" if indent else ""
+        ret = super().indent_drives*"\t" if indent else ""
         ret += "cubic"
         for v in [self.constant, self.linear, self.parabolic, self.cubic]:
             ret += ", " + str(v)
@@ -292,7 +292,7 @@ class CubicDriveOperator(Base):
         self.parabolic = self.entity.parabolic
         self.cubic = self.entity.cubic
     def store(self, context):
-        self.entity = database.drive[context.scene.drive_index]
+        self.entity = database.drive[self.index]
         self.entity.constant = self.constant
         self.entity.linear = self.linear
         self.entity.parabolic = self.parabolic
@@ -310,7 +310,7 @@ klasses[CubicDriveOperator.bl_label] = CubicDriveOperator
 
 class StepDrive(Entity):
     def string(self, indent=False):
-        ret = database.indent_drives*"\t" if indent else ""
+        ret = super().indent_drives*"\t" if indent else ""
         ret += "step"
         for v in [self.initial_time, self.step_value, self.initial_value]:
             ret += ", " + str(v)
@@ -334,7 +334,7 @@ class StepDriveOperator(Base):
         self.step_value = self.entity.step_value
         self.initial_value = self.entity.initial_value
     def store(self, context):
-        self.entity = database.drive[context.scene.drive_index]
+        self.entity = database.drive[self.index]
         self.entity.initial_time = self.initial_time
         self.entity.step_value = self.step_value
         self.entity.initial_value = self.initial_value
@@ -350,7 +350,7 @@ klasses[StepDriveOperator.bl_label] = StepDriveOperator
 
 class DoubleStepDrive(Entity):
     def string(self, indent=False):
-        ret = database.indent_drives*"\t" if indent else ""
+        ret = super().indent_drives*"\t" if indent else ""
         ret += "double step"
         for v in [self.initial_time, self.final_time, self.step_value, self.initial_value]:
             ret += ", " + str(v)
@@ -377,7 +377,7 @@ class DoubleStepDriveOperator(Base):
         self.step_value = self.entity.step_value
         self.initial_value = self.entity.initial_value
     def store(self, context):
-        self.entity = database.drive[context.scene.drive_index]
+        self.entity = database.drive[self.index]
         self.entity.initial_time = self.initial_time
         self.entity.final_time = self.final_time
         self.entity.step_value = self.step_value
@@ -395,7 +395,7 @@ klasses[DoubleStepDriveOperator.bl_label] = DoubleStepDriveOperator
 
 class RampDrive(Entity):
     def string(self, indent=False):
-        ret = database.indent_drives*"\t" if indent else ""
+        ret = super().indent_drives*"\t" if indent else ""
         ret += "ramp"
         for v in [self.slope, self.initial_time]:
             ret += ", " + str(v)
@@ -430,7 +430,7 @@ class RampDriveOperator(Base):
         self.final_time = self.entity.final_time
         self.initial_value = self.entity.initial_value
     def store(self, context):
-        self.entity = database.drive[context.scene.drive_index]
+        self.entity = database.drive[self.index]
         self.entity.slope = self.slope
         self.entity.initial_time = self.initial_time
         self.entity.forever = self.forever
@@ -454,17 +454,17 @@ klasses[RampDriveOperator.bl_label] = RampDriveOperator
 
 class PiecewiseLinearDrive(Entity):
     def string(self, indent=False):
-        ret = database.indent_drives*"\t" if indent else ""
+        ret = super().indent_drives*"\t" if indent else ""
         ret += "piecewise linear, "+str(self.N)
         for i in range(self.N):
-            ret += ",\n"+database.indent_drives*"\t" + str(self.T[i]) + ", " + str(self.X[i])
+            ret += ",\n"+super().indent_drives*"\t" + str(self.T[i]) + ", " + str(self.X[i])
         return ret
 
 class PiecewiseLinearDriveOperator(Base):
     bl_label = "Piecewise linear drive"
     N = bpy.props.IntProperty(name="Number of points", min=2, max=50, description="")
-    T = bpy.props.CollectionProperty(name="Times", type = Props.Floats)
-    X = bpy.props.CollectionProperty(name="Values", type = Props.Floats)
+    T = bpy.props.CollectionProperty(name="Times", type = BPY.Floats)
+    X = bpy.props.CollectionProperty(name="Values", type = BPY.Floats)
     @classmethod
     def poll(cls, context):
         return True
@@ -488,7 +488,7 @@ class PiecewiseLinearDriveOperator(Base):
         for i, value in enumerate(self.entity.X):
             self.X[i].value = value
     def store(self, context):
-        self.entity = database.drive[context.scene.drive_index]
+        self.entity = database.drive[self.index]
         self.entity.N = self.N
         self.entity.T = [t.value for t in self.T]
         self.entity.X = [x.value for x in self.X]
@@ -512,7 +512,7 @@ klasses[PiecewiseLinearDriveOperator.bl_label] = PiecewiseLinearDriveOperator
 
 class SineDrive(Entity):
     def string(self, indent=False):
-        ret = database.indent_drives*"\t" if indent else ""
+        ret = super().indent_drives*"\t" if indent else ""
         ret += "sine"
         for v in [self.initial_time, self.omega, self.amplitude]:
             ret += ", " + str(v)
@@ -549,7 +549,7 @@ class PeriodicDriveOperator(Base):
         self.initial_value = self.entity.initial_value
         self.duration = self.entity.duration
     def store(self, context):
-        self.entity = database.drive[context.scene.drive_index]
+        self.entity = database.drive[self.index]
         self.entity.initial_time = self.initial_time
         self.entity.omega = self.omega
         self.entity.amplitude = self.amplitude
@@ -580,7 +580,7 @@ klasses[SineDriveOperator.bl_label] = SineDriveOperator
 
 class CosineDrive(Entity):
     def string(self, indent=False):
-        ret = database.indent_drives*"\t" if indent else ""
+        ret = super().indent_drives*"\t" if indent else ""
         ret += "cosine"
         for v in [self.initial_time, self.omega, self.amplitude]:
             ret += ", " + str(v)
@@ -600,7 +600,7 @@ klasses[CosineDriveOperator.bl_label] = CosineDriveOperator
 
 class TanhDrive(Entity):
     def string(self, indent=False):
-        ret = database.indent_drives*"\t" if indent else ""
+        ret = super().indent_drives*"\t" if indent else ""
         ret += "tanh"
         for v in [self.initial_time, self.amplitude, self.slope, self.initial_value]:
             ret += ", " + str(v)
@@ -627,7 +627,7 @@ class TanhDriveOperator(Base):
         self.slope = self.entity.slope
         self.initial_value = self.entity.initial_value
     def store(self, context):
-        self.entity = database.drive[context.scene.drive_index]
+        self.entity = database.drive[self.index]
         self.entity.initial_time = self.initial_time
         self.entity.amplitude = self.amplitude
         self.entity.slope = self.slope
@@ -645,9 +645,9 @@ klasses[TanhDriveOperator.bl_label] = TanhDriveOperator
 
 class FourierSeriesDrive(Entity):
     def string(self, indent=False):
-        ret = database.indent_drives*"\t" if indent else ""
+        ret = super().indent_drives*"\t" if indent else ""
         ret += "fourier series"
-        indenture = database.indent_drives*"\t"
+        indenture = super().indent_drives*"\t"
         for v in [self.initial_time, self.omega, self.N]:
             ret += ", " + str(v)
         ret += ",\n" + indenture + str(self.A[0])
@@ -668,8 +668,8 @@ class FourierSeriesDriveOperator(Base):
     cycles = bpy.props.IntProperty(name="Cycles", description="Number of full cycles")
     duration = bpy.props.EnumProperty(items=[("cycles", "N-cycles", ""), ("one", "Full cycle", ""), ("forever", "Infinite cycle", "")])
     initial_value = bpy.props.FloatProperty(name="Initial value", description="", min=-9.9e10, max=9.9e10, precision=6)
-    A = bpy.props.CollectionProperty(name="A values", type = Props.Floats)
-    B = bpy.props.CollectionProperty(name="B values", type = Props.Floats)
+    A = bpy.props.CollectionProperty(name="A values", type = BPY.Floats)
+    B = bpy.props.CollectionProperty(name="B values", type = BPY.Floats)
     @classmethod
     def poll(cls, context):
         return True
@@ -703,7 +703,7 @@ class FourierSeriesDriveOperator(Base):
         for i, value in enumerate(self.entity.B):
             self.B[i].value = value
     def store(self, context):
-        self.entity = database.drive[context.scene.drive_index]
+        self.entity = database.drive[self.index]
         self.entity.initial_time = self.initial_time
         self.entity.omega = self.omega
         self.entity.N = self.N
@@ -741,9 +741,9 @@ klasses[FourierSeriesDriveOperator.bl_label] = FourierSeriesDriveOperator
 
 class FrequencySweepDrive(Entity):
     def string(self, indent=False):
-        ret = database.indent_drives*"\t" if indent else ""
+        ret = super().indent_drives*"\t" if indent else ""
         ret += "frequency sweep, " + str(self.initial_time)
-        indenture = database.indent_drives*"\t"
+        indenture = super().indent_drives*"\t"
         ret += ",\n" + self.links[0].string(True)
         ret += ",\n" + self.links[1].string(True)
         ret += ",\n" + indenture + str(self.initial_value)
@@ -785,7 +785,7 @@ class FrequencySweepDriveOperator(Base):
         self.final_time = self.entity.final_time
         self.final_value = self.entity.final_value
     def store(self, context):
-        self.entity = database.drive[context.scene.drive_index]
+        self.entity = database.drive[self.index]
         self.entity.initial_time = self.initial_time
         self.entity.initial_value = self.initial_value
         self.entity.forever = self.forever
@@ -815,7 +815,7 @@ klasses[FrequencySweepDriveOperator.bl_label] = FrequencySweepDriveOperator
 
 class ExponentialDrive(Entity):
     def string(self, indent=False):
-        ret = database.indent_drives*"\t" if indent else ""
+        ret = super().indent_drives*"\t" if indent else ""
         ret += "exponential"
         for v in [self.amplitude, self.time_constant, self.initial_time, self.initial_value]:
             ret += ", " + str(v)
@@ -842,7 +842,7 @@ class ExponentialDriveOperator(Base):
         self.initial_time = self.entity.initial_time
         self.initial_value = self.entity.initial_value
     def store(self, context):
-        self.entity = database.drive[context.scene.drive_index]
+        self.entity = database.drive[self.index]
         self.entity.amplitude = self.amplitude
         self.entity.time_constant = self.time_constant
         self.entity.initial_time = self.initial_time
@@ -860,7 +860,7 @@ klasses[ExponentialDriveOperator.bl_label] = ExponentialDriveOperator
 
 class RandomDrive(Entity):
     def string(self, indent=False):
-        ret = database.indent_drives*"\t" if indent else ""
+        ret = super().indent_drives*"\t" if indent else ""
         ret += "random"
         for v in [self.amplitude, self.mean, self.initial_time]:
             ret += ", " + str(v)
@@ -908,7 +908,7 @@ class RandomDriveOperator(Base):
         self.seed_type = self.entity.seed_type
         self.specified_seed = self.entity.specified_seed
     def store(self, context):
-        self.entity = database.drive[context.scene.drive_index]
+        self.entity = database.drive[self.index]
         self.entity.amplitude = self.amplitude
         self.entity.mean = self.mean
         self.entity.initial_time = self.initial_time
@@ -939,9 +939,8 @@ klasses[RandomDriveOperator.bl_label] = RandomDriveOperator
 
 class MeterDrive(Entity):
     def string(self, indent=False):
-        ret = database.indent_drives*"\t" if indent else ""
-        ret += "meter"
-        ret += ", " + str(self.initial_time)
+        ret = super().indent_drives*"\t" if indent else ""
+        ret += "meter, " + str(self.initial_time)
         if self.forever:
             ret += ", forever"
         else:
@@ -952,17 +951,14 @@ class MeterDrive(Entity):
 class MeterDriveOperator(Base):
     bl_label = "Meter drive"
     initial_time = bpy.props.FloatProperty(name="Initial time", description="", min=0.0, max=9.9e10, precision=6)
-    forever = bpy.props.BoolProperty(name="Forever", description="")
+    forever = bpy.props.BoolProperty(name="Forever", description="", default=True)
     final_time = bpy.props.FloatProperty(name="Final time", description="", min=0.0, max=9.9e10, precision=6)
-    steps = bpy.props.FloatProperty(name="Steps", description="", min=-9.9e10, max=9.9e10, precision=6)
+    steps = bpy.props.IntProperty(name="Steps", description="", min=1, default=1)
     @classmethod
     def poll(cls, context):
         return True
     def defaults(self, context):
-        self.initial_time = 0.0
-        self.forever = False
-        self.final_time = 0.0
-        self.steps = 0.0
+        pass
     def assign(self, context):
         self.entity = database.drive[context.scene.drive_index]
         self.initial_time = self.entity.initial_time
@@ -970,7 +966,7 @@ class MeterDriveOperator(Base):
         self.final_time = self.entity.final_time
         self.steps = self.entity.steps
     def store(self, context):
-        self.entity = database.drive[context.scene.drive_index]
+        self.entity = database.drive[self.index]
         self.entity.initial_time = self.initial_time
         self.entity.forever = self.forever
         self.entity.final_time = self.final_time
@@ -992,7 +988,7 @@ klasses[MeterDriveOperator.bl_label] = MeterDriveOperator
 
 class StringDrive(Entity):
     def string(self, indent=False):
-        ret = database.indent_drives*"\t" if indent else ""
+        ret = super().indent_drives*"\t" if indent else ""
         ret += "string, \"" + self.expression_string + "\""
         return ret
 
@@ -1008,7 +1004,7 @@ class StringDriveOperator(Base):
         self.entity = database.drive[context.scene.drive_index]
         self.expression_string = self.entity.expression_string
     def store(self, context):
-        self.entity = database.drive[context.scene.drive_index]
+        self.entity = database.drive[self.index]
         self.entity.expression_string = self.expression_string
     def create_entity(self):
         return StringDrive(self.name)
@@ -1017,7 +1013,7 @@ klasses[StringDriveOperator.bl_label] = StringDriveOperator
 
 class MultDrive(Entity):
     def string(self, indent=False):
-        ret = database.indent_drives*"\t" if indent else ""
+        ret = super().indent_drives*"\t" if indent else ""
         ret += "mult"
         ret += ",\n" + self.links[0].string(True)
         ret += ",\n" + self.links[1].string(True)
@@ -1039,7 +1035,7 @@ class MultDriveOperator(Base):
         self.drive_1_name = self.entity.links[0].name
         self.drive_2_name = self.entity.links[0].name
     def store(self, context):
-        self.entity = database.drive[context.scene.drive_index]
+        self.entity = database.drive[self.index]
         self.entity.unlink_all()
         self.link_drive(context, self.drive_1_name, self.drive_1_edit)
         self.link_drive(context, self.drive_2_name, self.drive_2_edit)
@@ -1055,7 +1051,7 @@ klasses[MultDriveOperator.bl_label] = MultDriveOperator
 
 class NodeDrive(Entity):
     def string(self, indent=False):
-        ret = database.indent_drives*"\t" if indent else ""
+        ret = super().indent_drives*"\t" if indent else ""
         ret += "node"
         if self.objects[0] in database.node:
             ob = self.objects[0]
@@ -1093,7 +1089,7 @@ class NodeDriveOperator(Base):
         self.symbolic_name = self.entity.symbolic_name
         self.drive_name = self.entity.links[0].name
     def store(self, context):
-        self.entity = database.drive[context.scene.drive_index]
+        self.entity = database.drive[self.index]
         self.entity.objects = SelectedObjects(context)
         self.entity.symbolic_name = self.symbolic_name
         self.entity.unlink_all()
@@ -1110,7 +1106,7 @@ klasses[NodeDriveOperator.bl_label] = NodeDriveOperator
 
 class ElementDrive(Entity):
     def string(self, indent=False):
-        ret = database.indent_drives*"\t" if indent else ""
+        ret = super().indent_drives*"\t" if indent else ""
         ret += "element, " + str(database.element.index(self.links[0])) + ", " + str(self.links[0].type)
         if self.symbolic_name:
             ret += ", string, \"" + selfsymbolic_name + "\""
@@ -1138,7 +1134,7 @@ class ElementDriveOperator(Base):
         self.element_name = self.entity.links[0].name
         self.drive_name = self.entity.links[1].name
     def store(self, context):
-        self.entity = database.drive[context.scene.drive_index]
+        self.entity = database.drive[self.index]
         self.symbolic_name = self.symbolic_name
         self.entity.unlink_all()
         self.link_drive(context, self.element_name, self.element_edit)
@@ -1156,7 +1152,7 @@ klasses[ElementDriveOperator.bl_label] = ElementDriveOperator
 
 class DriveDrive(Entity):
     def string(self, indent=False):
-        ret = database.indent_drives*"\t" if indent else ""
+        ret = super().indent_drives*"\t" if indent else ""
         ret += "drive"
         ret += ",\n" + self.links[0].string(True)
         ret += ",\n" + self.links[1].string(True)
@@ -1178,7 +1174,7 @@ class DriveDriveOperator(Base):
         self.drive_1_name = self.entity.links[0].name
         self.drive_2_name = self.entity.links[0].name
     def store(self, context):
-        self.entity = database.drive[context.scene.drive_index]
+        self.entity = database.drive[self.index]
         self.entity.unlink_all()
         self.link_drive(context, self.drive_1_name, self.drive_1_edit)
         self.link_drive(context, self.drive_2_name, self.drive_2_edit)
@@ -1194,7 +1190,7 @@ klasses[DriveDriveOperator.bl_label] = DriveDriveOperator
 
 class ArrayDrive(Entity):
     def string(self, indent=False):
-        ret = database.indent_drives*"\t" if indent else ""
+        ret = super().indent_drives*"\t" if indent else ""
         ret += "array, " + str(self.N)
         for i in range(self.N):
             ret += ',\n'+self.links[i].string(True)
@@ -1203,7 +1199,7 @@ class ArrayDrive(Entity):
 class ArrayDriveOperator(Base):
     bl_label = "Array drive"
     N = bpy.props.IntProperty(min=2, max=20)
-    drive_names = bpy.props.CollectionProperty(name="Drive Names", type = Props.DriveNames)
+    drive_names = bpy.props.CollectionProperty(name="Drive Names", type = BPY.DriveNames)
     @classmethod
     def poll(cls, context):
         return True
@@ -1220,7 +1216,7 @@ class ArrayDriveOperator(Base):
         for i, link in enumerate(self.entity.links):
             self.drive_names[i].value = link.name
     def store(self, context):
-        self.entity = database.drive[context.scene.drive_index]
+        self.entity = database.drive[self.index]
         self.entity.N = self.N
         self.entity.unlink_all()
         for d in self.drive_names[:self.N]:

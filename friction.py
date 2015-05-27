@@ -64,7 +64,7 @@ for t in types:
         def assign(self, context):
             self.entity = database.friction[context.scene.friction_index]
         def store(self, context):
-            self.entity = database.friction[context.scene.friction_index]
+            self.entity = database.friction[self.index]
         def create_entity(self):
             return Entity(self.name)
     klasses[t] = Tester
@@ -110,7 +110,7 @@ class ModlugreOperator(Base):
         self.radius = self.entity.radius
         self.function_name = self.entity.links[0].name
     def store(self, context):
-        self.entity = database.friction[context.scene.friction_index]
+        self.entity = database.friction[self.index]
         self.entity.sigma0 = self.sigma0
         self.entity.sigma1 = self.sigma1
         self.entity.sigma2 = self.sigma2

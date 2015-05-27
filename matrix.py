@@ -28,7 +28,7 @@ if "bpy" in locals():
     imp.reload(Operator)
     imp.reload(Entity)
 else:
-    from .base import bpy, database, Operator, Entity, Bundle, Props
+    from .base import bpy, database, Operator, Entity, Bundle, BPY
 
 types = ["3x1", "6x1", "3x3", "6x6", "6xN"]
 
@@ -61,7 +61,7 @@ for t in types:
         def assign(self, context):
             self.entity = database.matrix[context.scene.matrix_index]
         def store(self, context):
-            self.entity = database.matrix[context.scene.matrix_index]
+            self.entity = database.matrix[self.index]
         def create_entity(self):
             return Entity(self.name)
     klasses[t] = DefaultOperator
@@ -69,18 +69,15 @@ for t in types:
 class MatrixBase(Base):
     N = None
     subtype = None
-    floats = bpy.props.CollectionProperty(type = Props.Floats)
+    floats = bpy.props.CollectionProperty(type = BPY.Floats)
     scale = bpy.props.BoolProperty(name="Scale", description="Scale the vector")
     factor = bpy.props.FloatProperty(name="Factor", description="Scale factor", default=1.0, min=-9.9e10, max=9.9e10, precision=6)
     def defaults(self, context):
         self.floats.clear()
         for i in range(self.N):
             self.floats.add()
-        self.entity_name = ""
     def assign(self, context):
-        self.index = context.scene.matrix_index
         self.entity = database.matrix[self.index]
-        self.entity_name = database.matrix[self.index].name
         self.subtype = self.entity.subtype
         self.floats.clear()
         for i in range(self.N):
@@ -98,7 +95,6 @@ class MatrixBase(Base):
     def draw(self, context):
         self.basis = [self.subtype, self.scale]
         layout = self.layout
-        layout.label(self.entity_name)
         layout.prop(self, "subtype")
         if self.subtype == "matr":
             row = layout.row()
@@ -134,7 +130,6 @@ class Matrix3x1Operator(MatrixBase):
     def draw(self, context):
         self.basis = [self.subtype, self.scale]
         layout = self.layout
-        layout.label(self.entity_name)
         layout.prop(self, "subtype")
         if self.subtype not in "null default".split():
             row = layout.row()
@@ -198,7 +193,6 @@ class Matrix3x3Operator(MatrixBase):
     def draw(self, context):
         self.basis = [self.subtype, self.scale]
         layout = self.layout
-        layout.label(self.entity_name)
         layout.prop(self, "subtype")
         if self.subtype != "null":
             row = layout.row()
@@ -266,7 +260,6 @@ class Matrix6x6Operator(MatrixBase):
     def draw(self, context):
         self.basis = [self.subtype, self.scale]
         layout = self.layout
-        layout.label(self.entity_name)
         layout.prop(self, "subtype")
         if self.subtype != "null":
             row = layout.row()
