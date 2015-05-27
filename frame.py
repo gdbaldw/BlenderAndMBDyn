@@ -48,7 +48,7 @@ class Base(Operator):
     def make_list(self, ListItem):
         bpy.types.Scene.frame_uilist = bpy.props.CollectionProperty(type = ListItem)
         def select_and_activate(self, context):
-            if database.frame  and self.frame_index < len(database.frame):
+            if database.frame and self.frame_index < len(database.frame):
                 bpy.ops.object.select_all(action='DESELECT')
                 frame = database.frame[self.frame_index]
                 for ob in frame.objects:
@@ -83,14 +83,6 @@ for t in types:
     klasses[t] = Tester
 
 class Frame(Entity):
-    def write(self, text):
-        text.write("\tbody: "+str(database.frame.index(self))+",\n")
-        self.write_node(text, 0, node=True)
-        text.write("\t\t\t"+str(self.mass)+",\n")
-        self.write_node(text, 0, position=True, p_label="")
-        text.write(", "+self.links[0].string())
-        self.write_node(text, 0, orientation=True, o_label="inertial")
-        text.write(";\n")
     def remesh(self):
         RhombicPyramid(self.objects[0])
 
@@ -102,7 +94,7 @@ class FrameOperator(Base):
     angular_velocity_edit = bpy.props.BoolProperty(name="")
     @classmethod
     def poll(self, context):
-        if self.bl_idname.startswith(root_dot+"e_"):
+        if self.bl_idname.startswith(root_dot + "e_"):
             return True
         selected = SelectedObjects(context)
         overlapped = False in [set(selected[1:]).isdisjoint(set(f.objects[1:])) for f in database.frame]

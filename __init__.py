@@ -109,9 +109,6 @@ class Actions(bpy.types.Panel):
     bl_options = {'DEFAULT_CLOSED'}
     def draw(self, context):
         layout = self.layout
-        layout.operator(root_dot+"file")
-        layout.operator(root_dot+"run")
-        layout.operator(root_dot+"display")
         layout.operator(root_dot+"rigids")
         layout.operator(root_dot+"import")
         layout.operator(root_dot+"append")

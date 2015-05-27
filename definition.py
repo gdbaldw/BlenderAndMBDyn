@@ -29,7 +29,7 @@ if "bpy" in locals():
     imp.reload(Entity)
 else:
     from .base import bpy, BPY, root_dot, database, Operator, Entity, Bundle, enum_drive, enum_meter_drive, enum_method
-    from .common import method_types, nonlinear_solver_types
+    from .common import FORMAT, method_types, nonlinear_solver_types
 
 problem_types = ["General data"] + method_types + nonlinear_solver_types + ["Eigenanalysis", "Abort after", "Linear solver", "Dummy steps", "Output data", "Real time"]
 
@@ -92,31 +92,31 @@ class GeneralProblem(Entity):
     def write(self, f):
         f.write("\tstrategy: " + self.strategy)
         if self.strategy == "factor":
-            f.write(", " + ", ".join([str(v) for v in (self.reducion_factor, self.steps_before_reduction,
+            f.write(", " + ", ".join([FORMAT(v) for v in (self.reducion_factor, self.steps_before_reduction,
                 self.raise_factor, self.steps_before_raise, self.factor_min_iterations)])
-                + (", " + str(self.factor_max_iterations) if self.set_factor_max_iterations else ""))
+                + (", " + FORMAT(self.factor_max_iterations) if self.set_factor_max_iterations else ""))
         elif self.strategy == "change":
             f.write(", " + self.links[0].string())
         if self.strategy != "no change":
-            f.write(";\n\tmin time step: " + str(self.min_time_step) +
-            ";\n\tmax time step: " + ("unlimited" if self.unlimited else str(self.max_time_step)))
-        f.write(";\n\ttime step: " + str(self.time_step))
+            f.write(";\n\tmin time step: " + FORMAT(self.min_time_step) +
+            ";\n\tmax time step: " + ("unlimited" if self.unlimited else FORMAT(self.max_time_step)))
+        f.write(";\n\ttime step: " + FORMAT(self.time_step))
         if self.set_residual_tolerance:
-            f.write(";\n\ttolerance: " + str(self.residual_tolerance))
+            f.write(";\n\ttolerance: " + FORMAT(self.residual_tolerance))
             if self.set_residual_test:
                 f.write(", test, " + self.residual_test + (", scale" if self.scale_residual_test else ""))
             if self.set_solution_tolerance:
-                f.write(", " + str(self.solution_tolerance) + 
+                f.write(", " + FORMAT(self.solution_tolerance) +
                     (", test, " + self.solution_test if self.set_solution_test else ""))
-        f.write(";\n\tmax iterations: " + (str(self.max_iterations) if self.max_iterations else "null") +
+        f.write(";\n\tmax iterations: " + (FORMAT(self.max_iterations) if self.max_iterations else "null") +
             (", at most" if self.at_most else "") +
             (";\n\tmodify residual test" if self.modify_residual_test else ""))
         if self.set_threads:
             f.write(";\n\tthreads: " + self.auto_disable +
-                (", " + self.assembly_solver if self.set_assembly_solver else "") + ", " + str(self.threads))
-        f.write(";\n\tderivatives tolerance: " + str(self.derivatives_tolerance) +
-            ";\n\tderivatives max iterations: " + str(self.derivatives_max_iterations) +
-            ";\n\tderivatives coefficient: " + str(self.derivatives_coefficient) + ";\n")
+                (", " + self.assembly_solver if self.set_assembly_solver else "") + ", " + FORMAT(self.threads))
+        f.write(";\n\tderivatives tolerance: " + FORMAT(self.derivatives_tolerance) +
+            ";\n\tderivatives max iterations: " + FORMAT(self.derivatives_max_iterations) +
+            ";\n\tderivatives coefficient: " + FORMAT(self.derivatives_coefficient) + ";\n")
 
 class GeneralProblemOperator(Base):
     bl_label = "General data"
@@ -433,7 +433,7 @@ klasses[ThirdOrderOperator.bl_label] = ThirdOrderOperator
 
 class BDF(Entity):
     def write(self, f, tab=True):
-        f.write(("\t" if tab else "") + "method: bdf" + (", order, " + str(self.order) if self.set_order else "") + ";\n")
+        f.write(("\t" if tab else "") + "method: bdf" + (", order, " + FORMAT(self.order) if self.set_order else "") + ";\n")
 
 class BDFOperator(Base):
     bl_label = "bdf"
@@ -490,7 +490,7 @@ class NewtonRaphston(Entity):
     def write(self, f):
         f.write("\tnonlinear solver: newton raphson, " + self.true_or_modified)
         if self.true_or_modified == "modified":
-            f.write(", " + str(self.iterations) +
+            f.write(", " + FORMAT(self.iterations) +
                 (", keep jacobian matrix" if self.keep_jacobian_matrix else "") +
                 (", honor element requests" if self.honor_element_requests else ""))
         f.write(";\n")
@@ -542,27 +542,27 @@ class LineSearch(Entity):
     def write(self, f):
         f.write("\tnonlinear solver: line search, " + self.true_or_modified)
         if self.true_or_modified == "modified":
-            f.write(", " + str(self.iterations) +
+            f.write(", " + FORMAT(self.iterations) +
                 (", keep jacobian matrix" if self.keep_jacobian_matrix else "") +
                 (", honor element requests" if self.honor_element_requests else ""))
         f.write(
-            (",\n\t\ttolerance x, " + str(self.tolerance_x) if self.set_tolerance_x else "") +
-            (",\n\t\ttolerance min, " + str(self.tolerance_min) if self.set_tolerance_min else "") +
-            (",\n\t\tmax iterations, " + str(self.max_line_search_iterations) if self.set_max_line_search_iterations else "") +
-            (",\n\t\talpha, " + str(self.alpha) if self.set_alpha else ""))
+            (",\n\t\ttolerance x, " + FORMAT(self.tolerance_x) if self.set_tolerance_x else "") +
+            (",\n\t\ttolerance min, " + FORMAT(self.tolerance_min) if self.set_tolerance_min else "") +
+            (",\n\t\tmax iterations, " + FORMAT(self.max_line_search_iterations) if self.set_max_line_search_iterations else "") +
+            (",\n\t\talpha, " + FORMAT(self.alpha) if self.set_alpha else ""))
         if self.set_lambda_min:
-            f.write(",\n\t\tlambda min, " + str(self.lambda_min) +
+            f.write(",\n\t\tlambda min, " + FORMAT(self.lambda_min) +
                 ", relative, " + ("yes" if self.relative else "no"))
-        f.write((",\n\t\tlambda factor min, " + str(self.lambda_factor_min) if self.set_lambda_factor_min else "") +
-            (",\n\t\tmax step, " + str(self.max_step) if self.set_max_step else "") +
+        f.write((",\n\t\tlambda factor min, " + FORMAT(self.lambda_factor_min) if self.set_lambda_factor_min else "") +
+            (",\n\t\tmax step, " + FORMAT(self.max_step) if self.set_max_step else "") +
             (",\n\t\tzero gradient, continue, yes" if self.zero_gradient_continue else ""))
         if self.divergence_check:
-            f.write(",\n\t\tdivergence check, yes" + 
-                (", factor, " + str(self.divergence_check_factor) if self.set_divergence_check_factor else ""))
+            f.write(",\n\t\tdivergence check, yes" +
+                (", factor, " + FORMAT(self.divergence_check_factor) if self.set_divergence_check_factor else ""))
         f.write(",\n\t\talgorithm, " + self.cubic_or_factor)
         if self.scale_newton_step:
             f.write(",\n\t\tscale newton step, yes" +
-                (", min scale, " + str(self.min_scale_newton_step) if self.set_min_scale_newton_step else ""))
+                (", min scale, " + FORMAT(self.min_scale_newton_step) if self.set_min_scale_newton_step else ""))
         f.write(",\n\t\tprint convergence info, " + ("yes" if self.print_convergence_info else "no") +
             ", verbose, " + ("yes" if self.verbose else "no") +
             ", abort at lambda min, " + ("yes" if self.abort_at_lambda_min else "no") +
@@ -738,13 +738,13 @@ klasses[LineSearchOperator.bl_label] = LineSearchOperator
 class MatrixFree(Entity):
     def write(self, f):
         f.write("\tmatrix free: " + self.bicgstab_or_gmres +
-            (",\n\t\ttolerance, "+ str(self.tolerance) if self.set_tolerance else "") +
-            (",\n\t\tsteps, "+ str(self.steps) if self.set_steps else "") +
-            (",\n\t\ttau, "+ str(self.tau) if self.set_tau else "") +
-            (",\n\t\teta, "+ str(self.eta) if self.set_eta else ""))
+            (",\n\t\ttolerance, " + FORMAT(self.tolerance) if self.set_tolerance else "") +
+            (",\n\t\tsteps, " + FORMAT(self.steps) if self.set_steps else "") +
+            (",\n\t\ttau, " + FORMAT(self.tau) if self.set_tau else "") +
+            (",\n\t\teta, " + FORMAT(self.eta) if self.set_eta else ""))
         if self.preconditioner:
             f.write(",\n\t\tpreconditioner, full jacobian matrix" +
-                (", steps, " + str(self.preconditioner_steps) if self.set_preconditioner_steps else "") +
+                (", steps, " + FORMAT(self.preconditioner_steps) if self.set_preconditioner_steps else "") +
                 (", honor element requests" if self.honor_element_requests else ""))
         f.write(";\n")
 
@@ -839,18 +839,18 @@ klasses[MatrixFreeOperator.bl_label] = MatrixFreeOperator
 
 class Eigenanalysis(Entity):
     def write(self, f):
-        f.write("\teigenanalysis: list, " + str(self.num_times) + ", " + ", ".join([str(v) for v in self.when]) +
+        f.write("\teigenanalysis: list, " + FORMAT(self.num_times) + ", " + ", ".join([FORMAT(v) for v in self.when]) +
             (",\n\t\toutput full matrices" if self.output_full_matrices else "") +
             (",\n\t\toutput sparce matrices" if self.output_sparce_matrices else "") +
             (",\n\t\toutput eigenvectors" if self.output_eigenvectors else "") +
             (",\n\t\toutput geometry" if self.output_geometry else "") +
-            (",\n\t\tparameter, " + str(self.parameter) if self.set_parameter else "") +
-            (",\n\t\tlower frequency limit, " + str(self.lower_frequency_limit) if self.set_lower_frequency_limit else "") +
-            (",\n\t\tupper frequency limit, " + str(self.upper_frequency_limit) if self.set_upper_frequency_limit else ""))
+            (",\n\t\tparameter, " + FORMAT(self.parameter) if self.set_parameter else "") +
+            (",\n\t\tlower frequency limit, " + FORMAT(self.lower_frequency_limit) if self.set_lower_frequency_limit else "") +
+            (",\n\t\tupper frequency limit, " + FORMAT(self.upper_frequency_limit) if self.set_upper_frequency_limit else ""))
         if self.method == "use lapack":
             f.write(",\n\t\tuse lapack" + (", balance, " + self.balance if self.set_balance else ""))
         else:
-            f.write(",\n\t\t" + self.method + ", " + ", ".join([str(v) for v in [self.nev, self.ncv, self.tol]]))
+            f.write(",\n\t\t" + self.method + ", " + ", ".join([FORMAT(v) for v in [self.nev, self.ncv, self.tol]]))
         f.write(";\n")
 
 class EigenanalysisOperator(Base):
@@ -1010,16 +1010,16 @@ class LinearSolver(Entity):
         elif self.linear_solver == "superlu":
             f.write(",\n\t\tmmdata" if self.set_mmdata else "")
         if self.linear_solver in "naive taucs watson".split():
-            f.write(",\n\t\tmultithread, " + str(self.threads) if self.set_multithread else "")
+            f.write(",\n\t\tmultithread, " + FORMAT(self.threads) if self.set_multithread else "")
         if self.linear_solver == "y12":
-            f.write(",\n\t\tworkspace size, " + str(self.workspace_size) if self.set_workspace_size else "")
+            f.write(",\n\t\tworkspace size, " + FORMAT(self.workspace_size) if self.set_workspace_size else "")
         if self.linear_solver in "naive umfpack klu y12 lapack superlu watson".split():
-            f.write(",\n\t\tpivot factor, " + str(self.pivot_factor) if self.set_pivot_factor else "")
+            f.write(",\n\t\tpivot factor, " + FORMAT(self.pivot_factor) if self.set_pivot_factor else "")
         if self.linear_solver == "umfpack":
-            f.write(",\n\t\tdrop tolerance, " + str(self.drop_tolerance) if self.set_drop_tolerance else "" +
-                (",\n\t\tblock size, " + str(self.block_size) if self.set_block_size else ""))
+            f.write(",\n\t\tdrop tolerance, " + FORMAT(self.drop_tolerance) if self.set_drop_tolerance else "" +
+                (",\n\t\tblock size, " + FORMAT(self.block_size) if self.set_block_size else ""))
         if self.linear_solver == "umfpack":
-            f.write(",\n\t\tscale, " + str(self.scale) if self.set_scale else "")
+            f.write(",\n\t\tscale, " + FORMAT(self.scale) if self.set_scale else "")
         f.write(";\n")
 
 class LinearSolverOperator(Base):
@@ -1163,10 +1163,10 @@ klasses[LinearSolverOperator.bl_label] = LinearSolverOperator
 
 class DummySteps(Entity):
     def write(self, f):
-        f.write("\tdummy_steps_tolerance: " + str(self.dummy_steps_tolerance) +
-        ";\n\tdummy_steps_max_iterations: " + str(self.dummy_steps_max_iterations) +
-        ";\n\tdummy_steps_number: " + str(self.dummy_steps_number) +
-        ";\n\tdummy_steps_ratio: " + str(self.dummy_steps_ratio) +
+        f.write("\tdummy_steps_tolerance: " + FORMAT(self.dummy_steps_tolerance) +
+        ";\n\tdummy_steps_max_iterations: " + FORMAT(self.dummy_steps_max_iterations) +
+        ";\n\tdummy_steps_number: " + FORMAT(self.dummy_steps_number) +
+        ";\n\tdummy_steps_ratio: " + FORMAT(self.dummy_steps_ratio) +
         ";\n\tdummy steps ")
         self.links[0].write(f, tab=False) 
         
@@ -1290,14 +1290,14 @@ class RealTime(Entity):
     def write(self, f):
         f.write("\treal time: " + self.rtai_posix)
         if self.mode == "period":
-            f.write(", mode, period, time step, " + str(self.time_step))
+            f.write(", mode, period, time step, " + FORMAT(self.time_step))
         elif self.mode == "semaphore":
-            f.write(", mode, semaphore, " + str(self.semaphore))
+            f.write(", mode, semaphore, " + FORMAT(self.semaphore))
         else:
             f.write(", mode, " + self.mode)
-        f.write((",\n\t\treserve stack, " + str(self.stack_size) if self.set_reserve_stack else "") +
+        f.write((",\n\t\treserve stack, " + FORMAT(self.stack_size) if self.set_reserve_stack else "") +
             (",\n\t\tallow nonroot" if self.allow_nonroot else "") +
-            (",\n\t\tcpu map, " + str(self.cpu_map) if self.set_cpu_map else "") +
+            (",\n\t\tcpu map, " + FORMAT(self.cpu_map) if self.set_cpu_map else "") +
             (",\n\t\toutput, no" if self.disable_output else "") +
             (",\n\t\thard real time" if self.hard_real_time else "") +
             (",\n\t\treal time log" + (", file name, " + self.command_name if self.set_command_name else "") if self.real_time_log else "") +
@@ -1398,7 +1398,7 @@ class Assembly(Entity):
             f.write("\tskip initial joint assembly;\n")
         if (self.rigid_bodies or self.gravity or self.forces or self.beams 
             or self.aerodynamic_elements or self.loadable_elements):
-            f.write("\tuse: " + 
+            f.write("\tuse: " +
                 ("rigid bodies, " if self.rigid_bodies else "") +
                 ("gravity, " if self.gravity else "") +
                 ("forces, " if self.forces else "") +
@@ -1407,12 +1407,12 @@ class Assembly(Entity):
                 ("loadable elements, " if self.loadable_elements else "") +
                 " in assembly;\n")
         if self.set_initial_position_stiffness:
-            f.write("\tinitial stiffness: " + str(self.initial_position_stiffness) +
-                (", " + str(self.initial_velocity_stiffness) if self.set_initial_velocity_stiffness else "") +
+            f.write("\tinitial stiffness: " + FORMAT(self.initial_position_stiffness) +
+                (", " + FORMAT(self.initial_velocity_stiffness) if self.set_initial_velocity_stiffness else "") +
                 ";\n")
         f.write("\tomega rotates: " + ("yes;\n") if self.omega_rotates else "no;\n" +
-            ("\ttolerance: " + str(self.tolerance) + ";\n" if self.set_tolerance else "") +
-            ("\tmax iterations: " + str(self.max_iterations) + ";\n" if self.set_max_iterations else ""))
+            ("\ttolerance: " + FORMAT(self.tolerance) + ";\n" if self.set_tolerance else "") +
+            ("\tmax iterations: " + FORMAT(self.max_iterations) + ";\n" if self.set_max_iterations else ""))
 
 class AssemblyOperator(Base):
     bl_label = "Assembly"
@@ -1521,10 +1521,10 @@ class JobControl(Entity):
                 ("node connection, " if self.node_connection else ""))
             f.write(s[:-2] + ";\n")
         if self.set_select_timeout:
-            f.write("\tselect timeout, " + ("forever" if self.forever else str(self.timeout)) + ";\n")
+            f.write("\tselect timeout, " + ("forever" if self.forever else FORMAT(self.timeout)) + ";\n")
         f.write("\tdefault orientation: " + self.default_orientation + ";\n")
         f.write("\toutput meter: " + self.links[0].string() +
-            ";\n\toutput precision: " + str(self.output_precision) + ";\n" +
+            ";\n\toutput precision: " + FORMAT(self.output_precision) + ";\n" +
             #";\n\tdefault output: accelerations;\n" +
             ("\tmodel: static;\n" if self.static_model else ""))
 

@@ -29,6 +29,7 @@ if "bpy" in locals():
     imp.reload(Entity)
 else:
     from .base import bpy, database, Operator, Entity, Bundle, BPY, enum_function
+    from .common import FORMAT
 
 types = [
     "Const",
@@ -85,7 +86,7 @@ class Const(Entity):
     def write(self, text):
         if self.written:
             return
-        text.write("scalar function: \"" + self.name + "\", const, " + str(self.constant) + ";\n")
+        text.write("scalar function: \"" + self.name + "\", const, " + FORMAT(self.constant) + ";\n")
 
 class ConstOperator(Base):
     bl_label = "Const"
@@ -112,10 +113,10 @@ class Exp(Entity):
             return
         text.write("scalar function: \"" + self.name + "\", exp")
         if not self.default_base:
-            text.write(", base, " + str(self.base))
+            text.write(", base, " + FORMAT(self.base))
         if not self.default_coefficient:
-            text.write(", coefficient, " + str(self.coefficient))
-        text.write(", " + str(self.multiplier)+";\n")
+            text.write(", coefficient, " + FORMAT(self.coefficient))
+        text.write(", " + FORMAT(self.multiplier) + ";\n")
 
 class ExpLogBase(Base):
     default_base = bpy.props.BoolProperty(name="Default base (e)")
@@ -174,10 +175,10 @@ class Log(Entity):
             return
         text.write("scalar function: \"" + self.name + "\", log")
         if not self.default_base:
-            text.write(", base, " + str(self.base))
+            text.write(", base, " + FORMAT(self.base))
         if not self.default_coefficient:
-            text.write(", coefficient, " + str(self.coefficient))
-        text.write(", " + str(self.multiplier)+";\n")
+            text.write(", coefficient, " + FORMAT(self.coefficient))
+        text.write(", " + FORMAT(self.multiplier) + ";\n")
 
 class LogOperator(ExpLogBase):
     bl_label = "Log"
@@ -190,7 +191,7 @@ class Pow(Entity):
     def write(self, text):
         if self.written:
             return
-        text.write("scalar function: \"" + self.name + "\", pow, " + str(self.power) + ";\n")
+        text.write("scalar function: \"" + self.name + "\", pow, " + FORMAT(self.power) + ";\n")
 
 class PowOperator(Base):
     bl_label = "Pow"
@@ -216,8 +217,8 @@ class Linear(Entity):
         if self.written:
             return
         text.write("scalar function: \"" + self.name + "\", linear")
-        text.write(",\n\t" + str(self.x1) + ", " +  str(self.x2))
-        text.write(", " + str(self.y1) + ", " +  str(self.y2) + ";\n")
+        text.write(",\n\t" + FORMAT(self.x1) + ", " + FORMAT(self.x2))
+        text.write(", " + FORMAT(self.y1) + ", " + FORMAT(self.y2) + ";\n")
 
 class LinearOperator(Base):
     bl_label = "Linear"
@@ -262,9 +263,9 @@ class CubicNaturalSpline(Entity):
             return
         text.write("scalar function: \"" + self.name + "\", cubicspline")
         if not self.extrapolate:
-            text.write(', do not extrapolate')
+            text.write(", do not extrapolate")
         for i in range(self.N):
-            text.write(",\n\t" + str(self.X[i]) + ", " + str(self.Y[i]))
+            text.write(",\n\t" + FORMAT(self.X[i]) + ", " + FORMAT(self.Y[i]))
         text.write(";\n")
 
 class MultipleBase(Base):
@@ -330,9 +331,9 @@ class Multilinear(Entity):
             return
         text.write("scalar function: \"" + self.name + "\", multilinear")
         if not self.extrapolate:
-            text.write(', do not extrapolate')
+            text.write(", do not extrapolate")
         for i in range(self.N):
-            text.write(",\n\t" + str(self.X[i]) + ", " + str(self.Y[i]))
+            text.write(",\n\t" + FORMAT(self.X[i]) + ", " + FORMAT(self.Y[i]))
         text.write(";\n")
 
 class MultilinearOperator(MultipleBase):
@@ -347,16 +348,16 @@ class Chebychev(Entity):
         if self.written:
             return
         text.write("scalar function: \"" + self.name + "\", chebychev")
-        text.write(",\n\t" + str(self.lower_bound) + ", " + str(self.upper_bound))
+        text.write(",\n\t" + FORMAT(self.lower_bound) + ", " + FORMAT(self.upper_bound))
         if not self.extrapolate:
             text.write(", do not extrapolate")
         N = int(self.N/4)
         for i in range(N):
-            text.write(",\n\t"+str(self.C[4*i:4*(i+1)]).strip("[]"))
+            text.write(",\n\t" + ", ".join([FORMAT(c) for c in self.C[4*i:4*(i+1)]]))
         if 4*N == self.N:
             text.write(";\n")
         else:
-            text.write(",\n\t"+str(self.C[4*N:self.N]).strip("[]")+";\n")
+            text.write(",\n\t" + ", ".join([FORMAT(c) for c in self.C[4*N:self.N]]) + ";\n")
 
 class ChebychevOperator(Base):
     bl_label = "Chebychev"

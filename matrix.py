@@ -29,6 +29,7 @@ if "bpy" in locals():
     imp.reload(Entity)
 else:
     from .base import bpy, database, Operator, Entity, Bundle, BPY
+    from .common import FORMAT
 
 types = ["3x1", "6x1", "3x3", "6x6", "6xN"]
 
@@ -79,9 +80,7 @@ class MatrixBase(Base):
     def assign(self, context):
         self.entity = database.matrix[self.index]
         self.subtype = self.entity.subtype
-        self.floats.clear()
-        for i in range(self.N):
-            self.floats.add()
+        self.defaults(context)
         for i, value in enumerate(self.entity.floats):
             self.floats[i].value = value
         self.scale = self.entity.scale
@@ -89,7 +88,7 @@ class MatrixBase(Base):
     def store(self, context):
         self.entity = database.matrix[self.index]
         self.entity.subtype = self.subtype
-        self.entity.floats = [f.value for f in self.floats]
+        self.entity.floats = [f.value for f in self.floats] if self.floats else self.N*[0.0]
         self.entity.scale = self.scale
         self.entity.factor = self.factor
     def draw(self, context):
@@ -103,7 +102,7 @@ class MatrixBase(Base):
             rowrow.prop(self, "factor")
             row.prop(self, "scale")
             for i in range(self.N):
-                layout.prop(self.floats[i], "value", text="x"+str(i+1))
+                layout.prop(self.floats[i], "value", text="x" + FORMAT(i+1))
     def check(self, context):
         return [None for a, b in zip(self.basis, [self.subtype, self.scale]) if a != b]
 
@@ -114,9 +113,9 @@ class Matrix3x1(Entity):
         elif self.subtype == "default":
             ret = "\n\t\t\tdefault"
         else:
-            ret = "\n\t\t\t"+str(self.floats).strip("[]")
+            ret = "\n\t\t\t" + ", ".join([FORMAT(v) for v in self.floats])
             if self.scale:
-                ret += ", scale, "+str(self.factor)
+                ret += ", scale, " + FORMAT(self.factor)
         return ret
 
 class Matrix3x1Operator(MatrixBase):
@@ -138,7 +137,7 @@ class Matrix3x1Operator(MatrixBase):
             rowrow.prop(self, "factor")
             row.prop(self, "scale")
             for i in range(self.N):
-                layout.prop(self.floats[i], "value", text="x"+str(i+1))
+                layout.prop(self.floats[i], "value", text="x" + FORMAT(i+1))
     def create_entity(self):
         return Matrix3x1(self.name)
 
@@ -158,25 +157,25 @@ klasses[Matrix6x1Operator.bl_label] = Matrix6x1Operator
 class Matrix3x3(Entity):
     def string(self):
         if self.subtype == "matr":
-            ret = ("\n\t\t\tmatr,\n"+
-            "\t"*4+str(self.floats[0:3]).strip("[]")+",\n"+
-            "\t"*4+str(self.floats[3:6]).strip("[]")+",\n"+
-            "\t"*4+str(self.floats[6:9]).strip("[]"))
+            ret = ("\n\t\t\tmatr,\n" +
+            "\t"*4 + ", ".join([FORMAT(v) for v in self.floats[0:3]]) + ",\n" +
+            "\t"*4 + ", ".join([FORMAT(v) for v in self.floats[3:6]]) + ",\n" +
+            "\t"*4 + ", ".join([FORMAT(v) for v in self.floats[6:9]]))
         elif self.subtype == "sym":
-            ret = ("\n\t\t\tsym,\n"+
-            "\t"*4+str(self.floats[0:3]).strip("[]")+",\n"+
-            "\t"*5+str(self.floats[4:6]).strip("[]")+",\n"+
-            "\t"*6+str(self.floats[8]))
+            ret = ("\n\t\t\tsym,\n" +
+            "\t"*4 + ", ".join([FORMAT(v) for v in self.floats[0:3]]) + ",\n" +
+            "\t"*5 + ", ".join([FORMAT(v) for v in self.floats[4:6]]) + ",\n" +
+            "\t"*6 + FORMAT(self.floats[8]))
         elif self.subtype == "skew":
-            ret = "\n\t\t\tskew, "+str([self.floats[i] for i in [7, 2, 3]]).strip("[]")
+            ret = "\n\t\t\tskew, " + ", ".join([FORMAT(self.floats[i]) for i in [7, 2, 3]])
         elif self.subtype == "diag":
-            ret = "\n\t\t\tdiag, "+str([self.floats[i] for i in [0, 4, 8]]).strip("[]")
+            ret = "\n\t\t\tdiag, " + ", ".join([FORMAT(self.floats[i]) for i in [0, 4, 8]])
         elif self.subtype == "eye":
             ret = "\n\t\t\teye"
         elif self.subtype == "null":
             ret = "\n\t\t\tnull"
         if self.scale:
-            ret += ", scale, " + str(self.factor)
+            ret += ", scale, " + FORMAT(self.factor)
         return ret
 
 class Matrix3x3Operator(MatrixBase):
@@ -210,7 +209,7 @@ class Matrix3x3Operator(MatrixBase):
                         or (self.subtype == "diag" and k not in [0,4,8])):
                             row.label("")
                         else:
-                            row.prop(self.floats[k], "value", text="x"+str(k+1))
+                            row.prop(self.floats[k], "value", text="x" + str(k+1))
     def create_entity(self):
         return Matrix3x3(self.name)
 
@@ -219,29 +218,29 @@ klasses[Matrix3x3Operator.bl_label] = Matrix3x3Operator
 class Matrix6x6(Entity):
     def string(self):
         if self.subtype == "matr":
-            ret = ("\n\t\t\tmatr,\n"+
-            "\t"*4+str(self.floats[0:6]).strip("[]")+",\n"+
-            "\t"*4+str(self.floats[6:12]).strip("[]")+",\n"+
-            "\t"*4+str(self.floats[12:18]).strip("[]")+",\n"+
-            "\t"*4+str(self.floats[18:24]).strip("[]")+",\n"+
-            "\t"*4+str(self.floats[24:30]).strip("[]")+",\n"+
-            "\t"*4+str(self.floats[30:36]).strip("[]"))
+            ret = ("\n\t\t\tmatr,\n" +
+            "\t"*4 + ", ".join([FORMAT(v) for v in self.floats[0:6]]) + ",\n" +
+            "\t"*4 + ", ".join([FORMAT(v) for v in self.floats[6:12]]) + ",\n" +
+            "\t"*4 + ", ".join([FORMAT(v) for v in self.floats[12:18]]) + ",\n" +
+            "\t"*4 + ", ".join([FORMAT(v) for v in self.floats[18:24]]) + ",\n" +
+            "\t"*4 + ", ".join([FORMAT(v) for v in self.floats[24:30]]) + ",\n" +
+            "\t"*4 + ", ".join([FORMAT(v) for v in self.floats[30:36]]))
         elif self.subtype == "sym":
-            ret = ("\n\t\t\tsym,\n"+
-            "\t"*4+str(self.floats[0:6]).strip("[]")+",\n"+
-            "\t"*5+str(self.floats[7:12]).strip("[]")+",\n"+
-            "\t"*6+str(self.floats[14:18]).strip("[]")+",\n"+
-            "\t"*7+str(self.floats[21:24]).strip("[]")+",\n"+
-            "\t"*8+str(self.floats[28:30]).strip("[]")+",\n"+
-            "\t"*9+str(self.floats[35]))
+            ret = ("\n\t\t\tsym,\n" +
+            "\t"*4 + ", ".join([FORMAT(v) for v in self.floats[0:6]]) + ",\n" +
+            "\t"*5 + ", ".join([FORMAT(v) for v in self.floats[7:12]]) + ",\n" +
+            "\t"*6 + ", ".join([FORMAT(v) for v in self.floats[14:18]]) + ",\n" +
+            "\t"*7 + ", ".join([FORMAT(v) for v in self.floats[21:24]]) + ",\n" +
+            "\t"*8 + ", ".join([FORMAT(v) for v in self.floats[28:30]]) + ",\n" +
+            "\t"*9 + FORMAT(self.floats[35]))
         elif self.subtype == "diag":
-            ret = "\n\t\t\tdiag, "+str([self.floats[i] for i in [0,7,14,21,28,35]]).strip("[]")
+            ret = "\n\t\t\tdiag, " + ", ".join([FORMAT(self.floats[i]) for i in [0,7,14,21,28,35]])
         elif self.subtype == "eye":
             ret = "\n\t\t\teye"
         elif self.subtype == "null":
             ret = "\n\t\t\tnull"
         if self.scale:
-            ret += ", scale, "+str(self.factor)
+            ret += ", scale, " + FORMAT(self.factor)
         return ret
 
 class Matrix6x6Operator(MatrixBase):
@@ -276,7 +275,7 @@ class Matrix6x6Operator(MatrixBase):
                         or (self.subtype == "diag" and k not in [0,7,14,21,28,35])):
                             row.label("")
                         else:
-                            row.prop(self.floats[k], "value", text="x"+str(k+1))
+                            row.prop(self.floats[k], "value", text="x" + str(k+1))
     def create_entity(self):
         return Matrix6x6(self.name)
 

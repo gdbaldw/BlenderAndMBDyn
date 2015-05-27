@@ -32,6 +32,8 @@ else:
     from math import sqrt
     import bmesh
 
+FORMAT = "{:.6g}".format
+
 aerodynamic_types = [
     "Aerodynamic body",
     "Aerodynamic beam2",
@@ -55,8 +57,8 @@ joint_types = [
     "Deformable displacement joint",
     "Deformable hinge",
     "Deformable joint",
-    "In line",
-    "In plane",
+    "Inline",
+    "Inplane",
     "Revolute hinge",
     "Rod",
     "Spherical hinge",
@@ -90,40 +92,10 @@ nonlinear_solver_types = [
     "Matrix free"]
 
 class Common:
-    def round_vector(self, v):
-        for i in range(3):
-            v[i] = round(v[i], 5)
-        return v
-    def round_matrix(self, r):
-        for i in range(3):
-            r[i] = self.round_vector(r[i])
-        return r
-    def locationVector_write(self, v, text, end=''):
-        v = self.round_vector(v)
-        text.write(str(v[0])+', '+str(v[1])+', '+str(v[2])+end)
-    def rotationMatrix_write(self, rot, text, pad):
-        rot = self.round_matrix(rot)
-        text.write(
-        pad+', '.join([str(rot[0][j]) for j in range(3)])+',\n'+
-        pad+', '.join([str(rot[1][j]) for j in range(3)])+',\n'+
-        pad+', '.join([str(rot[2][j]) for j in range(3)]))
-    def write_node(self, text, i, node=False, position=False, orientation=False, p_label='', o_label=''):
-        rot_i, globalV_i, Node_i = self.rigid_offset(i)
-        localV_i = rot_i*globalV_i
-        rotT = self.objects[i].matrix_world.to_quaternion().to_matrix().transposed()
-        if node:
-            text.write('\t\t'+str(Node_i)+',\n')
-        if position:
-            text.write('\t\t\t')
-            if p_label:
-                text.write(p_label+', ')
-            self.locationVector_write(localV_i, text)
-        if orientation:
-            text.write(',\n\t\t\t')
-            if o_label:
-                text.write(o_label+', ')
-            text.write('matr,\n')
-            self.rotationMatrix_write(rot_i*rotT, text, '\t\t\t\t')
+    def write_vector(self, v, f, end=""):
+        f.write(", ".join([FORMAT(x) for x in v]) + end)
+    def write_matrix(self, m, f, pad=""):
+        f.write(",\n".join([pad + ", ".join(FORMAT(x) for x in r) for r in m]))
 
 def subsurf(obj):
     subsurf = [m for m in obj.modifiers if m.type == 'SUBSURF']

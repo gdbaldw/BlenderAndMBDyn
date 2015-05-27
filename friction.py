@@ -29,6 +29,7 @@ if "bpy" in locals():
     imp.reload(Entity)
 else:
     from .base import bpy, database, Operator, Entity, Bundle, enum_function
+    from .common import FORMAT
 
 types = ["Modlugre", "Discrete Coulomb"]
 
@@ -71,10 +72,10 @@ for t in types:
 
 class Modlugre(Entity):
 	def string(self):
-		string = ("modlugre, "+str(self.sigma0)+", "+str(self.sigma1)+", "+str(self.sigma2)+", "+str(self.kappa)+",\n"+
-		"\t\t\t\""+self.links[0].name+"\", ")
+		string = ("modlugre, " + FORMAT(self.sigma0) + ", " + FORMAT(self.sigma1) + ", " + FORMAT(self.sigma2) + ", " + FORMAT(self.kappa) + ",\n" +
+		"\t\t\t\"" + self.links[0].name + "\", ")
 		if self.plane_hinge:
-			string += "simple plane hinge, "+str(self.radius)
+			string += "simple plane hinge, " + FORMAT(self.radius)
 		else:
 			string += "simple"
 		return string

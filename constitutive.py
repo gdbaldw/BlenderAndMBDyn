@@ -28,7 +28,8 @@ if "bpy" in locals():
     imp.reload(Operator)
     imp.reload(Entity)
 else:
-    from .base import bpy, root_dot, database, Operator, Entity, Bundle, BPY, enum_drive, enum_function, enum_matrix_3x1, enum_matrix_6x1, enum_matrix_3x3, enum_matrix_6x6, enum_matrix_6xN 
+    from .base import bpy, root_dot, database, Operator, Entity, Bundle, BPY, enum_drive, enum_function, enum_matrix_3x1, enum_matrix_6x1, enum_matrix_3x3, enum_matrix_6x6, enum_matrix_6xN
+    from .common import FORMAT
 
 types = [
     "Linear elastic",
@@ -111,9 +112,9 @@ for t in types:
 class LinearElastic(Entity):
     def string(self):
         if self.dimensions == "1D":
-            return "linear elastic, "+str(self.stiffness)
+            return "linear elastic, " + FORMAT(self.stiffness)
         else:
-            return "linear elastic isotropic, "+str(self.stiffness)
+            return "linear elastic isotropic, " + FORMAT(self.stiffness)
 
 class LinearElasticOperator(Base):
     bl_label = "Linear elastic"
@@ -144,7 +145,7 @@ klasses[LinearElasticOperator.bl_label] = LinearElasticOperator
 class LinearElasticGeneric(Entity):
     def string(self):
         if self.dimensions == "1D":
-            return "linear elastic generic, " + str(self.stiffness)
+            return "linear elastic generic, " + FORMAT(self.stiffness)
         else:
             return "linear elastic generic, " + self.links[0].string()
 
@@ -202,7 +203,7 @@ klasses[LinearElasticGenericOperator.bl_label] = LinearElasticGenericOperator
 
 class LinearElasticGenericAxialTorsionCoupling(Entity):
     def string(self):
-        return "linear elastic generic axial torsion coupling," + self.links[0].string() + ",\n\t\t\t" + str(self.coupling_coefficient)
+        return "linear elastic generic axial torsion coupling," + self.links[0].string() + ",\n\t\t\t" + FORMAT(self.coupling_coefficient)
                 
 class LinearElasticGenericAxialTorsionCouplingOperator(Base):
     bl_label = "Linear elastic generic axial torsion coupling"
@@ -244,7 +245,7 @@ class CubicElasticGeneric(Entity):
         ret = "cubic elastic generic"
         if self.dimensions == "1D":
             for stiffness in [self.stiffness_1, self.stiffness_2, self.stiffness_3]:
-                ret += ", " + str(stiffness)
+                ret += ", " + FORMAT(stiffness)
         else:
             for link in self.links:
                 ret += "," + link.string()
@@ -314,7 +315,7 @@ klasses[CubicElasticGenericOperator.bl_label] = CubicElasticGenericOperator
 
 class InverseSquareElastic(Entity):
     def string(self):
-        return "inverse square elastic, " + str(self.stiffness) + ", " + str(self.ref_length)
+        return "inverse square elastic, " + FORMAT(self.stiffness) + ", " + FORMAT(self.ref_length)
 
 class InverseSquareElasticOperator(Base):
     bl_label = "Inverse square elastic"
@@ -349,7 +350,7 @@ klasses[InverseSquareElasticOperator.bl_label] = InverseSquareElasticOperator
 
 class LogElastic(Entity):
     def string(self):
-        return "log elastic, " + str(self.stiffness)
+        return "log elastic, " + FORMAT(self.stiffness)
 
 class LogElasticOperator(Base):
     bl_label = "Log elastic"
@@ -381,7 +382,7 @@ class LinearElasticBistop(Entity):
     def string(self):
         ret = "linear elastic bistop"
         if self.dimensions == "1D":
-            ret += ",\n\t\t\t" + str(self.stiffness)
+            ret += ",\n\t\t\t" + FORMAT(self.stiffness)
         else:
             ret += ", " + self.links[2].string()
         ret += ",\n\t\t\tinitial status, " + self.initial_status
@@ -460,12 +461,12 @@ class DoubleLinearElastic(Entity):
     def string(self):
         ret = "double linear elastic"
         if self.dimensions == "1D":
-            ret += ", " + str(self.stiffness_1)
-            ret += ", " + str(self.upper_strain) + ", " + str(self.lower_strain)
-            ret += ", " + str(self.stiffness_2)
+            ret += ", " + FORMAT(self.stiffness_1)
+            ret += ", " + FORMAT(self.upper_strain) + ", " + FORMAT(self.lower_strain)
+            ret += ", " + FORMAT(self.stiffness_2)
         else:
             ret += "," + self.links[0].string()
-            ret += ",\n\t\t\t" + str(self.upper_strain) + ", " + str(self.lower_strain)
+            ret += ",\n\t\t\t" + FORMAT(self.upper_strain) + ", " + FORMAT(self.lower_strain)
             ret += "," + self.links[1].string()
         return ret
 
@@ -534,12 +535,12 @@ class IsotropicHardeningElastic(Entity):
     def string(self):
         ret = "isotropic hardening elastic"
         if self.dimensions == "1D":
-            ret += ",\n\t\t\t" + str(self.stiffness)
+            ret += ",\n\t\t\t" + FORMAT(self.stiffness)
         else:
             ret += ", " + self.links[0].string()
-        ret += ",\n\t\t\t" + str(self.reference_strain)
+        ret += ",\n\t\t\t" + FORMAT(self.reference_strain)
         if self.use_linear_stiffness:
-            ret += ", linear stiffness, " + str(self.linear_stiffness)
+            ret += ", linear stiffness, " + FORMAT(self.linear_stiffness)
         return ret
 
 class IsotropicHardeningElasticOperator(Base):
@@ -706,9 +707,9 @@ klasses[ScalarFunctionElasticOrthotropicOperator.bl_label] = ScalarFunctionElast
 class LinearViscous(Entity):
     def string(self):
         if self.dimensions == "1D":
-            return "linear viscous, " + str(self.viscosity)
+            return "linear viscous, " + FORMAT(self.viscosity)
         else:
-            return "linear viscous isotropic, " + str(self.viscosity)
+            return "linear viscous isotropic, " + FORMAT(self.viscosity)
 
 class LinearViscousOperator(Base):
     bl_label = "Linear viscous"
@@ -739,7 +740,7 @@ klasses[LinearViscousOperator.bl_label] = LinearViscousOperator
 class LinearViscousGeneric(Entity):
     def string(self):
         if self.dimensions == "1D":
-            return "linear viscous generic, " + str(self.viscosity)
+            return "linear viscous generic, " + FORMAT(self.viscosity)
         else:
             return "linear viscous generic, " + self.links[0].string()
 
@@ -799,13 +800,13 @@ class LinearViscoelastic(Entity):
     def string(self):
         ret = "linear viscoelastic"
         if self.dimensions == "1D":
-            ret += ", " + str(self.stiffness)
+            ret += ", " + FORMAT(self.stiffness)
         else:
-            ret += " isotropic, " + str(self.stiffness)
+            ret += " isotropic, " + FORMAT(self.stiffness)
         if self.proportional:
-            ret += ", proportional, " + str(self.factor)
+            ret += ", proportional, " + FORMAT(self.factor)
         else:
-            ret += ", " + str(self.viscosity)
+            ret += ", " + FORMAT(self.viscosity)
         return ret
 
 class LinearViscoelasticOperator(Base):
@@ -859,14 +860,14 @@ class LinearViscoelasticGeneric(Entity):
     def string(self):
         ret = "linear viscoelastic generic"
         if self.dimensions == "1D":
-            ret += ", " + str(self.stiffness)
+            ret += ", " + FORMAT(self.stiffness)
         else:
             ret += ", " + self.links[0].string()
         if self.proportional:
-            ret += ", proportional, " + str(self.factor)
+            ret += ", proportional, " + FORMAT(self.factor)
         else:
             if self.dimensions == "1D":
-                ret += ", " + str(self.viscosity)
+                ret += ", " + FORMAT(self.viscosity)
             else:
                 ret += ", " + self.links[1].string()
         return ret
@@ -962,15 +963,15 @@ class LinearTimeVariantViscoelasticGeneric(Entity):
     def string(self):
         ret = "linear time variant viscoelastic generic"
         if self.dimensions == "1D":
-            ret += ", " + str(self.stiffness)
+            ret += ", " + FORMAT(self.stiffness)
         else:
             ret += ", " + self.links[2].string()
         ret += ", " + self.links[0].string()
         if self.proportional:
-            ret += ", proportional, " + str(self.factor)
+            ret += ", proportional, " + FORMAT(self.factor)
         else:
             if self.dimensions == "1D":
-                ret += ", " + str(self.viscosity)
+                ret += ", " + FORMAT(self.viscosity)
             else:
                 ret += ", " + self.links[3].string()
         ret += ", " + self.links[1].string()
@@ -1078,29 +1079,26 @@ class LinearViscoelasticGenericAxialTorsionCoupling(Entity):
         ret = "linear viscoelastic generic axial torsion coupling"
         ret += "," + self.links[0].string()
         if self.proportional:
-            ret += ",\n\t\t\tproportional, " + str(self.factor)
+            ret += ",\n\t\t\tproportional, " + FORMAT(self.factor)
         else:
             ret += "," + self.links[1].string()
-        ret += ",\n\t\t\t" + str(self.coupling_coefficient)
+        ret += ",\n\t\t\t" + FORMAT(self.coupling_coefficient)
         return ret
 
 class LinearViscoelasticGenericAxialTorsionCouplingOperator(Base):
     bl_label = "Linear viscoelastic generic axial torsion coupling"
     dimensions = bpy.props.EnumProperty(items=[("6D", "6D", "")], name="Dimension(s)")
-    coupling_coefficient = bpy.props.FloatProperty(name="Coupling coefficient", description="", min=0.000001, max=9.9e10, precision=6)
+    coupling_coefficient = bpy.props.FloatProperty(name="Coupling coefficient", description="", min=0.000001, max=9.9e10, precision=6, default=1.0)
     stiffness_matrix_6x1_name = bpy.props.EnumProperty(items=enum_matrix_6x1, name="Stiffness")
     stiffness_matrix_edit = bpy.props.BoolProperty(name="")
-    proportional = bpy.props.BoolProperty(name="Proportional")
-    factor = bpy.props.FloatProperty(name="Factor", description="", min=0.000001, max=9.9e10, precision=6)
+    proportional = bpy.props.BoolProperty(name="Proportional", default=False)
+    factor = bpy.props.FloatProperty(name="Factor", description="", min=0.000001, max=9.9e10, precision=6, default=1.0)
     viscosity_matrix_6x1_name = bpy.props.EnumProperty(items=enum_matrix_6x1, name="Viscosity")
-    viscosity_matrix__edit = bpy.props.BoolProperty(name="")
+    viscosity_matrix_edit = bpy.props.BoolProperty(name="")
     @classmethod
     def poll(cls, context):
         return True
     def defaults(self, context):
-        self.coupling_coefficient = 1.0
-        self.proportional = False
-        self.factor = 1.0
         self.matrix_exists(context, "6x1")
     def assign(self, context):
         self.entity = database.constitutive[context.scene.constitutive_index]
@@ -1145,8 +1143,8 @@ class CubicViscoelasticGeneric(Entity):
         ret = "cubic viscoelastic generic"
         if self.dimensions == "1D":
             for stiffness in [self.stiffness_1, self.stiffness_2, self.stiffness_3]:
-                ret += ", " + str(stiffness)
-            ret += ", " + str(self.viscosity)
+                ret += ", " + FORMAT(stiffness)
+            ret += ", " + FORMAT(self.viscosity)
         else:
             for link in self.links:
                 ret += "," + link.string()
@@ -1228,15 +1226,15 @@ class DoubleLinearViscoelastic(Entity):
     def string(self):
         ret = "double linear viscoelastic"
         if self.dimensions == "1D":
-            ret += ", " + str(self.stiffness_1)
-            ret += ", " + str(self.upper_strain) + ", " + str(self.lower_strain)
-            ret += ", " + str(self.stiffness_2)
-            ret += ", " + str(self.viscosity_1)
+            ret += ", " + FORMAT(self.stiffness_1)
+            ret += ", " + FORMAT(self.upper_strain) + ", " + FORMAT(self.lower_strain)
+            ret += ", " + FORMAT(self.stiffness_2)
+            ret += ", " + FORMAT(self.viscosity_1)
             if self.second_damping:
-                ret += ", second damping, " + str(self.viscosity_1)
+                ret += ", second damping, " + FORMAT(self.viscosity_1)
         else:
             ret += "," + self.links[0].string()
-            ret += ",\n\t\t\t" + str(self.upper_strain) + ", " + str(self.lower_strain)
+            ret += ",\n\t\t\t" + FORMAT(self.upper_strain) + ", " + FORMAT(self.lower_strain)
             ret += "," + self.links[1].string()
             ret += "," + self.links[2].string()
             if self.second_damping:
@@ -1338,11 +1336,11 @@ klasses[DoubleLinearViscoelasticOperator.bl_label] = DoubleLinearViscoelasticOpe
 
 class TurbulentViscoelastic(Entity):
     def string(self):
-        ret = "turbulent viscoelastic, " + str(self.stiffness) + ", " + str(self.parabolic_viscosity)
+        ret = "turbulent viscoelastic, " + FORMAT(self.stiffness) + ", " + FORMAT(self.parabolic_viscosity)
         if self.use_threshold:
-            ret += ", " + str(self.threshold)
+            ret += ", " + FORMAT(self.threshold)
             if self.use_linear_viscosity:
-                ret += ", " + str(self.linear_viscosity)
+                ret += ", " + FORMAT(self.linear_viscosity)
         return ret
 
 class TurbulentViscoelasticOperator(Base):
@@ -1405,7 +1403,7 @@ class LinearViscoelasticBistop(Entity):
     def string(self):
         ret = "linear viscoelastic bistop"
         if self.dimensions == "1D":
-            ret += ",\n\t\t\t" + str(self.stiffness) + ", " + str(self.viscosity)
+            ret += ",\n\t\t\t" + FORMAT(self.stiffness) + ", " + FORMAT(self.viscosity)
         else:
             ret += ", " + self.links[2].string() + ", " + self.links[3].string()
         ret += ",\n\t\t\tinitial status, " + self.initial_status

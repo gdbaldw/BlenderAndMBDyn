@@ -108,7 +108,7 @@ class Database(Common):
     def unpickle(self):
         self.clear()
         def _exec(_repr):
-            exec("id_data = "+_repr)
+            exec("id_data = " + _repr)
             return locals()["id_data"]
         if bpy.context.scene.pickled_database:
             with BytesIO(b64decode(bpy.context.scene.pickled_database.encode())) as f:
@@ -134,7 +134,7 @@ class Database(Common):
                 self.structural_dynamic_nodes |= set([ob])
             elif e.type in structural_static_types:
                 self.structural_static_nodes |= set([ob])
-            elif e.type == 'Dummy':
+            elif e.type == "Dummy":
                 self.structural_dummy_nodes |= set([ob])
                 dummy_dict[ob] = e.objects[1]
         self.structural_static_nodes -= self.structural_dynamic_nodes | self.structural_dummy_nodes
@@ -142,40 +142,40 @@ class Database(Common):
         self.node.extend(list(nodes))
         self.node.sort(key = lambda x: x.name)
         f.write(
-        '\n/* Label Indexes\n')
+        "\n/* Label Indexes\n")
         if self.frame:
-            f.write('\nreference frames:\n')
+            f.write("\nreference frames:\n")
             for i, frame in enumerate(self.frame):
-                f.write('\t'+str(i)+'\t- '+frame.objects[0].name+'\n')
+                f.write("\t" + str(i) + "\t- " + frame.objects[0].name + "\n")
         if self.node:
-            f.write('\nnodes:\n')
+            f.write("\nnodes:\n")
             for i, entity in enumerate(self.node):
-                f.write('\t'+str(i)+'\t- '+entity.name+'\n')
-        for clas in 'ns_node drive driver element'.split():
-            if eval('self.'+clas):
-                f.write('\n'+clas+'s:\n')
-                for i, entity in enumerate(eval('self.'+clas)):
-                    f.write('\t'+str(i)+'\t- '+entity.name+' ('+entity.type)
+                f.write("\t" + str(i) + "\t- " + entity.name + "\n")
+        for clas in "ns_node drive driver element".split():
+            if eval("self." + clas):
+                f.write("\n" + clas + "s:\n")
+                for i, entity in enumerate(eval("self." + clas)):
+                    f.write("\t" + str(i) + "\t- " + entity.name + " (" + entity.type)
                     if entity.users:
-                        f.write(', users='+str(entity.users))
-                    f.write(')')
-                    if clas == 'element' and hasattr(entity, "objects"):
+                        f.write(", users=" + str(entity.users))
+                    f.write(")")
+                    if clas == "element" and hasattr(entity, "objects"):
                         names = [o.name for o in entity.objects if o]
                         if names:
-                            string = ' objects: '
+                            string = " objects: "
                             for name in names:
-                                string += name+', '
-                            string = string[:-2]+'.'
+                                string += name + ", "
+                            string = string[:-2] + "."
                             f.write(string)
                     names = [l.name for l in entity.links if l]
                     if names:
-                        string = ' links: '
+                        string = " links: "
                         for name in names:
-                            string += name+', '
-                        string = string[:-2]+'.'
+                            string += name + ", "
+                        string = string[:-2] + "."
                         f.write(string)
-                    f.write('\n')
-        f.write('\n*/\n\n')
+                    f.write("\n")
+        f.write("\n*/\n\n")
     def write_control(self, f):
         structural_node_count = len(
             self.structural_static_nodes | self.structural_dynamic_nodes | self.structural_dummy_nodes)
@@ -183,11 +183,11 @@ class Database(Common):
         force_count = len([e for e in self.element if e.type in force_types])
         rigid_body_count = len([e for e in self.element if e.type in rigid_body_types])
         aerodynamic_element_count = len([e for e in self.element if e.type in aerodynamic_types])
-        rotor_count = len([e for e in self.element if e.type in ['Rotor']])
+        rotor_count = len([e for e in self.element if e.type in ["Rotor"]])
         genel_count = len([e for e in self.element if e.type in genel_types])
         beam_count = len([e for e in self.element if e.type in beam_types])
-        air_properties = bool([e for e in self.element if e.type in ['Air properties']])
-        gravity = bool([e for e in self.element if e.type in ['Gravity']])
+        air_properties = bool([e for e in self.element if e.type in ["Air properties"]])
+        gravity = bool([e for e in self.element if e.type in ["Gravity"]])
         self.file_driver_count = 0
         bailout_upper = False
         upper_bailout_time = 0.0
@@ -195,7 +195,7 @@ class Database(Common):
             driver.columns = list()
         self.drive_callers.clear()
         for drive in self.drive:
-            if drive.type == 'File drive':
+            if drive.type == "File drive":
                 drive.links[0].columns.append(drive)
             if not drive.users:
                 self.drive_callers.append(drive)
@@ -204,10 +204,10 @@ class Database(Common):
                 self.file_driver_count += 1
                 if driver.bailout_upper:
                     if driver.filename:
-                        name = driver.filename.replace(' ', '')
+                        name = driver.filename.replace(" ", "")
                     else:
-                        name = driver.name.replace(' ', '')
-                    command = "tail -n 1 "+os.path.splitext(database.filepath)[0]+".echo_"+name+" | awk '{print $1}'"
+                        name = driver.name.replace(" ", "")
+                    command = "tail -n 1 " + os.path.splitext(database.filepath)[0] + ".echo_" + name + " | awk '{print $1}'"
                     f1 = TemporaryFile()
                     call(command, shell=True, stdout=f1)
                     try:
@@ -221,40 +221,40 @@ class Database(Common):
         hydraulic_node_count = len([e for e in self.ns_node if e.type in ["Hydraulic"]])
         #parameter_node_count = len([e for e in self.ns_node if e.type in ["Parameter"]])
         if structural_node_count:
-            f.write('\tstructural nodes: '+str(structural_node_count)+';\n')
+            f.write("\tstructural nodes: " + str(structural_node_count) + ";\n")
         if electric_node_count:
-            f.write('\telectric nodes: '+str(electric_node_count)+';\n')
+            f.write("\telectric nodes: " + str(electric_node_count) + ";\n")
         if abstract_node_count:
-            f.write('\tabstract nodes: '+str(abstract_node_count)+';\n')
+            f.write("\tabstract nodes: " + str(abstract_node_count) + ";\n")
         if hydraulic_node_count:
-            f.write('\thydraulic nodes: '+str(hydraulic_node_count)+';\n')
+            f.write("\thydraulic nodes: " + str(hydraulic_node_count) + ";\n")
         if joint_count:
-            f.write('\tjoints: '+str(joint_count)+';\n')
+            f.write("\tjoints: " + str(joint_count) + ";\n")
         if force_count:
-            f.write('\tforces: '+str(force_count)+';\n')
+            f.write("\tforces: " + str(force_count) + ";\n")
         if genel_count:
-            f.write('\tgenels: '+str(genel_count)+';\n')
+            f.write("\tgenels: " + str(genel_count) + ";\n")
         if beam_count:
-            f.write('\tbeams: '+str(beam_count)+';\n')
+            f.write("\tbeams: " + str(beam_count) + ";\n")
         if rigid_body_count:
-            f.write('\trigid bodies: '+str(rigid_body_count)+';\n')
+            f.write("\trigid bodies: " + str(rigid_body_count) + ";\n")
         if air_properties:
-            f.write('\tair properties;\n')
+            f.write("\tair properties;\n")
         if gravity:
-            f.write('\tgravity;\n')
+            f.write("\tgravity;\n")
         if aerodynamic_element_count:
-            f.write('\taerodynamic elements: '+str(aerodynamic_element_count)+';\n')
+            f.write("\taerodynamic elements: " + str(aerodynamic_element_count) + ";\n")
         if rotor_count:
-            f.write('\trotors: '+str(rotor_count)+';\n')
+            f.write("\trotors: " + str(rotor_count) + ";\n")
         if self.file_driver_count:
-            f.write('\tfile drivers: '+str(self.file_driver_count)+';\n')
+            f.write("\tfile drivers: " + str(self.file_driver_count) + ";\n")
     def write(self, f):
         frame_dict = dict()
         if self.frame:
-            f.write('\n')
+            f.write("\n")
             for i, frame in enumerate(self.frame):
                 frame_dict.update({ob : str(i) for ob in frame.objects[1:]})
-                parent_label = 'global'
+                parent_label = "global"
                 for ip, parent_frame in enumerate(self.frame):
                     if frame.objects[0] in parent_frame.objects[1:]:
                         parent_label = str(ip)
@@ -266,35 +266,35 @@ class Database(Common):
                         vectors.append(rot*Vector([0., 0., 0.]))
                     else:
                         vectors.append(rot*Vector(link.floats) * (link.factor if link.scale else 1))
-                f.write('reference: '+str(i)+',\n'+'\treference, global, ')
-                self.locationVector_write(list(frame.objects[0].matrix_world.translation), f, ',\n')
-                f.write('\treference, global, matr,\n')
-                self.rotationMatrix_write(rot, f, '\t\t')
-                f.write(',\n\treference, '+parent_label+', ')
-                self.locationVector_write(vectors[0], f, ',\n')
-                f.write('\treference, '+parent_label+', ')
-                self.locationVector_write(vectors[1], f, ';\n')
+                f.write("reference: " + str(i) + ",\n" + "\treference, global, ")
+                self.write_vector(list(frame.objects[0].matrix_world.translation), f, ",\n")
+                f.write("\treference, global, matr,\n")
+                self.write_matrix(rot, f, "\t\t")
+                f.write(",\n\treference, " + parent_label + ", ")
+                self.write_vector(vectors[0], f, ",\n")
+                f.write("\treference, " + parent_label + ", ")
+                self.write_vector(vectors[1], f, ";\n")
         if self.node:
-            f.write('\nbegin: nodes;\n')
+            f.write("\nbegin: nodes;\n")
             for i, node in enumerate(self.node):
                     if node in self.structural_dynamic_nodes:
-                        f.write('\tstructural: '+str(i)+', dynamic,\n')
+                        f.write("\tstructural: " + str(i) + ", dynamic,\n")
                     elif node in self.structural_static_nodes:
-                        f.write('\tstructural: '+str(i)+', static,\n')
+                        f.write("\tstructural: " + str(i) + ", static,\n")
                     else:
                         continue
                     rot = node.matrix_world.to_quaternion().to_matrix()
                     if node in frame_dict:
                         frame_label = frame_dict[node]
                     else:
-                        frame_label = 'global'
-                    f.write('\t\treference, global, ')
-                    self.locationVector_write(list(node.matrix_world.translation), f, ',\n')
-                    f.write('\t\treference, global, matr,\n')
-                    self.rotationMatrix_write(rot, f, '\t'*3)
-                    f.write(',\n'+
-                        '\t\treference, '+frame_label+', null,\n'+
-                        '\t\treference, '+frame_label+', null;\n')
+                        frame_label = "global"
+                    f.write("\t\treference, global, ")
+                    self.write_vector(list(node.matrix_world.translation), f, ",\n")
+                    f.write("\t\treference, global, matr,\n")
+                    self.write_matrix(rot, f, "\t"*3)
+                    f.write(",\n" +
+                        "\t\treference, " + frame_label + ", null,\n" +
+                        "\t\treference, " + frame_label + ", null;\n")
             for i, node in enumerate(self.node):
                 if node in self.structural_dummy_nodes:
                     base_node = dummy_dict[node]
@@ -302,41 +302,41 @@ class Database(Common):
                     globalV = node.matrix_world.translation - base_node.matrix_world.translation
                     localV = rot*globalV
                     rotT = node.matrix_world.to_quaternion().to_matrix().transposed()
-                    f.write('\tstructural: '+str(i)+', dummy,\n\t\t'+
-                        str(self.node.index(base_node))+', offset,\n\t\t\t')
-                    self.locationVector_write(localV, f, ',\n\t\t\tmatr,\n')
-                    self.rotationMatrix_write(rot*rotT, f, '\t\t\t\t')
-                    f.write(';\n')
+                    f.write("\tstructural: " + str(i) + ", dummy,\n\t\t" +
+                        str(self.node.index(base_node)) + ", offset,\n\t\t\t")
+                    self.write_vector(localV, f, ",\n\t\t\tmatr,\n")
+                    self.write_matrix(rot*rotT, f, "\t\t\t\t")
+                    f.write(";\n")
             """
             for i, ns_node in enumerate(self.ns_node):
-                if ns_node.type == 'Electric':
-                    f.write('\telectric: '+str(i)+', value, '+str(ns_node._args[0]))
-                    if ns_node._args[1]: f.write(', derivative, '+str(ns_node._args[2]))
-                    f.write(';\n')
-                if ns_node.type == 'Abstract':
-                    f.write('\tabstract: '+str(i)+', value, '+str(ns_node._args[0]))
-                    if ns_node._args[1]: f.write(', differential, '+str(ns_node._args[2]))
-                    f.write(';\n')
-                if ns_node.type == 'Hydraulic':
-                    f.write('\thydraulic: '+str(i)+', value, '+str(ns_node._args[0])+';\n')
+                if ns_node.type == "Electric":
+                    f.write("\telectric: " + str(i) + ", value, " + str(ns_node._args[0]))
+                    if ns_node._args[1]: f.write(", derivative, " + str(ns_node._args[2]))
+                    f.write(";\n")
+                if ns_node.type == "Abstract":
+                    f.write("\tabstract: " + str(i) + ", value, " + str(ns_node._args[0]))
+                    if ns_node._args[1]: f.write(", differential, " + str(ns_node._args[2]))
+                    f.write(";\n")
+                if ns_node.type == "Hydraulic":
+                    f.write("\thydraulic: " + str(i) + ", value, " + str(ns_node._args[0]) + ";\n")
             """
-            f.write('end: nodes;\n')
+            f.write("end: nodes;\n")
         if self.file_driver_count:
-            f.write('\nbegin: drivers;\n')
+            f.write("\nbegin: drivers;\n")
             for driver in self.Driver:
                 if driver.users:
                     driver.write(f)
-            f.write('end: drivers;\n')
+            f.write("end: drivers;\n")
         if self.element:
             self.element[0].indent_drives *= 0
             self.element[0].indent_drives += 1
         if self.drive_callers:
-            f.write('\n')
+            f.write("\n")
             for drive in self.drive_callers:
-                name = drive.name.replace(' ', '').replace('.', '__')
-                f.write('set: integer '+name+' = '+str(self.drive.index(drive))+';\n\tdrive caller: '+name+', '+drive.string()+';\n')
+                name = drive.name.replace(" ", "").replace(".", "__")
+                f.write("set: integer " + name + " = " + str(self.drive.index(drive)) + ";\n\tdrive caller: " + name + ", " + drive.string() + ";\n")
         if self.function:
-            f.write('\n')
+            f.write("\n")
             for function in self.function:
                 function.written = False
             for function in self.function:
@@ -344,7 +344,7 @@ class Database(Common):
         if self.element:
             self.element[0].indent_drives *= 0
             self.element[0].indent_drives += 2
-            f.write('\nbegin: elements;\n')
+            f.write("\nbegin: elements;\n")
             try:
                 for element_type in aerodynamic_types + beam_types + ["Body"] + force_types + genel_types + joint_types + ["Rotor"] + environment_types + ["Driven"]:
                     for element in self.element:
@@ -352,5 +352,5 @@ class Database(Common):
                             element.write(f)
             except Exception as e:
                 print(e)
-                f.write(str(e) + "\n")            
-            f.write('end: elements;\n')
+                f.write(str(e) + "\n")
+            f.write("end: elements;\n")

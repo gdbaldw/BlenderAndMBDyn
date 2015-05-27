@@ -29,6 +29,7 @@ if "bpy" in locals():
     imp.reload(Entity)
 else:
     from .base import bpy, root_dot, database, Operator, Entity, Bundle, enum_general_data, enum_method, enum_nonlinear_solver, enum_eigenanalysis, enum_abort_after, enum_linear_solver, enum_dummy_steps, enum_output_data, enum_real_time, enum_assembly, enum_job_control, enum_default_output, enum_default_aerodynamic_output, enum_default_beam_output
+    from .common import FORMAT
     from bpy_extras.io_utils import ExportHelper
     from mathutils import Matrix
     from subprocess import call, Popen
@@ -64,9 +65,9 @@ class Base(Operator):
         if context.scene.dirty_simulator:
             layout.label("Choose a simulator")
         else:
-            layout.operator(root_dot+"simulate")
+            layout.operator(root_dot + "simulate")
             if context.scene.clean_log:
-                layout.operator(root_dot+"animate")
+                layout.operator(root_dot + "animate")
 
 for t in types:
     class Tester(Base):
@@ -86,15 +87,15 @@ for t in types:
 
 class InitialValue(Entity):
     def write_input_file(self, context, directory):
-        with open(os.path.join(directory, context.scene.name+".mbd"), 'w') as f:
+        with open(os.path.join(directory, context.scene.name + ".mbd"), "w") as f:
             database.write_indexes(f)
             f.write(
                 "begin: data" +
                 ";\n\tproblem: initial value" +
                 ";\nend: data" +
                 ";\n\nbegin: initial value" +
-                ";\n\tinitial time: " + str(self.initial_time) +
-                ";\n\tfinal time: " + ("forever" if self.forever else str(self.final_time)) +
+                ";\n\tinitial time: " + FORMAT(self.initial_time) +
+                ";\n\tfinal time: " + ("forever" if self.forever else FORMAT(self.final_time)) +
                 ";\n")
             problem_count = len([v for v in [True, self.set_method, self.set_nonlinear_solver,
                 self.set_eigenanalysis, self.set_abort_after, self.set_linear_solver,
@@ -336,7 +337,7 @@ class Register(list):
 register = Register()
 
 class Save(bpy.types.Operator, Base):
-    bl_idname = root_dot+"save"
+    bl_idname = root_dot + "save"
     bl_options = {'REGISTER', 'INTERNAL'}
     bl_label = "Save Blender File"
     filter_glob = bpy.props.StringProperty(
@@ -363,7 +364,7 @@ class Save(bpy.types.Operator, Base):
 register.append(Save)
 
 class Simulate(bpy.types.Operator, Base):
-    bl_idname = root_dot+"simulate"
+    bl_idname = root_dot + "simulate"
     bl_options = {'REGISTER', 'INTERNAL'}
     bl_label = "Run simulation"
     bl_description = "Run MBDyn for the input file"
@@ -399,17 +400,17 @@ class Simulate(bpy.types.Operator, Base):
     def execute(self, context):
         sim = database.simulator[context.scene.simulator_index]
         directory = os.path.splitext(context.blend_data.filepath)[0]
-        command = sim.executable_path + " -s -f " + os.path.join(directory, context.scene.name + ".mbd") + ' &'
+        command = sim.executable_path + " -s -f " + os.path.join(directory, context.scene.name + ".mbd") + " &"
         print(command)
         self.f1 = TemporaryFile()
         process = Popen(command, shell=True, stdout=self.f1)
-        out_file = os.path.join(directory, context.scene.name+".out")
+        out_file = os.path.join(directory, context.scene.name + ".out")
         self.command = "tail -n 1 " + out_file + " | awk '{print $3}'"
         print(self.command)
-        self.t_hold, self.t_now, self.t_final  = (-float("inf"), sim.initial_time,
+        self.t_hold, self.t_now, self.t_final = (-float("inf"), sim.initial_time,
             sim.final_time if not sim.forever else float("inf"))
         self.t_range = self.t_final - self.t_now
-        call("touch "+out_file, shell=True)
+        call("touch " + out_file, shell=True)
         self.f2 = TemporaryFile()
         wm = context.window_manager
         wm.progress_begin(0., 100.)
@@ -419,7 +420,7 @@ class Simulate(bpy.types.Operator, Base):
 register.append(Simulate)
 
 class Animate(bpy.types.Operator, Base):
-    bl_idname = root_dot+"animate"
+    bl_idname = root_dot + "animate"
     bl_options = {'REGISTER', 'INTERNAL'}
     bl_label = "Animate objects"
     bl_description = "Import results into Blender animation starting at the next frame"
@@ -461,7 +462,7 @@ class Animate(bpy.types.Operator, Base):
                 fields = [float(field) for field in fields[1:13]]
                 euler = Matrix([fields[3:6], fields[6:9], fields[9:12]]).to_euler()
                 database.node[i].location = fields[:3]
-                database.node[i].rotation_euler = euler[0], euler[1], euler[2]    
+                database.node[i].rotation_euler = euler[0], euler[1], euler[2]
                 for data_path in "location rotation_euler".split():
                     database.node[i].keyframe_insert(data_path)
         scene.frame_current = frame_initial + 1

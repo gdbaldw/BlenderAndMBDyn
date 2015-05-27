@@ -31,9 +31,9 @@ if "bpy" in locals():
     imp.reload(enum_objects)
     imp.reload(enum_matrix_3x3)
 else:
-    from .common import (aerodynamic_types, beam_types, force_types, genel_types, joint_types, environment_types, node_types,
+    from .common import (FORMAT, aerodynamic_types, beam_types, force_types, genel_types, joint_types, environment_types, node_types,
         structural_static_types, structural_dynamic_types, Ellipsoid, RhombicPyramid, Teardrop, Cylinder, Sphere)
-    from .base import bpy, root_dot, database, Operator, Entity, Bundle, enum_objects, enum_matrix_3x1, enum_matrix_3x3, enum_constitutive_1D, enum_constitutive_3D, enum_constitutive_6D, enum_drive, enum_friction, SelectedObjects
+    from .base import bpy, root_dot, database, Operator, Entity, Bundle, enum_objects, enum_matrix_3x1, enum_matrix_3x3, enum_constitutive_1D, enum_constitutive_3D, enum_constitutive_6D, enum_drive, enum_element, enum_friction, SelectedObjects
     from mathutils import Vector
 
 types = aerodynamic_types + beam_types + ["Body"] + force_types + genel_types + joint_types + ["Rotor"] + environment_types + ["Driven"] + node_types
@@ -60,7 +60,7 @@ class Base(Operator):
             test = len(obs) == N and not database.element.filter(cls.bl_label, obs[0])
         else:
             test = not database.element.filter(cls.bl_label)
-        return cls.bl_idname.startswith(root_dot+"e_") or test
+        return cls.bl_idname.startswith(root_dot + "e_") or test
     def defaults(self, context):
         pass
     def assign(self, context):
@@ -92,6 +92,28 @@ class Base(Operator):
         return context.scene.element_index, context.scene.element_uilist
     def set_index(self, context, value):
         context.scene.element_index = value
+    def write_hinge(self, text, name, V1=True, V2=True, M1=True, M2=True):
+        rot_0, globalV_0, Node_0 = self.rigid_offset(0)
+        localV_0 = rot_0*globalV_0
+        rot_1, globalV_1, Node_1 = self.rigid_offset(1)
+        to_hinge = rot_1*(globalV_1 + self.objects[0].matrix_world.translation - self.objects[1].matrix_world.translation)
+        rotT = self.objects[0].matrix_world.to_quaternion().to_matrix().transposed()
+        text.write(
+        "\tjoint: " + FORMAT(database.element.index(self)) + ", " + name + ",\n" +
+        "\t\t" + FORMAT(Node_0))
+        if V1:
+            text.write(", ")
+            self.write_vector(localV_0, text)
+        if M1:
+            text.write(",\n\t\t\thinge, matr,\n")
+            self.write_matrix(rot_0*rotT, text, "\t\t\t\t")
+        text.write(", \n\t\t" + FORMAT(Node_1))
+        if V2:
+            text.write(", ")
+            self.write_vector(to_hinge, text)
+        if M2:
+            text.write(",\n\t\t\thinge, matr,\n")
+            self.write_matrix(rot_1*rotT, text, "\t\t\t\t")
 
 klasses = dict()
 
@@ -112,12 +134,13 @@ for t in types:
     klasses[t] = Tester
 
 class StructuralForce(Entity):
+    elem_type = "force"
     def write(self, text):
         rot_0, globalV_0, Node_0 = self.rigid_offset(0)
         rotT_0 = self.objects[0].matrix_world.to_quaternion().to_matrix().transposed()
         relative_dir = rot_0*rotT_0*Vector((0., 0., 1.))
         relative_arm_0 = rot_0*globalV_0
-        string = "\tforce: "+str(database.element.index(self))+", "
+        string = "\tforce: " + FORMAT(database.element.index(self)) + ", "
         if self.orientation == "follower":
             string += "follower"
             relative_dir = rot_0*rotT_0*Vector((0., 0., 1.))
@@ -127,11 +150,11 @@ class StructuralForce(Entity):
         relative_dir = self.round_vector(relative_dir)
         relative_arm_0 = self.round_vector(relative_arm_0)
         text.write(string+
-        ",\n\t\t"+str(Node_0)+
+        ",\n\t\t" + FORMAT(Node_0)+
         ",\n\t\t\tposition, ")
-        self.locationVector_write(relative_arm_0, text, ",\n\t\t\t")
-        self.locationVector_write(relative_dir, text, ",\n\t\t")
-        text.write(self.links[0].string(self)+";\n")
+        self.write_vector(relative_arm_0, text, ",\n\t\t\t")
+        self.write_vector(relative_dir, text, ",\n\t\t")
+        text.write(self.links[0].string(self) + ";\n")
     def remesh(self):
         RhombicPyramid(self.objects[0])
 
@@ -169,13 +192,14 @@ class StructuralForceOperator(ForceBase):
 klasses[StructuralForceOperator.bl_label] = StructuralForceOperator
 
 class StructuralInternalForce(Entity):
+    elem_type = "force"
     def write(self, text):
         rot_0, globalV_0, Node_0 = self.rigid_offset(0)
         rotT_0 = self.objects[0].matrix_world.to_quaternion().to_matrix().transposed()
         relative_arm_0 = rot_0*globalV_0
         rot_1, globalV_1, Node_1 = self.rigid_offset(1)
         relative_arm_1 = rot_1*globalV_1
-        string = "\tforce: "+str(database.element.index(self))+", "
+        string = "\tforce: " + FORMAT(database.element.index(self)) + ", "
         if self.orientation == "follower":
             string += "follower internal"
             relative_dir = rot_0*rotT_0*Vector((0., 0., 1.))
@@ -183,12 +207,12 @@ class StructuralInternalForce(Entity):
             string += "absolute internal"
             relative_dir = rotT_0*Vector((0., 0., 1.))
         text.write(string+
-        ",\n\t\t"+str(Node_0)+",\n\t\t\t")
-        self.locationVector_write(relative_dir, text, ",\n\t\t\t")
-        self.locationVector_write(relative_arm_0, text, ",\n\t\t")
-        text.write(str(Node_1)+",\n\t\t\t")
-        self.locationVector_write(relative_arm_1, text, ",\n\t\t")
-        text.write(self.links[0].string(self)+";\n")
+        ",\n\t\t" + FORMAT(Node_0) + ",\n\t\t\t")
+        self.write_vector(relative_dir, text, ",\n\t\t\t")
+        self.write_vector(relative_arm_0, text, ",\n\t\t")
+        text.write(FORMAT(Node_1) + ",\n\t\t\t")
+        self.write_vector(relative_arm_1, text, ",\n\t\t")
+        text.write(self.links[0].string(self) + ";\n")
     def remesh(self):
         RhombicPyramid(self.objects[0])
 
@@ -203,10 +227,11 @@ class StructuralInternalForceOperator(ForceBase):
 klasses[StructuralInternalForceOperator.bl_label] = StructuralInternalForceOperator
 
 class StructuralCouple(Entity):
+    elem_type = "couple"
     def write(self, text):
         rot_0, globalV_0, Node_0 = self.rigid_offset(0)
         rotT_0 = self.objects[0].matrix_world.to_quaternion().to_matrix().transposed()
-        string = "\tcouple: "+str(database.element.index(self))+", "
+        string = "\tcouple: " + FORMAT(database.element.index(self)) + ", "
         if self.orientation == "follower":
             string += "follower"
             relative_dir = rot_0*rotT_0*Vector((0., 0., 1.))
@@ -214,9 +239,9 @@ class StructuralCouple(Entity):
             string += "absolute"
             relative_dir = rotT_0*Vector((0., 0., 1.))
         text.write(string+
-        ",\n\t\t"+str(Node_0)+",\n\t\t\t")
-        self.locationVector_write(relative_dir, text, ",\n\t\t")
-        text.write(self.links[0].string(self)+";\n")
+        ",\n\t\t" + FORMAT(Node_0) + ",\n\t\t\t")
+        self.write_vector(relative_dir, text, ",\n\t\t")
+        text.write(self.links[0].string(self) + ";\n")
     def remesh(self):
         RhombicPyramid(self.objects[0])
 
@@ -231,11 +256,12 @@ class StructuralCoupleOperator(ForceBase):
 klasses[StructuralCoupleOperator.bl_label] = StructuralCoupleOperator
 
 class StructuralInternalCouple(Entity):
+    elem_type = "couple"
     def write(self, text):
         rot_0, globalV_0, Node_0 = self.rigid_offset(0)
         rotT_0 = self.objects[0].matrix_world.to_quaternion().to_matrix().transposed()
         rot_1, globalV_1, Node_1 = self.rigid_offset(1)
-        string = "\tcouple: "+str(database.element.index(self))+", "
+        string = "\tcouple: " + FORMAT(database.element.index(self)) + ", "
         if self.orientation == "follower":
             string += "follower internal"
             relative_dir = rot_0*rotT_0*Vector((0., 0., 1.))
@@ -243,9 +269,9 @@ class StructuralInternalCouple(Entity):
             string += "absolute internal"
             relative_dir = rotT_0*Vector((0., 0., 1.))
         text.write(string+
-        ",\n\t\t"+str(Node_0)+",\n\t\t\t")
-        self.locationVector_write(relative_dir, text, ",\n\t\t")
-        text.write(str(Node_1)+",\n"+self.links[0].string(True)+";\n")
+        ",\n\t\t" + FORMAT(Node_0) + ",\n\t\t\t")
+        self.write_vector(relative_dir, text, ",\n\t\t")
+        text.write(FORMAT(Node_1) + ",\n" + self.links[0].string(True) + ";\n")
     def remesh(self):
         RhombicPyramid(self.objects[0])
 
@@ -260,9 +286,10 @@ class StructuralInternalCoupleOperator(ForceBase):
 klasses[StructuralInternalCoupleOperator.bl_label] = StructuralInternalCoupleOperator
 
 class AxialRotation(Entity):
+    elem_type = "joint"
     def write(self, text):
         self.write_hinge(text, "axial rotation")
-        text.write(",\n"+self.links[0].string(True)+";\n")
+        text.write(",\n" + self.links[0].string(True) + ";\n")
     def remesh(self):
         Cylinder(self.objects[0])
 
@@ -293,10 +320,11 @@ class AxialRotationOperator(Base):
 klasses[AxialRotationOperator.bl_label] = AxialRotationOperator
 
 class Clamp(Entity):
+    elem_type = "joint"
     def write(self, text):
         text.write(
-        "\tjoint: "+str(database.element.index(self))+", clamp,\n"+
-        "\t\t"+str(database.node.index(self.objects[0]))+", node, node;\n")
+        "\tjoint: " + FORMAT(database.element.index(self)) + ", clamp,\n" +
+        "\t\t" + FORMAT(database.node.index(self.objects[0])) + ", node, node;\n")
     def remesh(self):
         Teardrop(self.objects[0])
 
@@ -311,9 +339,10 @@ class ClampOperator(Base):
 klasses[ClampOperator.bl_label] = ClampOperator
 
 class DeformableDisplacementJoint(Entity):
+    elem_type = "joint"
     def write(self, text):
         self.write_hinge(text, "deformable displacement joint")
-        text.write(",\n\t\t"+self.links[0].string()+";\n")
+        text.write(",\n\t\t" + self.links[0].string() + ";\n")
     def remesh(self):
         Cylinder(self.objects[0])
 
@@ -346,9 +375,10 @@ class DeformableDisplacementJointOperator(ConstitutiveBase):
 klasses[DeformableDisplacementJointOperator.bl_label] = DeformableDisplacementJointOperator
 
 class DeformableHinge(Entity):
+    elem_type = "joint"
     def write(self, text):
         self.write_hinge(text, "deformable hinge", V1=False, V2=False)
-        text.write(",\n\t\t"+self.links[0].string()+";\n")
+        text.write(",\n\t\t" + self.links[0].string() + ";\n")
     def remesh(self):
         Cylinder(self.objects[0])
 
@@ -367,9 +397,10 @@ class DeformableHingeOperator(ConstitutiveBase):
 klasses[DeformableHingeOperator.bl_label] = DeformableHingeOperator
 
 class DeformableJoint(Entity):
+    elem_type = "joint"
     def write(self, text):
         self.write_hinge(text, "deformable joint")
-        text.write(",\n\t\t"+self.links[0].string()+";\n")
+        text.write(",\n\t\t" + self.links[0].string() + ";\n")
     def remesh(self):
         Cylinder(self.objects[0])
 
@@ -388,15 +419,16 @@ class DeformableJointOperator(ConstitutiveBase):
 klasses[DeformableJointOperator.bl_label] = DeformableJointOperator
 
 class Distance(Entity):
+    elem_type = "joint"
     def write(self, text):
-        text.write("\tjoint: "+str(database.element.index(self))+", distance,\n")
+        text.write("\tjoint: " + FORMAT(database.element.index(self)) + ", distance,\n")
         for i in range(2):
             self.write_node(text, i, node=True, position=True, p_label="position")
             text.write(",\n")
         if self.from_nodes:
             text.write("\t\tfrom nodes;\n")
         else:
-            text.write(self.links[0].string(True)+";\n")
+            text.write(self.links[0].string(True) + ";\n")
 
 class DistanceOperator(Base):
     bl_label = "Distance"
@@ -436,17 +468,18 @@ class DistanceOperator(Base):
 klasses[DistanceOperator.bl_label] = DistanceOperator
 
 class InLine(Entity):
+    elem_type = "joint"
     def write(self, text):
         rot0, globalV0, iNode0 = self.rigid_offset(0)
         localV0 = rot0*globalV0
         rot_1, globalV_1, Node_1 = self.rigid_offset(1)
         to_point = rot_1*(globalV_1 + self.objects[0].matrix_world.translation - self.objects[1].matrix_world.translation)
         rot = self.objects[0].matrix_world.to_quaternion().to_matrix().transposed()
-        text.write("\tjoint: "+str(database.element.index(self))+", inline,\n")
+        text.write("\tjoint: " + FORMAT(database.element.index(self)) + ", inline,\n")
         self.write_node(text, 0, node=True, position=True, orientation=True)
-        text.write(",\n\t\t"+str(Node_1))
+        text.write(",\n\t\t" + FORMAT(Node_1))
         text.write(",\n\t\t\toffset, ")
-        self.locationVector_write(to_point, text, ";\n")
+        self.write_vector(to_point, text, ";\n")
     def remesh(self):
         RhombicPyramid(self.objects[0])
 
@@ -461,6 +494,7 @@ class InLineOperator(Base):
 klasses[InLineOperator.bl_label] = InLineOperator
 
 class InPlane(Entity):
+    elem_type = "joint"
     def write(self, text):
         rot0, globalV0, iNode0 = self.rigid_offset(0)
         localV0 = rot0*globalV0
@@ -469,11 +503,11 @@ class InPlane(Entity):
         rot = self.objects[0].matrix_world.to_quaternion().to_matrix().transposed()
         normal = rot*rot0*Vector((0., 0., 1.))
         text.write(
-        "\tjoint: "+str(database.element.index(self))+", inplane,\n"+
-        "\t\t"+str(iNode0)+",\n\t\t\t")
-        self.locationVector_write(localV0, text, ",\n\t\t\t")
-        self.locationVector_write(normal, text, ",\n\t\t")
-        text.write(str(iNode1)+",\n\t\t\toffset, "+str(to_point[0])+", "+str(to_point[1])+", "+str(to_point[2])+";\n")
+        "\tjoint: " + FORMAT(database.element.index(self)) + ", inplane,\n" +
+        "\t\t" + FORMAT(iNode0) + ",\n\t\t\t")
+        self.write_vector(localV0, text, ",\n\t\t\t")
+        self.write_vector(normal, text, ",\n\t\t")
+        text.write(FORMAT(iNode1) + ",\n\t\t\toffset, " + FORMAT(to_point[0]) + ", " + FORMAT(to_point[1]) + ", " + FORMAT(to_point[2]) + ";\n")
     def remesh(self):
         RhombicPyramid(self.objects[0])
 
@@ -488,15 +522,16 @@ class InPlaneOperator(Base):
 klasses[InPlaneOperator.bl_label] = InPlaneOperator
 
 class RevoluteHinge(Entity):
+    elem_type = "joint"
     def write(self, text):
         self.write_hinge(text, "revolute hinge")
         if self.enable_theta:
-            text.write(",\n\t\tinitial theta, "+str(self.theta))
+            text.write(",\n\t\tinitial theta, " + FORMAT(self.theta))
         if self.enable_friction:
-            text.write(",\n\t\tfriction, "+str(self.average_radius))
+            text.write(",\n\t\tfriction, " + FORMAT(self.average_radius))
             if self.enable_preload:
-                text.write(",\n\t\t\tpreload, "+str(self.preload))
-            text.write(",\n\t\t\t"+self.links[0].string())
+                text.write(",\n\t\t\tpreload, " + FORMAT(self.preload))
+            text.write(",\n\t\t\t" + self.links[0].string())
         text.write(";\n")
     def remesh(self):
         Cylinder(self.objects[0])
@@ -568,12 +603,13 @@ class RevoluteHingeOperator(Base):
 klasses[RevoluteHingeOperator.bl_label] = RevoluteHingeOperator
 
 class Rod(Entity):
+    elem_type = "joint"
     def write(self, text):
-        text.write("\tjoint: "+str(database.element.index(self))+", rod,\n")
+        text.write("\tjoint: " + FORMAT(database.element.index(self)) + ", rod,\n")
         for i in range(2):
             self.write_node(text, i, node=True, position=True, p_label="position")
             text.write(",\n")
-        text.write("\t\tfrom nodes,\n\t\t"+self.links[0].string()+";\n")
+        text.write("\t\tfrom nodes,\n\t\t" + self.links[0].string() + ";\n")
 
 class RodOperator(ConstitutiveBase):
     bl_label = "Rod"
@@ -590,6 +626,7 @@ class RodOperator(ConstitutiveBase):
 klasses[RodOperator.bl_label] = RodOperator
 
 class SphericalHinge(Entity):
+    elem_type = "joint"
     def write(self, text):
         self.write_hinge(text, "spherical hinge")
         text.write(";\n")
@@ -607,6 +644,7 @@ class SphericalHingeOperator(Base):
 klasses[SphericalHingeOperator.bl_label] = SphericalHingeOperator
 
 class TotalJoint(Entity):
+    elem_type = "joint"
     def write(self, text):
         rot_0, globalV_0, Node_0 = self.rigid_offset(0)
         localV_0 = rot_0*globalV_0
@@ -617,24 +655,24 @@ class TotalJoint(Entity):
             rot_position = rot
         else:
             rot_position = self.objects[1].matrix_world.to_quaternion().to_matrix().transposed()
-        text.write("\tjoint: "+str(database.element.index(self))+", total joint")
+        text.write("\tjoint: " + FORMAT(database.element.index(self)) + ", total joint")
         if self.first == "rotate":
-            text.write(",\n\t\t"+str(Node_0)+", position, ")
-            self.locationVector_write(localV_0, text, ",\n\t\t\tposition orientation, matr,\n")
-            self.rotationMatrix_write(rot_0*rot_position, text, "\t\t\t\t")
+            text.write(",\n\t\t" + FORMAT(Node_0) + ", position, ")
+            self.write_vector(localV_0, text, ",\n\t\t\tposition orientation, matr,\n")
+            self.write_matrix(rot_0*rot_position, text, "\t\t\t\t")
             text.write(",\n\t\t\trotation orientation, matr,\n")
-            self.rotationMatrix_write(rot_0*rot, text, "\t\t\t\t")
-        text.write(",\n\t\t"+str(Node_1)+", position, ")
-        self.locationVector_write(to_joint, text, ",\n\t\t\tposition orientation, matr,\n")
-        self.rotationMatrix_write(rot_1*rot_position, text, "\t\t\t\t")
+            self.write_matrix(rot_0*rot, text, "\t\t\t\t")
+        text.write(",\n\t\t" + FORMAT(Node_1) + ", position, ")
+        self.write_vector(to_joint, text, ",\n\t\t\tposition orientation, matr,\n")
+        self.write_matrix(rot_1*rot_position, text, "\t\t\t\t")
         text.write(",\n\t\t\trotation orientation, matr,\n")
-        self.rotationMatrix_write(rot_1*rot, text, "\t\t\t\t")
+        self.write_matrix(rot_1*rot, text, "\t\t\t\t")
         if self.first == "displace":
-            text.write(",\n\t\t"+str(Node_0)+", position, ")
-            self.locationVector_write(localV_0, text, ",\n\t\t\tposition orientation, matr,\n")
-            self.rotationMatrix_write(rot_0*rot_position, text, "\t\t\t\t")
+            text.write(",\n\t\t" + FORMAT(Node_0) + ", position, ")
+            self.write_vector(localV_0, text, ",\n\t\t\tposition orientation, matr,\n")
+            self.write_matrix(rot_0*rot_position, text, "\t\t\t\t")
             text.write(",\n\t\t\trotation orientation, matr,\n")
-            self.rotationMatrix_write(rot_0*rot, text, "\t\t\t\t")
+            self.write_matrix(rot_0*rot, text, "\t\t\t\t")
         text.write(",\n\t\t\tposition constraint")
         for b in [self.displacement_x, self.displacement_y, self.displacement_z]: 
             if b:
@@ -645,7 +683,7 @@ class TotalJoint(Entity):
         super().indent_drives += 2
         for i, b in enumerate([self.displacement_x, self.displacement_y, self.displacement_z]):
             if b:
-                text.write(",\n"+self.links[i].string(True))
+                text.write(",\n" + self.links[i].string(True))
             else:
                 text.write(",\n\t\t\t\tinactive")
         text.write(",\n\t\t\torientation constraint")
@@ -657,7 +695,7 @@ class TotalJoint(Entity):
         text.write(", component")
         for i, b in enumerate([self.angular_displacement_x, self.angular_displacement_y, self.angular_displacement_z]):
             if b:
-                text.write(",\n"+self.links[3+i].string(True))
+                text.write(",\n" + self.links[3+i].string(True))
             else:
                 text.write(",\n\t\t\t\tinactive")
         super().indent_drives -= 2
@@ -745,12 +783,13 @@ class TotalJointOperator(Base):
 klasses[TotalJointOperator.bl_label] = TotalJointOperator
 
 class ViscousBody(Entity):
+    elem_type = "joint"
     def write(self, text):
         text.write(
-        "\tjoint: "+str(database.element.index(self))+", viscous body,\n\t\t"+
-        str(database.node.index(self.objects[0]))+
-        ",\n\t\tposition, reference, node, null"+
-        ",\n\t\t"+self.links[0].string()+";\n")
+        "\tjoint: " + FORMAT(database.element.index(self)) + ", viscous body,\n\t\t" +
+        FORMAT(database.node.index(self.objects[0]))+
+        ",\n\t\tposition, reference, node, null" +
+        ",\n\t\t" + self.links[0].string() + ";\n")
     def remesh(self):
         Sphere(self.objects[0])
 
@@ -769,12 +808,13 @@ class ViscousBodyOperator(ConstitutiveBase):
 klasses[ViscousBodyOperator.bl_label] = ViscousBodyOperator
 
 class Body(Entity):
+    elem_type = "body"
     def write(self, text):
-        text.write("\tbody: "+str(database.element.index(self))+",\n")
+        text.write("\tbody: " + FORMAT(database.element.index(self)) + ",\n")
         self.write_node(text, 0, node=True)
-        text.write("\t\t\t"+str(self.mass)+",\n")
+        text.write("\t\t\t" + FORMAT(self.mass) + ",\n")
         self.write_node(text, 0, position=True, p_label="")
-        text.write(", "+self.links[0].string())
+        text.write(", " + self.links[0].string())
         self.write_node(text, 0, orientation=True, o_label="inertial")
         text.write(";\n")
     def remesh(self):
@@ -822,7 +862,7 @@ class RigidOffsetOperator(Base):
         obs = SelectedObjects(context)
         test = len(obs) == 2 and not (database.element.filter("Rigid offset", obs[0])
             or database.element.filter("Dummy node", obs[0]))
-        return cls.bl_idname.startswith(root_dot+"e_") or test
+        return cls.bl_idname.startswith(root_dot + "e_") or test
     def create_entity(self):
         return RigidOffset(self.name)
 
@@ -839,7 +879,7 @@ class DummyNodeOperator(Base):
         obs = SelectedObjects(context)
         test = len(obs) == 2 and not (database.element.filter("Rigid offset", obs[0])
             or database.element.filter("Dummy node", obs[0]))
-        return cls.bl_idname.startswith(root_dot+"e_") or test
+        return cls.bl_idname.startswith(root_dot + "e_") or test
     def create_entity(self):
         return DummyNode(self.name)
 
@@ -863,8 +903,9 @@ class BeamSegmentOperator(ConstitutiveBase):
 klasses[BeamSegmentOperator.bl_label] = BeamSegmentOperator
 
 class Gravity(Entity):
+    elem_type = "gravity"
     def write(self, text):
-        text.write("\tgravity: "+self.links[0].string()+", "+self.links[1].string()+";\n")
+        text.write("\tgravity: " + self.links[0].string() + ", " + self.links[1].string() + ";\n")
 
 class GravityOperator(Base):
     bl_label = "Gravity"
@@ -874,7 +915,7 @@ class GravityOperator(Base):
     drive_edit = bpy.props.BoolProperty(name="")
     @classmethod
     def poll(self, context):
-        return (self.bl_idname.startswith(root_dot+"e_")
+        return (self.bl_idname.startswith(root_dot + "e_")
             or not database.element.filter("Gravity"))
     def defaults(self, context):
         self.matrix_exists(context, "3x1")
@@ -897,5 +938,43 @@ class GravityOperator(Base):
         return Gravity(self.name)
 
 klasses[GravityOperator.bl_label] = GravityOperator
+
+class Driven(Entity):
+    elem_type = "driven"
+    def write(self, text):
+        text.write("\tdriven: " + FORMAT(database.element.index(self.links[1])) + ",\n" +
+        self.links[0].string(True) + ",\n" +
+        "\t\texisting: " + self.links[1].elem_type + ", " + FORMAT(database.element.index(self.links[1])) + ";\n")
+
+class DrivenOperator(Base):
+    bl_label = "Driven"
+    drive_name = bpy.props.EnumProperty(items=enum_drive, name="Drive")
+    drive_edit = bpy.props.BoolProperty(name="")
+    element_name = bpy.props.EnumProperty(items=enum_element, name="Element")
+    element_edit = bpy.props.BoolProperty(name="")
+    @classmethod
+    def poll(cls, context):
+        return super().base_poll(cls, context) and context.scene.element_uilist
+    def defaults(self, context):
+        self.drive_exists(context)
+        self.element_name = context.scene.element_uilist[context.scene.element_index].name
+    def assign(self, context):
+        self.entity = database.element[context.scene.element_index]
+        self.drive_name = self.entity.links[0].name
+        self.element_name = self.entity.links[1].name
+    def store(self, context):
+        self.entity = database.element[self.index]
+        self.entity.unlink_all()
+        self.link_drive(context, self.drive_name, self.drive_edit)
+        self.link_element(context, self.element_name, self.element_edit)
+        self.entity.increment_links()
+    def draw(self, context):
+        layout = self.layout
+        self.draw_link(layout, "drive_name", "drive_edit")
+        self.draw_link(layout, "element_name", "element_edit")
+    def create_entity(self):
+        return Driven(self.name)
+
+klasses[DrivenOperator.bl_label] = DrivenOperator
 
 bundle = Bundle(tree, Base, klasses, database.element, "element")
