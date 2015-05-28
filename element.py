@@ -1026,15 +1026,6 @@ class DuplicateObs(bpy.types.Operator):
             ob.select = True
             bpy.ops.object.duplicate()
             new_obs.append(context.selected_objects[0])
-#        for new_element in database.element[len_element:]:
-#            for i, ob in enumerate(new_element.objects):
-#                if ob in obs:
-#                    new_element.objects[i] = new_obs[obs.index(ob)]
-#            for i, link in enumerate(new_element.links):
-#                if link in elements:
-#                    link.users -= 1
-#                    new_element.links[i] = new_elements[elements.index(link)]
-#                    new_element.links[i].users += 1
         items = elements + drives
         new_items = database.element[len_element:] + database.drive[len_drive:]
         for new_item in new_items:

@@ -441,7 +441,8 @@ class Animate(bpy.types.Operator, Base):
         wm.progress_begin(0., 100.)
         skip = self.steps - 1
         for n, line in enumerate(self.lines):
-            skip = (skip + 1) % self.steps
+            if int(line.split()[0]) == self.marker:
+                skip = (skip + 1) % self.steps
             if not skip:
                 wm.progress_update(100.*float(n)/self.N)
                 fields = line.split()
