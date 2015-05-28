@@ -82,6 +82,8 @@ class Base(Operator):
         return context.scene.drive_index, context.scene.drive_uilist
     def set_index(self, context, value):
         context.scene.drive_index = value
+    def prereqs(self, context):
+        pass
 
 klasses = dict()
 
@@ -91,8 +93,6 @@ for t in types:
         @classmethod
         def poll(cls, context):
             return False
-        def defaults(self, context):
-            pass
         def assign(self, context):
             self.entity = database.drive[context.scene.drive_index]
         def store(self, context):
@@ -111,8 +111,6 @@ class DriveOperator(Base):
     @classmethod
     def poll(cls, context):
         return True
-    def defaults(self, context):
-        pass
     def assign(self, context):
         self.entity = database.drive[context.scene.drive_index]
     def store(self, context):
@@ -159,12 +157,10 @@ class ConstantDrive(Entity):
 
 class ConstantDriveOperator(Base):
     bl_label = "Constant drive"
-    constant = bpy.props.FloatProperty(name="Constant", description="", min=-9.9e10, max=9.9e10, precision=6)
+    constant = bpy.props.FloatProperty(name="Constant", description="", min=-9.9e10, max=9.9e10, precision=6, default=0.0)
     @classmethod
     def poll(cls, context):
         return True
-    def defaults(self, context):
-        self.constant = 0.0
     def assign(self, context):
         self.entity = database.drive[context.scene.drive_index]
         self.constant = self.entity.constant
@@ -199,14 +195,11 @@ class LinearDrive(Entity):
 
 class LinearDriveOperator(Base):
     bl_label = "Linear drive"
-    constant = bpy.props.FloatProperty(name="Constant", description="", min=-9.9e10, max=9.9e10, precision=6)
-    linear = bpy.props.FloatProperty(name="Linear", description="", min=-9.9e10, max=9.9e10, precision=6)
+    constant = bpy.props.FloatProperty(name="Constant", description="", min=-9.9e10, max=9.9e10, precision=6, default=0.0)
+    linear = bpy.props.FloatProperty(name="Linear", description="", min=-9.9e10, max=9.9e10, precision=6, default=0.0)
     @classmethod
     def poll(cls, context):
         return True
-    def defaults(self, context):
-        self.constant = 0.0
-        self.linear = 0.0
     def assign(self, context):
         self.entity = database.drive[context.scene.drive_index]
         self.constant = self.entity.constant
@@ -234,16 +227,12 @@ class ParabolicDrive(Entity):
 
 class ParabolicDriveOperator(Base):
     bl_label = "Parabolic drive"
-    constant = bpy.props.FloatProperty(name="Constant", description="", min=-9.9e10, max=9.9e10, precision=6)
-    linear = bpy.props.FloatProperty(name="Linear", description="", min=-9.9e10, max=9.9e10, precision=6)
-    parabolic = bpy.props.FloatProperty(name="Parabolic", description="", min=-9.9e10, max=9.9e10, precision=6)
+    constant = bpy.props.FloatProperty(name="Constant", description="", min=-9.9e10, max=9.9e10, precision=6, default=0.0)
+    linear = bpy.props.FloatProperty(name="Linear", description="", min=-9.9e10, max=9.9e10, precision=6, default=0.0)
+    parabolic = bpy.props.FloatProperty(name="Parabolic", description="", min=-9.9e10, max=9.9e10, precision=6, default=0.0)
     @classmethod
     def poll(cls, context):
         return True
-    def defaults(self, context):
-        self.constant = 0.0
-        self.linear = 0.0
-        self.parabolic = 0.0
     def assign(self, context):
         self.entity = database.drive[context.scene.drive_index]
         self.constant = self.entity.constant
@@ -274,18 +263,13 @@ class CubicDrive(Entity):
 
 class CubicDriveOperator(Base):
     bl_label = "Cubic drive"
-    constant = bpy.props.FloatProperty(name="Constant", description="", min=-9.9e10, max=9.9e10, precision=6)
-    linear = bpy.props.FloatProperty(name="Linear", description="", min=-9.9e10, max=9.9e10, precision=6)
-    parabolic = bpy.props.FloatProperty(name="Parabolic", description="", min=-9.9e10, max=9.9e10, precision=6)
-    cubic = bpy.props.FloatProperty(name="Cubic", description="", min=-9.9e10, max=9.9e10, precision=6)
+    constant = bpy.props.FloatProperty(name="Constant", description="", min=-9.9e10, max=9.9e10, precision=6, default=0.0)
+    linear = bpy.props.FloatProperty(name="Linear", description="", min=-9.9e10, max=9.9e10, precision=6, default=0.0)
+    parabolic = bpy.props.FloatProperty(name="Parabolic", description="", min=-9.9e10, max=9.9e10, precision=6, default=0.0)
+    cubic = bpy.props.FloatProperty(name="Cubic", description="", min=-9.9e10, max=9.9e10, precision=6, default=0.0)
     @classmethod
     def poll(cls, context):
         return True
-    def defaults(self, context):
-        self.constant = 0.0
-        self.linear = 0.0
-        self.parabolic = 0.0
-        self.cubic = 0.0
     def assign(self, context):
         self.entity = database.drive[context.scene.drive_index]
         self.constant = self.entity.constant
@@ -319,16 +303,12 @@ class StepDrive(Entity):
 
 class StepDriveOperator(Base):
     bl_label = "Step drive"
-    initial_time = bpy.props.FloatProperty(name="Initial time", description="", min=0.0, max=9.9e10, precision=6)
-    step_value = bpy.props.FloatProperty(name="Step value", description="", min=-9.9e10, max=9.9e10, precision=6)
-    initial_value = bpy.props.FloatProperty(name="Initial value", description="", min=-9.9e10, max=9.9e10, precision=6)
+    initial_time = bpy.props.FloatProperty(name="Initial time", description="", min=0.0, max=9.9e10, precision=6, default=0.0)
+    step_value = bpy.props.FloatProperty(name="Step value", description="", min=-9.9e10, max=9.9e10, precision=6, default=0.0)
+    initial_value = bpy.props.FloatProperty(name="Initial value", description="", min=-9.9e10, max=9.9e10, precision=6, default=0.0)
     @classmethod
     def poll(cls, context):
         return True
-    def defaults(self, context):
-        self.initial_time = 0.0
-        self.step_value = 0.0
-        self.initial_value = 0.0
     def assign(self, context):
         self.entity = database.drive[context.scene.drive_index]
         self.initial_time = self.entity.initial_time
@@ -359,18 +339,13 @@ class DoubleStepDrive(Entity):
 
 class DoubleStepDriveOperator(Base):
     bl_label = "Double step drive"
-    initial_time = bpy.props.FloatProperty(name="Initial time", description="", min=0.0, max=9.9e10, precision=6)
-    final_time = bpy.props.FloatProperty(name="Final time", description="", min=0.0, max=9.9e10, precision=6)
-    step_value = bpy.props.FloatProperty(name="Step value", description="", min=-9.9e10, max=9.9e10, precision=6)
-    initial_value = bpy.props.FloatProperty(name="Initial value", description="", min=-9.9e10, max=9.9e10, precision=6)
+    initial_time = bpy.props.FloatProperty(name="Initial time", description="", min=0.0, max=9.9e10, precision=6, default=0.0)
+    final_time = bpy.props.FloatProperty(name="Final time", description="", min=0.0, max=9.9e10, precision=6, default=0.0)
+    step_value = bpy.props.FloatProperty(name="Step value", description="", min=-9.9e10, max=9.9e10, precision=6, default=0.0)
+    initial_value = bpy.props.FloatProperty(name="Initial value", description="", min=-9.9e10, max=9.9e10, precision=6, default=0.0)
     @classmethod
     def poll(cls, context):
         return True
-    def defaults(self, context):
-        self.initial_time = 0.0
-        self.final_time = 0.0
-        self.step_value = 0.0
-        self.initial_value = 0.0
     def assign(self, context):
         self.entity = database.drive[context.scene.drive_index]
         self.initial_time = self.entity.initial_time
@@ -409,20 +384,14 @@ class RampDrive(Entity):
 
 class RampDriveOperator(Base):
     bl_label = "Ramp drive"
-    slope = bpy.props.FloatProperty(name="Slope", description="", min=-9.9e10, max=9.9e10, precision=6)
-    initial_time = bpy.props.FloatProperty(name="Initial time", description="", min=0.0, max=9.9e10, precision=6)
-    forever = bpy.props.BoolProperty(name="Forever", description="")
-    final_time = bpy.props.FloatProperty(name="Final time", description="", min=0.0, max=9.9e10, precision=6)
-    initial_value = bpy.props.FloatProperty(name="Initial value", description="", min=-9.9e10, max=9.9e10, precision=6)
+    slope = bpy.props.FloatProperty(name="Slope", description="", min=-9.9e10, max=9.9e10, precision=6, default=0.0)
+    initial_time = bpy.props.FloatProperty(name="Initial time", description="", min=0.0, max=9.9e10, precision=6, default=0.0)
+    forever = bpy.props.BoolProperty(name="Forever", description="", default=False)
+    final_time = bpy.props.FloatProperty(name="Final time", description="", min=0.0, max=9.9e10, precision=6, default=0.0)
+    initial_value = bpy.props.FloatProperty(name="Initial value", description="", min=-9.9e10, max=9.9e10, precision=6, default=0.0)
     @classmethod
     def poll(cls, context):
         return True
-    def defaults(self, context):
-        self.slope = 0.0
-        self.initial_time = 0.0
-        self.forever = False
-        self.final_time = 0.0
-        self.initial_value = 0.0
     def assign(self, context):
         self.entity = database.drive[context.scene.drive_index]
         self.slope = self.entity.slope
@@ -469,7 +438,7 @@ class PiecewiseLinearDriveOperator(Base):
     @classmethod
     def poll(cls, context):
         return True
-    def defaults(self, context):
+    def prereqs(self, context):
         self.N = 2
         self.T.clear()
         self.X.clear()
@@ -479,11 +448,6 @@ class PiecewiseLinearDriveOperator(Base):
     def assign(self, context):
         self.entity = database.drive[context.scene.drive_index]
         self.N = self.entity.N
-        self.T.clear()
-        self.X.clear()
-        for i in range(50):
-            self.T.add()
-            self.X.add()
         for i, value in enumerate(self.entity.T):
             self.T[i].value = value
         for i, value in enumerate(self.entity.X):
@@ -525,22 +489,15 @@ class SineDrive(Entity):
         return ret
 
 class PeriodicDriveOperator(Base):
-    initial_time = bpy.props.FloatProperty(name="Initial time", description="", min=0.0, max=9.9e10, precision=6)
-    omega = bpy.props.FloatProperty(name="Omega", description="", min=-9.9e10, max=9.9e10, precision=6)
-    amplitude = bpy.props.FloatProperty(name="Amplitude", description="", min=-9.9e10, max=9.9e10, precision=6)
-    cycles = bpy.props.IntProperty(name="Cycles", description="Number of full cycles")
-    initial_value = bpy.props.FloatProperty(name="Initial value", description="", min=-9.9e10, max=9.9e10, precision=6)
-    duration = bpy.props.EnumProperty(items=[("cycles", "N-cycles", ""), ("half", "Half cycle", ""), ("one", "Full cycle", ""), ("forever", "Infinite cycle", "")])
+    initial_time = bpy.props.FloatProperty(name="Initial time", description="", min=0.0, max=9.9e10, precision=6, default=0.0)
+    omega = bpy.props.FloatProperty(name="Omega", description="", min=-9.9e10, max=9.9e10, precision=6, default=0.0)
+    amplitude = bpy.props.FloatProperty(name="Amplitude", description="", min=-9.9e10, max=9.9e10, precision=6, default=0.0)
+    cycles = bpy.props.IntProperty(name="Cycles", description="Number of full cycles", default=1)
+    initial_value = bpy.props.FloatProperty(name="Initial value", description="", min=-9.9e10, max=9.9e10, precision=6, default=0.0)
+    duration = bpy.props.EnumProperty(items=[("cycles", "N-cycles", ""), ("half", "Half cycle", ""), ("one", "Full cycle", ""), ("forever", "Infinite cycle", "")], default="cycles")
     @classmethod
     def poll(cls, context):
         return True
-    def defaults(self, context):
-        self.initial_time = 0.0
-        self.omega = 0.0
-        self.amplitude = 0.0
-        self.cycles = 1
-        self.initial_value = 0.0
-        self.duration = "cycles"
     def assign(self, context):
         self.entity = database.drive[context.scene.drive_index]
         self.initial_time = self.entity.initial_time
@@ -609,18 +566,13 @@ class TanhDrive(Entity):
 
 class TanhDriveOperator(Base):
     bl_label = "Tanh drive"
-    initial_time = bpy.props.FloatProperty(name="Initial time", description="", min=0.0, max=9.9e10, precision=6)
-    amplitude = bpy.props.FloatProperty(name="Amplitude", description="", min=-9.9e10, max=9.9e10, precision=6)
-    slope = bpy.props.FloatProperty(name="Slope", description="", min=-9.9e10, max=9.9e10, precision=6)
-    initial_value = bpy.props.FloatProperty(name="Initial value", description="", min=-9.9e10, max=9.9e10, precision=6)
+    initial_time = bpy.props.FloatProperty(name="Initial time", description="", min=0.0, max=9.9e10, precision=6, default=0.0)
+    amplitude = bpy.props.FloatProperty(name="Amplitude", description="", min=-9.9e10, max=9.9e10, precision=6, default=0.0)
+    slope = bpy.props.FloatProperty(name="Slope", description="", min=-9.9e10, max=9.9e10, precision=6, default=0.0)
+    initial_value = bpy.props.FloatProperty(name="Initial value", description="", min=-9.9e10, max=9.9e10, precision=6, default=0.0)
     @classmethod
     def poll(cls, context):
         return True
-    def defaults(self, context):
-        self.initial_time = 0.0
-        self.amplitude = 0.0
-        self.slope = 0.0
-        self.initial_value = 0.0
     def assign(self, context):
         self.entity = database.drive[context.scene.drive_index]
         self.initial_time = self.entity.initial_time
@@ -663,24 +615,18 @@ class FourierSeriesDrive(Entity):
 
 class FourierSeriesDriveOperator(Base):
     bl_label = "Fourier series drive"
-    initial_time = bpy.props.FloatProperty(name="Initial time", description="", min=0.0, max=9.9e10, precision=6)
-    omega = bpy.props.FloatProperty(name="Omega", description="", min=-9.9e10, max=9.9e10, precision=6)
-    N = bpy.props.IntProperty(name="Number of terms", min=1, max=50, description="")
-    cycles = bpy.props.IntProperty(name="Cycles", description="Number of full cycles")
-    duration = bpy.props.EnumProperty(items=[("cycles", "N-cycles", ""), ("one", "Full cycle", ""), ("forever", "Infinite cycle", "")])
-    initial_value = bpy.props.FloatProperty(name="Initial value", description="", min=-9.9e10, max=9.9e10, precision=6)
+    initial_time = bpy.props.FloatProperty(name="Initial time", description="", min=0.0, max=9.9e10, precision=6, default=0.0)
+    omega = bpy.props.FloatProperty(name="Omega", description="", min=-9.9e10, max=9.9e10, precision=6, default=0.0)
+    N = bpy.props.IntProperty(name="Number of terms", min=1, max=50, description="", default=1)
+    cycles = bpy.props.IntProperty(name="Cycles", description="Number of full cycles", default=1)
+    duration = bpy.props.EnumProperty(items=[("cycles", "N-cycles", ""), ("one", "Full cycle", ""), ("forever", "Infinite cycle", "")], default="cycles")
+    initial_value = bpy.props.FloatProperty(name="Initial value", description="", min=-9.9e10, max=9.9e10, precision=6, default=0.0)
     A = bpy.props.CollectionProperty(name="A values", type = BPY.Floats)
     B = bpy.props.CollectionProperty(name="B values", type = BPY.Floats)
     @classmethod
     def poll(cls, context):
         return True
-    def defaults(self, context):
-        self.initial_time = 0.0
-        self.omega = 0.0
-        self.N = 1
-        self.cycles = 1
-        self.duration = "cycles"
-        self.initial_value = 0.0
+    def prereqs(self, context):
         self.A.clear()
         self.B.clear()
         for i in range(50):
@@ -694,11 +640,6 @@ class FourierSeriesDriveOperator(Base):
         self.cycles = self.entity.cycles
         self.duration = self.entity.duration
         self.initial_value = self.entity.initial_value
-        self.A.clear()
-        self.B.clear()
-        for i in range(50):
-            self.A.add()
-            self.B.add()
         for i, value in enumerate(self.entity.A):
             self.A[i].value = value
         for i, value in enumerate(self.entity.B):
@@ -757,25 +698,18 @@ class FrequencySweepDrive(Entity):
 
 class FrequencySweepDriveOperator(Base):
     bl_label = "Frequency sweep drive"
-    initial_time = bpy.props.FloatProperty(name="Initial time", description="", min=0.0, max=9.9e10, precision=6)
+    initial_time = bpy.props.FloatProperty(name="Initial time", description="", min=0.0, max=9.9e10, precision=6, default=0.0)
     angular_velocity_drive_name = bpy.props.EnumProperty(items=enum_drive, name="Angular velocity drive")
     angular_velocity_edit = bpy.props.BoolProperty(name="")
     amplitude_drive_name = bpy.props.EnumProperty(items=enum_drive, name="Amplitude drive")
     amplitude_drive_edit = bpy.props.BoolProperty(name="")
-    initial_value = bpy.props.FloatProperty(name="Initial value", description="", min=-9.9e10, max=9.9e10, precision=6)
-    forever = bpy.props.BoolProperty(name="Forever", description="")
-    final_time = bpy.props.FloatProperty(name="Final time", description="", min=0.0, max=9.9e10, precision=6)
-    final_value = bpy.props.FloatProperty(name="Final value", description="", min=-9.9e10, max=9.9e10, precision=6)
+    initial_value = bpy.props.FloatProperty(name="Initial value", description="", min=-9.9e10, max=9.9e10, precision=6, default=0.0)
+    forever = bpy.props.BoolProperty(name="Forever", description="", default=False)
+    final_time = bpy.props.FloatProperty(name="Final time", description="", min=0.0, max=9.9e10, precision=6, default=0.0)
+    final_value = bpy.props.FloatProperty(name="Final value", description="", min=-9.9e10, max=9.9e10, precision=6, default=0.0)
     @classmethod
     def poll(cls, context):
         return True
-    def defaults(self, context):
-        self.drive_exists(context)
-        self.initial_time = 0.0
-        self.initial_value = 0.0
-        self.forever = False
-        self.final_time = 0.0
-        self.final_value = 0.0
     def assign(self, context):
         self.entity = database.drive[context.scene.drive_index]
         self.angular_velocity_drive_name = self.entity.links[0].name
@@ -824,18 +758,13 @@ class ExponentialDrive(Entity):
 
 class ExponentialDriveOperator(Base):
     bl_label = "Exponential drive"
-    amplitude = bpy.props.FloatProperty(name="Amplitude", description="", min=-9.9e10, max=9.9e10, precision=6)
-    time_constant = bpy.props.FloatProperty(name="Time constant", description="", min=-9.9e10, max=9.9e10, precision=6)
-    initial_time = bpy.props.FloatProperty(name="Initial time", description="", min=-9.9e10, max=9.9e10, precision=6)
-    initial_value = bpy.props.FloatProperty(name="Initial value", description="", min=-9.9e10, max=9.9e10, precision=6)
+    amplitude = bpy.props.FloatProperty(name="Amplitude", description="", min=-9.9e10, max=9.9e10, precision=6, default=0.0)
+    time_constant = bpy.props.FloatProperty(name="Time constant", description="", min=-9.9e10, max=9.9e10, precision=6, default=0.0)
+    initial_time = bpy.props.FloatProperty(name="Initial time", description="", min=-9.9e10, max=9.9e10, precision=6, default=0.0)
+    initial_value = bpy.props.FloatProperty(name="Initial value", description="", min=-9.9e10, max=9.9e10, precision=6, default=0.0)
     @classmethod
     def poll(cls, context):
         return True
-    def defaults(self, context):
-        self.amplitude = 0.0
-        self.time_constant = 0.0
-        self.initial_time = 0.0
-        self.initial_value = 0.0
     def assign(self, context):
         self.entity = database.drive[context.scene.drive_index]
         self.amplitude = self.entity.amplitude
@@ -878,26 +807,17 @@ class RandomDrive(Entity):
 
 class RandomDriveOperator(Base):
     bl_label = "Random drive"
-    amplitude = bpy.props.FloatProperty(name="Amplitude", description="", min=-9.9e10, max=9.9e10, precision=6)
-    mean = bpy.props.FloatProperty(name="Mean", description="", min=-9.9e10, max=9.9e10, precision=6)
-    initial_time = bpy.props.FloatProperty(name="Initial time", description="", min=0.0, max=9.9e10, precision=6)
-    forever = bpy.props.BoolProperty(name="Forever", description="")
-    final_time = bpy.props.FloatProperty(name="Final time", description="", min=0.0, max=9.9e10, precision=6)
-    steps = bpy.props.FloatProperty(name="Steps", description="", min=-9.9e10, max=9.9e10, precision=6)
-    seed_type = bpy.props.EnumProperty(items=[("time_seed", "Time seed", ""), ("specified_seed", "Specified seed", "")], name="Seed type")
-    specified_seed = bpy.props.FloatProperty(name="Specified seed", description="", min=0.0, max=9.9e10, precision=6)
+    amplitude = bpy.props.FloatProperty(name="Amplitude", description="", min=-9.9e10, max=9.9e10, precision=6, default=0.0)
+    mean = bpy.props.FloatProperty(name="Mean", description="", min=-9.9e10, max=9.9e10, precision=6, default=0.0)
+    initial_time = bpy.props.FloatProperty(name="Initial time", description="", min=0.0, max=9.9e10, precision=6, default=0.0)
+    forever = bpy.props.BoolProperty(name="Forever", description="", default=False)
+    final_time = bpy.props.FloatProperty(name="Final time", description="", min=0.0, max=9.9e10, precision=6, default=0.0)
+    steps = bpy.props.FloatProperty(name="Steps", description="", min=-9.9e10, max=9.9e10, precision=6, default=0.0)
+    seed_type = bpy.props.EnumProperty(items=[("time_seed", "Time seed", ""), ("specified_seed", "Specified seed", "")], name="Seed type", default="specified_seed")
+    specified_seed = bpy.props.FloatProperty(name="Specified seed", description="", min=0.0, max=9.9e10, precision=6, default=0.0)
     @classmethod
     def poll(cls, context):
         return True
-    def defaults(self, context):
-        self.amplitude = 0.0
-        self.mean = 0.0
-        self.initial_time = 0.0
-        self.forever = False
-        self.final_time = 0.0
-        self.steps = 0.0
-        self.seed_type = "specified_seed"
-        self.specified_seed = 0.0
     def assign(self, context):
         self.entity = database.drive[context.scene.drive_index]
         self.amplitude = self.entity.amplitude
@@ -958,8 +878,6 @@ class MeterDriveOperator(Base):
     @classmethod
     def poll(cls, context):
         return True
-    def defaults(self, context):
-        pass
     def assign(self, context):
         self.entity = database.drive[context.scene.drive_index]
         self.initial_time = self.entity.initial_time
@@ -995,12 +913,10 @@ class StringDrive(Entity):
 
 class StringDriveOperator(Base):
     bl_label = "String drive"
-    expression_string = bpy.props.StringProperty(name="Expression string", maxlen=100)
+    expression_string = bpy.props.StringProperty(name="Expression string", maxlen=100, default="")
     @classmethod
     def poll(cls, context):
         return True
-    def defaults(self, context):
-        self.expression_string = ""
     def assign(self, context):
         self.entity = database.drive[context.scene.drive_index]
         self.expression_string = self.entity.expression_string
@@ -1029,7 +945,7 @@ class MultDriveOperator(Base):
     @classmethod
     def poll(cls, context):
         return True
-    def defaults(self, context):
+    def prereqs(self, context):
         self.drive_exists(context)
     def assign(self, context):
         self.entity = database.drive[context.scene.drive_index]
@@ -1075,16 +991,15 @@ class NodeDrive(Entity):
 class NodeDriveOperator(Base):
     bl_label = "Node drive"
     symbolic_name = bpy.props.StringProperty(name="Symbolic name", maxlen=100,
-        description="Private data of the structural node")
+        description="Private data of the structural node", default="")
     drive_name = bpy.props.EnumProperty(items=enum_drive, name="Drive")
     drive_edit = bpy.props.BoolProperty(name="")
     @classmethod
     def poll(cls, context):
         obs = SelectedObjects(context)
         return cls.bl_idname.startswith(root_dot + "e_") or len(obs) == 1
-    def defaults(self, context):
+    def prereqs(self, context):
         self.drive_exists(context)
-        self.symbolic_name = ""
     def assign(self, context):
         self.entity = database.drive[context.scene.drive_index]
         self.symbolic_name = self.entity.symbolic_name
@@ -1119,16 +1034,15 @@ class ElementDriveOperator(Base):
     element_name = bpy.props.EnumProperty(items=enum_element, name="Element")
     element_edit = bpy.props.BoolProperty(name="")
     symbolic_name = bpy.props.StringProperty(name="Symbolic name", maxlen=100,
-        description="Private data of the structural node")
+        description="Private data of the structural node", default="")
     drive_name = bpy.props.EnumProperty(items=enum_drive, name="Drive")
     drive_edit = bpy.props.BoolProperty(name="")
     @classmethod
     def poll(cls, context):
         return True
-    def defaults(self, context):
+    def prereqs(self, context):
         self.element_exists(context)
         self.drive_exists(context)
-        self.symbolic_name = ""
     def assign(self, context):
         self.entity = database.drive[context.scene.drive_index]
         self.symbolic_name = self.entity.symbolic_name
@@ -1168,7 +1082,7 @@ class DriveDriveOperator(Base):
     @classmethod
     def poll(cls, context):
         return True
-    def defaults(self, context):
+    def prereqs(self, context):
         self.drive_exists(context)
     def assign(self, context):
         self.entity = database.drive[context.scene.drive_index]
@@ -1204,7 +1118,7 @@ class ArrayDriveOperator(Base):
     @classmethod
     def poll(cls, context):
         return True
-    def defaults(self, context):
+    def prereqs(self, context):
         self.N = 2
         self.drive_exists(context)
         for i in range(20):
@@ -1212,8 +1126,6 @@ class ArrayDriveOperator(Base):
     def assign(self, context):
         self.entity = database.drive[context.scene.drive_index]
         self.N = self.entity.N
-        for i in range(20):
-            self.drive_names.add()
         for i, link in enumerate(self.entity.links):
             self.drive_names[i].value = link.name
     def store(self, context):

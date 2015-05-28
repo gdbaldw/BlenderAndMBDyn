@@ -65,6 +65,8 @@ class Base(Operator):
         return context.scene.frame_index, context.scene.frame_uilist
     def set_index(self, context, value):
         context.scene.frame_index = value
+    def prereqs(self, context):
+        pass
 
 for t in types:
     class Tester(Base):
@@ -72,8 +74,6 @@ for t in types:
         @classmethod
         def poll(cls, context):
             return False
-        def defaults(self, context):
-            pass
         def assign(self, context):
             self.entity = database.frame[context.scene.frame_index]
         def store(self, context):
@@ -94,7 +94,7 @@ class FrameOperator(Base):
     angular_velocity_edit = bpy.props.BoolProperty(name="")
     @classmethod
     def poll(self, context):
-        if self.bl_idname.startswith(root_dot + "e_"):
+        if self.bl_idname.startswith(root_dot + "e_") or self.bl_idname.startswith(root_dot + "d_"):
             return True
         selected = SelectedObjects(context)
         overlapped = False in [set(selected[1:]).isdisjoint(set(f.objects[1:])) for f in database.frame]
@@ -110,7 +110,7 @@ class FrameOperator(Base):
                     head = frame[0]
                     frames.remove(frame)
         return head not in selected[1:]
-    def defaults(self, context):
+    def prereqs(self, context):
         self.matrix_exists(context, "3x1")
     def assign(self, context):
         self.entity = database.frame[context.scene.frame_index]

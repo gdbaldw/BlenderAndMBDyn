@@ -50,6 +50,8 @@ class Base(Operator):
         return context.scene.driver_index, context.scene.driver_uilist
     def set_index(self, context, value):
         context.scene.driver_index = value
+    def prereqs(self, context):
+        pass
 
 klasses = dict()
 
@@ -59,8 +61,6 @@ for t in types:
         @classmethod
         def poll(cls, context):
             return False
-        def defaults(self, context):
-            pass
         def assign(self, context):
             self.entity = database.driver[context.scene.driver_index]
         def store(self, context):

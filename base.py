@@ -125,21 +125,22 @@ class BPY:
     class FunctionNames(bpy.types.PropertyGroup):
         value = bpy.props.EnumProperty(items=enum_function, name="Function")
         edit = bpy.props.BoolProperty(name="")
+    class ObjectNames(bpy.types.PropertyGroup):
+        value = bpy.props.EnumProperty(items=enum_objects, name="Object")
+    klasses = [Floats, DriveNames, FunctionNames, ObjectNames]
     @classmethod
-    def register(self):
-        bpy.utils.register_class(BPY.Floats)
-        bpy.utils.register_class(BPY.DriveNames)
-        bpy.utils.register_class(BPY.FunctionNames)
+    def register(cls):
+        for klass in cls.klasses:
+            bpy.utils.register_class(klass)
         bpy.app.handlers.load_post.append(load_post)
         bpy.app.handlers.scene_update_post.append(scene_update_post)
         bpy.app.handlers.save_pre.append(save_pre)
         bpy.types.Scene.dirty_simulator = bpy.props.BoolProperty(default=True)
         bpy.types.Scene.clean_log = bpy.props.BoolProperty(default=False)
     @classmethod
-    def unregister(self):
-        bpy.utils.unregister_class(BPY.Floats)
-        bpy.utils.unregister_class(BPY.DriveNames)
-        bpy.utils.unregister_class(BPY.FunctionNames)
+    def unregister(cls):
+        for klass in cls.klasses:
+            bpy.utils.unregister_class(klass)
         bpy.app.handlers.save_pre.append(save_pre)
         bpy.app.handlers.scene_update_post.remove(scene_update_post)
         bpy.app.handlers.load_post.remove(load_post)
@@ -377,11 +378,12 @@ class Operators(list):
     def __init__(self, klasses, entity_list):
         for name, klass in klasses.items():
             klass.entity_list = entity_list
+            klass.module = klass.__module__.split(".")[1]
             class Create(bpy.types.Operator, klass):
                 bl_idname = root_dot + "c_" + "_".join(name.lower().split())
                 bl_options = {'REGISTER', 'INTERNAL'}
                 def invoke(self, context, event):
-                    self.defaults(context)
+                    self.prereqs(context)
                     return context.window_manager.invoke_props_dialog(self)
                 def execute(self, context):
                     index, uilist = self.get_uilist(context)
@@ -399,6 +401,7 @@ class Operators(list):
                 bl_idname = root_dot + "e_" + "_".join(name.lower().split())
                 bl_options = {'REGISTER', 'INTERNAL'}
                 def invoke(self, context, event):
+                    self.prereqs(context)
                     self.index, uilist = self.get_uilist(context)
                     self.assign(context)
                     return context.window_manager.invoke_props_dialog(self)
@@ -430,6 +433,8 @@ class Operators(list):
                     layout.operator_context = 'INVOKE_DEFAULT'
                     layout.operator(root_dot + "e_" + self.bl_idname[8:])
                     layout.operator(root_dot + "d_" + self.bl_idname[8:])
+                    if self.module == "element":
+                        layout.operator(root_dot + "reassign")
             self.extend([Create, Edit, Duplicate, Menu])
     def register(self):
         for klass in self:

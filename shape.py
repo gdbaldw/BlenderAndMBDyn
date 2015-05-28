@@ -56,6 +56,8 @@ class Base(Operator):
         return context.scene.shape_index, context.scene.shape_uilist
     def set_index(self, context, value):
         context.scene.shape_index = value
+    def prereqs(self, context):
+        pass
 
 for t in types:
     class Tester(Base):
@@ -63,8 +65,6 @@ for t in types:
         @classmethod
         def poll(cls, context):
             return False
-        def defaults(self, context):
-            pass
         def assign(self, context):
             self.entity = database.shape[context.scene.shape_index]
         def store(self, context):

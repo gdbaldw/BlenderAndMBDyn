@@ -56,6 +56,8 @@ class Base(Operator):
         return context.scene.ns_node_index, context.scene.ns_node_uilist
     def set_index(self, context, value):
         context.scene.ns_node_index = value
+    def prereqs(self, context):
+        pass
 
 for t in types:
     class Tester(Base):
@@ -63,8 +65,6 @@ for t in types:
         @classmethod
         def poll(cls, context):
             return False
-        def defaults(self, context):
-            pass
         def assign(self, context):
             self.entity = database.ns_node[context.scene.ns_node_index]
         def store(self, context):

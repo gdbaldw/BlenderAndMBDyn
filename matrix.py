@@ -51,14 +51,14 @@ class Base(Operator):
         return context.scene.matrix_index, context.scene.matrix_uilist
     def set_index(self, context, value):
         context.scene.matrix_index = value
+    def prereqs(self, context):
+        pass
 
 klasses = dict()
 
 for t in types:
     class DefaultOperator(Base):
         bl_label = t
-        def defaults(self, context):
-            pass
         def assign(self, context):
             self.entity = database.matrix[context.scene.matrix_index]
         def store(self, context):
@@ -73,14 +73,13 @@ class MatrixBase(Base):
     floats = bpy.props.CollectionProperty(type = BPY.Floats)
     scale = bpy.props.BoolProperty(name="Scale", description="Scale the vector")
     factor = bpy.props.FloatProperty(name="Factor", description="Scale factor", default=1.0, min=-9.9e10, max=9.9e10, precision=6)
-    def defaults(self, context):
+    def prereqs(self, context):
         self.floats.clear()
         for i in range(self.N):
             self.floats.add()
     def assign(self, context):
         self.entity = database.matrix[self.index]
         self.subtype = self.entity.subtype
-        self.defaults(context)
         for i, value in enumerate(self.entity.floats):
             self.floats[i].value = value
         self.scale = self.entity.scale

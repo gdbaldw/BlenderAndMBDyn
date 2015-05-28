@@ -65,6 +65,8 @@ class Base(Operator):
         return context.scene.function_index, context.scene.function_uilist
     def set_index(self, context, value):
         context.scene.function_index = value
+    def prereqs(self, context):
+        pass
 
 for t in types:
     class Tester(Base):
@@ -72,8 +74,6 @@ for t in types:
         @classmethod
         def poll(cls, context):
             return False
-        def defaults(self, context):
-            pass
         def assign(self, context):
             self.entity = database.function[context.scene.function_index]
         def store(self, context):
@@ -90,12 +90,10 @@ class Const(Entity):
 
 class ConstOperator(Base):
     bl_label = "Const"
-    constant = bpy.props.FloatProperty(name="Constant", description="", min=-9.9e10, max=9.9e10, precision=6)
+    constant = bpy.props.FloatProperty(name="Constant", description="", min=-9.9e10, max=9.9e10, precision=6, default=1.0)
     @classmethod
     def poll(cls, context):
         return True
-    def defaults(self, context):
-        self.constant = 1.0
     def assign(self, context):
         self.entity = database.function[context.scene.function_index]
         self.constant = self.entity.constant
@@ -119,20 +117,14 @@ class Exp(Entity):
         text.write(", " + FORMAT(self.multiplier) + ";\n")
 
 class ExpLogBase(Base):
-    default_base = bpy.props.BoolProperty(name="Default base (e)")
-    base = bpy.props.FloatProperty(name="Base", description="", min=-9.9e10, max=9.9e10, precision=6)
-    default_coefficient = bpy.props.BoolProperty(name="Default coefficient (1)")
-    coefficient = bpy.props.FloatProperty(name="Coefficient", description="", min=-9.9e10, max=9.9e10, precision=6)
-    multiplier = bpy.props.FloatProperty(name="Multiplier", description="", min=-9.9e10, max=9.9e10, precision=6)
+    default_base = bpy.props.BoolProperty(name="Default base (e)", default=True)
+    base = bpy.props.FloatProperty(name="Base", description="", min=-9.9e10, max=9.9e10, precision=6, default=10.0)
+    default_coefficient = bpy.props.BoolProperty(name="Default coefficient (1)", default=True)
+    coefficient = bpy.props.FloatProperty(name="Coefficient", description="", min=-9.9e10, max=9.9e10, precision=6, default=1.0)
+    multiplier = bpy.props.FloatProperty(name="Multiplier", description="", min=-9.9e10, max=9.9e10, precision=6, default=1.0)
     @classmethod
     def poll(cls, context):
         return True
-    def defaults(self, context):
-        self.default_base = True
-        self.base = 10.0
-        self.default_coefficient = True
-        self.coefficient = 1.0
-        self.multiplier = 1.0
     def assign(self, context):
         self.entity = database.function[context.scene.function_index]
         self.default_base = self.entity.default_base
@@ -195,12 +187,10 @@ class Pow(Entity):
 
 class PowOperator(Base):
     bl_label = "Pow"
-    power = bpy.props.FloatProperty(name="Power", description="", min=-9.9e10, max=9.9e10, precision=6)
+    power = bpy.props.FloatProperty(name="Power", description="", min=-9.9e10, max=9.9e10, precision=6, default=1.0)
     @classmethod
     def poll(cls, context):
         return True
-    def defaults(self, context):
-        self.power = 1.0
     def assign(self, context):
         self.entity = database.function[context.scene.function_index]
         self.power = self.entity.power
@@ -222,18 +212,13 @@ class Linear(Entity):
 
 class LinearOperator(Base):
     bl_label = "Linear"
-    x1 = bpy.props.FloatProperty(name="x1", description="", min=-9.9e10, max=9.9e10, precision=6)
-    x2 = bpy.props.FloatProperty(name="x2", description="", min=-9.9e10, max=9.9e10, precision=6)
-    y1 = bpy.props.FloatProperty(name="y1", description="", min=-9.9e10, max=9.9e10, precision=6)
-    y2 = bpy.props.FloatProperty(name="y2", description="", min=-9.9e10, max=9.9e10, precision=6)
+    x1 = bpy.props.FloatProperty(name="x1", description="", min=-9.9e10, max=9.9e10, precision=6, default=0.0)
+    x2 = bpy.props.FloatProperty(name="x2", description="", min=-9.9e10, max=9.9e10, precision=6, default=0.0)
+    y1 = bpy.props.FloatProperty(name="y1", description="", min=-9.9e10, max=9.9e10, precision=6, default=0.0)
+    y2 = bpy.props.FloatProperty(name="y2", description="", min=-9.9e10, max=9.9e10, precision=6, default=0.0)
     @classmethod
     def poll(cls, context):
         return True
-    def defaults(self, context):
-        self.x1 = 0.0
-        self.x2 = 0.0
-        self.y1 = 0.0
-        self.y2 = 0.0
     def assign(self, context):
         self.entity = database.function[context.scene.function_index]
         self.x1 = self.entity.x1
@@ -269,16 +254,14 @@ class CubicNaturalSpline(Entity):
         text.write(";\n")
 
 class MultipleBase(Base):
-    extrapolate = bpy.props.BoolProperty(name="Extrapolate")
-    N = bpy.props.IntProperty(name="Number of points", min=2, max=50, description="")
+    extrapolate = bpy.props.BoolProperty(name="Extrapolate", default=True)
+    N = bpy.props.IntProperty(name="Number of points", min=2, max=50, description="", default=2)
     X = bpy.props.CollectionProperty(name="X", type = BPY.Floats)
     Y = bpy.props.CollectionProperty(name="Y", type = BPY.Floats)
     @classmethod
     def poll(cls, context):
         return True
-    def defaults(self, context):
-        self.extrapolate = True
-        self.N = 2
+    def prereqs(self, context):
         self.X.clear()
         self.Y.clear()
         for i in range(50):
@@ -288,11 +271,6 @@ class MultipleBase(Base):
         self.entity = database.function[context.scene.function_index]
         self.extrapolate = self.entity.extrapolate
         self.N = self.entity.N
-        self.X.clear()
-        self.Y.clear()
-        for i in range(50):
-            self.X.add()
-            self.Y.add()
         for i, value in enumerate(self.entity.X):
             self.X[i].value = value
         for i, value in enumerate(self.entity.Y):
@@ -361,19 +339,15 @@ class Chebychev(Entity):
 
 class ChebychevOperator(Base):
     bl_label = "Chebychev"
-    lower_bound = bpy.props.FloatProperty(name="Lower bound", description="", min=-9.9e10, max=9.9e10, precision=6)
-    upper_bound = bpy.props.FloatProperty(name="Upper bound", description="", min=-9.9e10, max=9.9e10, precision=6)
-    extrapolate = bpy.props.BoolProperty(name="Extrapolate")
-    N = bpy.props.IntProperty(name="Number of points", min=2, max=50, description="")
+    lower_bound = bpy.props.FloatProperty(name="Lower bound", description="", min=-9.9e10, max=9.9e10, precision=6, default=0.0)
+    upper_bound = bpy.props.FloatProperty(name="Upper bound", description="", min=-9.9e10, max=9.9e10, precision=6, default=0.0)
+    extrapolate = bpy.props.BoolProperty(name="Extrapolate", default=True)
+    N = bpy.props.IntProperty(name="Number of points", min=2, max=50, description="", default=2)
     C = bpy.props.CollectionProperty(name="Coefficients", type = BPY.Floats)
     @classmethod
     def poll(cls, context):
         return True
-    def defaults(self, context):
-        self.lower_bound = 0.0
-        self.upper_bound = 0.0
-        self.extrapolate = True
-        self.N = 2
+    def prereqs(self, context):
         self.C.clear()
         for i in range(50):
             self.C.add()
@@ -383,9 +357,6 @@ class ChebychevOperator(Base):
         self.upper_bound = self.entity.upper_bound
         self.extrapolate = self.entity.extrapolate
         self.N = self.entity.N
-        self.C.clear()
-        for i in range(50):
-            self.C.add()
         for i, value in enumerate(self.entity.C):
             self.C[i].value = value
     def store(self, context):
@@ -427,7 +398,7 @@ class BinaryOperator(Base):
     @classmethod
     def poll(cls, context):
         return True
-    def defaults(self, context):
+    def prereqs(self, context):
         self.function_exists(context)
     def assign(self, context):
         self.entity = database.function[context.scene.function_index]

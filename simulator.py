@@ -28,7 +28,7 @@ if "bpy" in locals():
     imp.reload(Operator)
     imp.reload(Entity)
 else:
-    from .base import bpy, root_dot, database, Operator, Entity, Bundle, enum_general_data, enum_method, enum_nonlinear_solver, enum_eigenanalysis, enum_abort_after, enum_linear_solver, enum_dummy_steps, enum_output_data, enum_real_time, enum_assembly, enum_job_control, enum_default_output, enum_default_aerodynamic_output, enum_default_beam_output
+    from .base import bpy, BPY, root_dot, database, Operator, Entity, Bundle, enum_general_data, enum_method, enum_nonlinear_solver, enum_eigenanalysis, enum_abort_after, enum_linear_solver, enum_dummy_steps, enum_output_data, enum_real_time, enum_assembly, enum_job_control, enum_default_output, enum_default_aerodynamic_output, enum_default_beam_output
     from .common import FORMAT
     from bpy_extras.io_utils import ExportHelper
     from mathutils import Matrix
@@ -61,6 +61,8 @@ class Base(Operator):
         return context.scene.simulator_index, context.scene.simulator_uilist
     def set_index(self, context, value):
         context.scene.simulator_index = value
+    def prereqs(self, context):
+        pass
     def draw_panel_post(self, context, layout):
         if context.scene.dirty_simulator:
             layout.label("Choose a simulator")
@@ -75,8 +77,6 @@ for t in types:
         @classmethod
         def poll(cls, context):
             return False
-        def defaults(self, context):
-            pass
         def assign(self, context):
             self.entity = database.simulator[context.scene.simulator_index]
         def store(self, context):
@@ -158,7 +158,7 @@ class InitialValueOperator(Base):
     @classmethod
     def poll(self, context):
         return True
-    def defaults(self, context):
+    def prereqs(self, context):
         self.drive_exists(context)
         self.meter_drive_exists(context)
         self.general_data_exists(context)
@@ -177,7 +177,6 @@ class InitialValueOperator(Base):
         self.default_beam_output_exists(context)
     def assign(self, context):
         self.entity = database.simulator[context.scene.simulator_index]
-        self.defaults(context)
         self.executable_path = self.entity.executable_path
         self.initial_time = self.entity.initial_time
         self.forever = self.entity.forever
@@ -327,15 +326,6 @@ class InitialValueOperator(Base):
 
 klasses[InitialValueOperator.bl_label] = InitialValueOperator
 
-class Register(list):
-    def register(self):
-        for klass in self:
-            bpy.utils.register_class(klass)
-    def unregister(self):
-        for klass in self:
-            bpy.utils.unregister_class(klass)
-register = Register()
-
 class Save(bpy.types.Operator, Base):
     bl_idname = root_dot + "save"
     bl_options = {'REGISTER', 'INTERNAL'}
@@ -361,7 +351,7 @@ class Save(bpy.types.Operator, Base):
         context.scene.dirty_simulator = False
         context.scene.clean_log = False
         return{'PASS_THROUGH'}
-register.append(Save)
+BPY.klasses.append(Save)
 
 class Simulate(bpy.types.Operator, Base):
     bl_idname = root_dot + "simulate"
@@ -417,7 +407,7 @@ class Simulate(bpy.types.Operator, Base):
         self.timer = wm.event_timer_add(0.0001, context.window)
         wm.modal_handler_add(self)
         return{'RUNNING_MODAL'}
-register.append(Simulate)
+BPY.klasses.append(Simulate)
 
 class Animate(bpy.types.Operator, Base):
     bl_idname = root_dot + "animate"
@@ -472,8 +462,6 @@ class Animate(bpy.types.Operator, Base):
         layout = self.layout
         layout.label("File has " + str(int(self.N/(self.i+1))) + " timesteps.")
         layout.prop(self, "steps")
-        
-register.append(Animate)
+BPY.klasses.append(Animate)
 
 bundle = Bundle(tree, Base, klasses, database.simulator, "simulator")
-bundle.append(register)

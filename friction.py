@@ -53,6 +53,8 @@ class Base(Operator):
         return context.scene.friction_index, context.scene.friction_uilist
     def set_index(self, context, value):
         context.scene.friction_index = value
+    def prereqs(self, context):
+        pass
 
 for t in types:
     class Tester(Base):
@@ -60,8 +62,6 @@ for t in types:
         @classmethod
         def poll(cls, context):
             return False
-        def defaults(self, context):
-            pass
         def assign(self, context):
             self.entity = database.friction[context.scene.friction_index]
         def store(self, context):
@@ -82,24 +82,18 @@ class Modlugre(Entity):
 
 class ModlugreOperator(Base):
     bl_label = "Modlugre"
-    sigma0 = bpy.props.FloatProperty(name="Sigma 0", description="", min=-9.9e10, max=9.9e10, precision=6)
-    sigma1 = bpy.props.FloatProperty(name="Sigma 1", description="", min=-9.9e10, max=9.9e10, precision=6)
-    sigma2 = bpy.props.FloatProperty(name="Sigma 2", description="", min=-9.9e10, max=9.9e10, precision=6)
-    kappa = bpy.props.FloatProperty(name="Kappa", description="", min=-9.9e10, max=9.9e10, precision=6)
-    plane_hinge = bpy.props.BoolProperty(name="Plane hinge", description="Simple plane hinge (else just simple shape function)")
-    radius = bpy.props.FloatProperty(name="Radius", description="", min=0.0, max=9.9e10, precision=6)
+    sigma0 = bpy.props.FloatProperty(name="Sigma 0", description="", min=-9.9e10, max=9.9e10, precision=6, default=0.0)
+    sigma1 = bpy.props.FloatProperty(name="Sigma 1", description="", min=-9.9e10, max=9.9e10, precision=6, default=0.0)
+    sigma2 = bpy.props.FloatProperty(name="Sigma 2", description="", min=-9.9e10, max=9.9e10, precision=6, default=0.0)
+    kappa = bpy.props.FloatProperty(name="Kappa", description="", min=-9.9e10, max=9.9e10, precision=6, default=0.0)
+    plane_hinge = bpy.props.BoolProperty(name="Plane hinge", description="Simple plane hinge (else just simple shape function)", default=False)
+    radius = bpy.props.FloatProperty(name="Radius", description="", min=0.0, max=9.9e10, precision=6, default=0.0)
     function_name = bpy.props.EnumProperty(items=enum_function, name="Shape Function")
     function_edit = bpy.props.BoolProperty(name="")
     @classmethod
     def poll(cls, context):
         return True
-    def defaults(self, context):
-        self.sigma0 = 1.0
-        self.sigma1 = 1.0
-        self.sigma2 = 1.0
-        self.kappa = 1.0
-        self.plane_hinge = False
-        self.radius = 1.0
+    def prereqs(self, context):
         self.function_exists(context)
     def assign(self, context):
         self.entity = database.friction[context.scene.friction_index]

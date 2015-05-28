@@ -71,6 +71,8 @@ class Base(Operator):
         return context.scene.definition_index, context.scene.definition_uilist
     def set_index(self, context, value):
         context.scene.definition_index = value
+    def prereqs(self, context):
+        pass
 
 for t in types:
     class Tester(Base):
@@ -78,8 +80,6 @@ for t in types:
         @classmethod
         def poll(cls, context):
             return False
-        def defaults(self, context):
-            pass
         def assign(self, context):
             self.entity = database.definition[context.scene.definition_index]
         def store(self, context):
@@ -175,7 +175,7 @@ class GeneralProblemOperator(Base):
     @classmethod
     def poll(self, context):
         return True
-    def defaults(self, context):
+    def prereqs(self, context):
         self.drive_exists(context)
     def assign(self, context):
         self.drive_exists(context)
@@ -324,8 +324,6 @@ class CrankNicolsonOperator(Base):
     @classmethod
     def poll(self, context):
         return True
-    def defaults(self, context):
-        pass
     def assign(self, context):
         self.entity = database.definition[context.scene.definition_index]
     def store(self, context):
@@ -348,7 +346,7 @@ class MSHopeOperator(Base):
     @classmethod
     def poll(self, context):
         return True
-    def defaults(self, context):
+    def prereqs(self, context):
         self.drive_exists(context)
     def assign(self, context):
         self.entity = database.definition[context.scene.definition_index]
@@ -405,7 +403,7 @@ class ThirdOrderOperator(Base):
     @classmethod
     def poll(self, context):
         return True
-    def defaults(self, context):
+    def prereqs(self, context):
         self.drive_exists(context)
     def assign(self, context):
         self.entity = database.definition[context.scene.definition_index]
@@ -442,8 +440,6 @@ class BDFOperator(Base):
     @classmethod
     def poll(self, context):
         return True
-    def defaults(self, context):
-        pass
     def assign(self, context):
         self.entity = database.definition[context.scene.definition_index]
         self.set_order = self.entity.set_order
@@ -475,8 +471,6 @@ class ImplicitEulerOperator(Base):
     @classmethod
     def poll(self, context):
         return True
-    def defaults(self, context):
-        pass
     def assign(self, context):
         self.entity = database.definition[context.scene.definition_index]
     def store(self, context):
@@ -507,8 +501,6 @@ class NewtonRaphstonOperator(Base):
     @classmethod
     def poll(self, context):
         return True
-    def defaults(self, context):
-        pass
     def assign(self, context):
         self.entity = database.definition[context.scene.definition_index]
         self.true_or_modified = self.entity.true_or_modified
@@ -608,8 +600,6 @@ class LineSearchOperator(Base):
     @classmethod
     def poll(self, context):
         return True
-    def defaults(self, context):
-        pass
     def assign(self, context):
         self.entity = database.definition[context.scene.definition_index]
         self.true_or_modified = self.entity.true_or_modified
@@ -770,8 +760,6 @@ class MatrixFreeOperator(Base):
     @classmethod
     def poll(self, context):
         return True
-    def defaults(self, context):
-        pass
     def assign(self, context):
         self.entity = database.definition[context.scene.definition_index]
         self.bicgstab_or_gmres = self.entity.bicgstab_or_gmres
@@ -885,15 +873,12 @@ class EigenanalysisOperator(Base):
     @classmethod
     def poll(self, context):
         return True
-    def defaults(self, context):
+    def prereqs(self, context):
         self.when.clear()
         for i in range(50):
             self.when.add()
     def assign(self, context):
         self.entity = database.definition[context.scene.definition_index]
-        self.when.clear()
-        for i in range(50):
-            self.when.add()
         self.num_times = self.entity.num_times
         for i, value in enumerate(self.entity.when):
             self.when[i].value = value
@@ -987,8 +972,6 @@ class AbortAfterOperator(Base):
     @classmethod
     def poll(self, context):
         return True
-    def defaults(self, context):
-        pass
     def assign(self, context):
         self.entity = database.definition[context.scene.definition_index]
         self.abort_after = self.entity.abort_after
@@ -1067,8 +1050,6 @@ class LinearSolverOperator(Base):
     @classmethod
     def poll(self, context):
         return True
-    def defaults(self, context):
-        pass
     def assign(self, context):
         self.entity = database.definition[context.scene.definition_index]
         self.linear_solver = self.entity.linear_solver
@@ -1181,7 +1162,7 @@ class DummyStepsOperator(Base):
     @classmethod
     def poll(self, context):
         return True
-    def defaults(self, context):
+    def prereqs(self, context):
         self.method_exists(context)
     def assign(self, context):
         self.entity = database.definition[context.scene.definition_index]
@@ -1242,8 +1223,6 @@ class OutputDataOperator(Base):
     @classmethod
     def poll(self, context):
         return True
-    def defaults(self, context):
-        pass
     def assign(self, context):
         self.entity = database.definition[context.scene.definition_index]
         self.none = self.entity.none
@@ -1328,8 +1307,6 @@ class RealTimeOperator(Base):
     @classmethod
     def poll(self, context):
         return True
-    def defaults(self, context):
-        pass
     def assign(self, context):
         self.entity = database.definition[context.scene.definition_index]
         self.rtai_posix = self.entity.rtai_posix
@@ -1435,8 +1412,6 @@ class AssemblyOperator(Base):
     @classmethod
     def poll(self, context):
         return True
-    def defaults(self, context):
-        pass
     def assign(self, context):
         self.entity = database.definition[context.scene.definition_index]
         self.skip_initial_joint_assembly = self.entity.skip_initial_joint_assembly
@@ -1554,7 +1529,7 @@ class JobControlOperator(Base):
     @classmethod
     def poll(self, context):
         return True
-    def defaults(self, context):
+    def prereqs(self, context):
         self.meter_drive_exists(context)
     def assign(self, context):
         self.entity = database.definition[context.scene.definition_index]
@@ -1672,8 +1647,6 @@ class DefaultOutputOperator(Base):
     @classmethod
     def poll(self, context):
         return True
-    def defaults(self, context):
-        pass
     def assign(self, context):
         self.entity = database.definition[context.scene.definition_index]
         self.none = self.entity.none
@@ -1772,8 +1745,6 @@ class DefaultAerodynamicOutputOperator(Base):
     @classmethod
     def poll(self, context):
         return True
-    def defaults(self, context):
-        pass
     def assign(self, context):
         self.entity = database.definition[context.scene.definition_index]
         self.position = self.entity.position
@@ -1849,8 +1820,6 @@ class DefaultBeamOutputOperator(Base):
     @classmethod
     def poll(self, context):
         return True
-    def defaults(self, context):
-        pass
     def assign(self, context):
         self.entity = database.definition[context.scene.definition_index]
         self.position = self.entity.position
