@@ -1048,6 +1048,7 @@ class DuplicateObs(bpy.types.Operator):
                     new_frame.objects[i] = new_obs[obs.index(ob)]
         bpy.ops.object.select_all(action='DESELECT')
         for ob in new_obs:
+            ob.animation_data_clear()
             ob.select = True
         context.scene.dirty_simulator = True
         return {'FINISHED'}
