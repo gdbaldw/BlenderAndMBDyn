@@ -197,14 +197,14 @@ class Entity(Common):
                 text.write(o_label + ", ")
             text.write("matr,\n")
             self.write_matrix(rot_i*rotT, text, "\t\t\t\t")
-    def makecopy(self):
-        newcopy = copy(self)
+    def duplicate(self):
+        new_entity = copy(self)
         if hasattr(self, "objects"):
-            newcopy.objects = copy(self.objects)
-        newcopy.links = copy(self.links)
-        newcopy.increment_links()
-        newcopy.users = 0
-        return newcopy
+            new_entity.objects = copy(self.objects)
+        new_entity.links = copy(self.links)
+        new_entity.increment_links()
+        new_entity.users = 0
+        return new_entity
 
 class SelectedObjects(list):
     def __init__(self, context):
@@ -400,6 +400,9 @@ class Operators(list):
                 bl_label = "Edit"
                 bl_idname = root_dot + "e_" + "_".join(name.lower().split())
                 bl_options = {'REGISTER', 'INTERNAL'}
+                @classmethod
+                def poll(cls, context):
+                    return True
                 def invoke(self, context, event):
                     self.prereqs(context)
                     self.index, uilist = self.get_uilist(context)
@@ -414,12 +417,15 @@ class Operators(list):
                 bl_label = "Duplicate"
                 bl_idname = root_dot + "d_" + "_".join(name.lower().split())
                 bl_options = {'REGISTER', 'INTERNAL'}
+                @classmethod
+                def poll(cls, context):
+                    return True
                 def execute(self, context):
                     index, uilist = self.get_uilist(context)
                     self.index = len(uilist)
                     uilist.add()
                     self.set_index(context, self.index)
-                    entity = self.entity_list[index].makecopy()
+                    entity = self.entity_list[index].duplicate()
                     self.entity_list.append(entity)
                     uilist[self.index].name = entity.name
                     context.scene.dirty_simulator = True

@@ -93,7 +93,6 @@ class Database(Common):
         self.structural_dynamic_nodes.clear()
         self.structural_static_nodes.clear()
         self.structural_dummy_nodes.clear()
-        self.filepath = None
         self.scene = None
     def pickle(self):
         if not self.scene:
@@ -179,7 +178,7 @@ class Database(Common):
                         f.write(string)
                     f.write("\n")
         f.write("\n*/\n\n")
-    def write_control(self, f):
+    def write_control(self, f, context):
         structural_node_count = len(
             self.structural_static_nodes | self.structural_dynamic_nodes | self.structural_dummy_nodes)
         joint_count = len([e for e in self.element if e.type in joint_types])
@@ -210,7 +209,7 @@ class Database(Common):
                         name = driver.filename.replace(" ", "")
                     else:
                         name = driver.name.replace(" ", "")
-                    command = "tail -n 1 " + os.path.splitext(database.filepath)[0] + ".echo_" + name + " | awk '{print $1}'"
+                    command = "tail -n 1 " + os.path.splitext(context.blend_data.filepath)[0] + ".echo_" + name + " | awk '{print $1}'"
                     f1 = TemporaryFile()
                     call(command, shell=True, stdout=f1)
                     try:

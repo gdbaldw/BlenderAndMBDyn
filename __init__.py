@@ -76,14 +76,6 @@ from tempfile import TemporaryFile
 from time import sleep, clock
 import os
 
-class ParentRigids(bpy.types.Operator):
-    bl_idname = root_dot+"rigids"
-    bl_options = {'REGISTER', 'INTERNAL'}
-    bl_label = "Parent Rigids"
-    bl_description = "Parent rigids"
-    def execute(self, context):
-        return{'FINISHED'}
-
 class ImportFile(bpy.types.Operator):
     bl_idname = root_dot+"import"
     bl_options = {'REGISTER', 'INTERNAL'}
@@ -109,11 +101,10 @@ class Actions(bpy.types.Panel):
     bl_options = {'DEFAULT_CLOSED'}
     def draw(self, context):
         layout = self.layout
-        layout.operator(root_dot+"rigids")
         layout.operator(root_dot+"import")
         layout.operator(root_dot+"append")
 
-klasses = [] # [ParentRigids, ImportFile, AppendModel, Actions]
+klasses = [] # [ImportFile, AppendModel, Actions]
 
 modules = [element, constitutive, drive, driver, frame, friction, function, matrix, ns_node, shape, definition, simulator]
 

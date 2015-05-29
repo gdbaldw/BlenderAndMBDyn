@@ -106,7 +106,7 @@ class InitialValue(Entity):
                 "\nbegin: control data;\n")
             for link in self.links[problem_count:]:
                 link.write(f)
-            database.write_control(f)
+            database.write_control(f, context)
             f.write("end: control data;\n")
             database.write(f)
 

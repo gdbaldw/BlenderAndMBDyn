@@ -60,7 +60,7 @@ class Base(Operator):
             test = len(obs) == N and not database.element.filter(cls.bl_label, obs[0])
         else:
             test = not database.element.filter(cls.bl_label)
-        return cls.bl_idname.startswith(root_dot + "e_") or test
+        return test
     def assign(self, context):
         self.entity = database.element[context.scene.element_index]
     def store(self, context):
@@ -847,7 +847,7 @@ class RigidOffsetOperator(Base):
         obs = SelectedObjects(context)
         test = len(obs) == 2 and not (database.element.filter("Rigid offset", obs[0])
             or database.element.filter("Dummy node", obs[0]))
-        return cls.bl_idname.startswith(root_dot + "e_") or test
+        return test
     def store(self, context):
         self.entity = database.element[self.index]
         self.entity.objects = SelectedObjects(context)
@@ -868,7 +868,7 @@ class DummyNodeOperator(Base):
         obs = SelectedObjects(context)
         test = len(obs) == 2 and not (database.element.filter("Rigid offset", obs[0])
             or database.element.filter("Dummy node", obs[0]))
-        return cls.bl_idname.startswith(root_dot + "e_") or test
+        return test
     def create_entity(self):
         return DummyNode(self.name)
 
@@ -904,8 +904,7 @@ class GravityOperator(Base):
     drive_edit = bpy.props.BoolProperty(name="")
     @classmethod
     def poll(self, context):
-        return (self.bl_idname.startswith(root_dot + "e_")
-            or not database.element.filter("Gravity"))
+        return not database.element.filter("Gravity")
     def prereqs(self, context):
         self.matrix_exists(context, "3x1")
         self.drive_exists(context)
@@ -1014,10 +1013,10 @@ class DuplicateObs(bpy.types.Operator):
         for drive in drives:
             context.scene.drive_index = database.drive.index(drive)
             exec("bpy.ops." + root_dot + "d_" + "_".join(drive.type.lower().split()) + "()")
-            for item in database.element + database.constitutive + database.drive:
-                for i, link in enumerate(item.links):
+            for entity in database.element + database.constitutive + database.drive:
+                for i, link in enumerate(entity.links):
                     if link == drive:
-                        item.links[i] = database.drive[-1]
+                        entity.links[i] = database.drive[-1]
                         drive.users -= 1
                         database.drive[-1].users += 1
         new_obs = list()
@@ -1026,18 +1025,20 @@ class DuplicateObs(bpy.types.Operator):
             ob.select = True
             bpy.ops.object.duplicate()
             new_obs.append(context.selected_objects[0])
-        items = elements + drives
-        new_items = database.element[len_element:] + database.drive[len_drive:]
-        for new_item in new_items:
-            if hasattr(new_item, "objects"):
-                for i, ob in enumerate(new_item.objects):
+        entities = elements + drives
+        new_entities = database.element[len_element:] + database.drive[len_drive:]
+        for new_entity in new_entities:
+            if hasattr(new_entity, "objects"):
+                for i, ob in enumerate(new_entity.objects):
                     if ob in obs:
-                        new_item.objects[i] = new_obs[obs.index(ob)]
-            for i, link in enumerate(new_item.links):
-                if link in items:
+                        new_entity.objects[i] = new_obs[obs.index(ob)]
+            for i, link in enumerate(new_entity.links):
+                if link in entities:
                     link.users -= 1
-                    new_item.links[i] = new_items[items.index(link)]
-                    new_item.links[i].users += 1
+                    new_entity.links[i] = new_entities[entities.index(link)]
+                    new_entity.links[i].users += 1
+            if new_entity.type == "Rigid offset":
+                new_entity.objects[0].parent = new_entity.objects[1]
         frames = [frame for frame in database.frame if frame.objects[0] in obs]
         len_frame = len(database.frame)
         for frame in frames:
