@@ -71,15 +71,13 @@ class Base(Operator):
         bpy.types.Scene.element_uilist = bpy.props.CollectionProperty(type = ListItem)
         def select_and_activate(self, context):
             if database.element and self.element_index < len(database.element):
+                bpy.ops.object.select_all(action='DESELECT')
                 if hasattr(database.element[self.element_index], "objects"):
-                    bpy.ops.object.select_all(action='DESELECT')
                     element = database.element[self.element_index]
                     for ob in element.objects:
                         ob.select = True
                     context.scene.objects.active = element.objects[0]
                     element.remesh()
-                elif database.element[self.element_index].type in ["Gravity", "Air properties"]:
-                    bpy.ops.object.select_all(action='DESELECT')
         bpy.types.Scene.element_index = bpy.props.IntProperty(default=-1, update=select_and_activate)
     @classmethod
     def delete_list(self):
@@ -152,8 +150,6 @@ class StructuralForce(Entity):
         else:
             string += "absolute"
             relative_dir = rotT_0*Vector((0., 0., 1.))
-        relative_dir = self.round_vector(relative_dir)
-        relative_arm_0 = self.round_vector(relative_arm_0)
         text.write(string+
         ",\n\t\t" + FORMAT(Node_0)+
         ",\n\t\t\tposition, ")
@@ -852,6 +848,10 @@ class RigidOffsetOperator(Base):
         test = len(obs) == 2 and not (database.element.filter("Rigid offset", obs[0])
             or database.element.filter("Dummy node", obs[0]))
         return cls.bl_idname.startswith(root_dot + "e_") or test
+    def store(self, context):
+        self.entity = database.element[self.index]
+        self.entity.objects = SelectedObjects(context)
+        self.entity.objects[0].parent = self.entity.objects[1]
     def create_entity(self):
         return RigidOffset(self.name)
 
@@ -1029,9 +1029,10 @@ class DuplicateObs(bpy.types.Operator):
         items = elements + drives
         new_items = database.element[len_element:] + database.drive[len_drive:]
         for new_item in new_items:
-            for i, ob in enumerate(new_item.objects):
-                if ob in obs:
-                    new_item.objects[i] = new_obs[obs.index(ob)]
+            if hasattr(new_item, "objects"):
+                for i, ob in enumerate(new_item.objects):
+                    if ob in obs:
+                        new_item.objects[i] = new_obs[obs.index(ob)]
             for i, link in enumerate(new_item.links):
                 if link in items:
                     link.users -= 1

@@ -484,9 +484,11 @@ class UI(list):
             def execute(self, context):
                 index, uilist = self.get_uilist(context)
                 uilist.remove(index)
-                for link in self.entity_list[index].links:
+                entity = self.entity_list.pop(index)
+                for link in entity.links:
                     link.users -= 1
-                self.entity_list.pop(index)
+                if entity.type == "Rigid offset":
+                    entity.objects[0].parent = None
                 context.scene.dirty_simulator = True
                 self.set_index(context, 0 if index == 0 and 0 < len(uilist) else index-1)
                 return{'FINISHED'}

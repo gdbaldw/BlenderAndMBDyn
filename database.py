@@ -125,6 +125,9 @@ class Database(Common):
         self.pickle()
         self.unpickle()
     def write_indexes(self, f):
+        self.structural_dynamic_nodes.clear()
+        self.structural_static_nodes.clear()
+        self.structural_dummy_nodes.clear()
         self.rigid_dict = {e.objects[0] : e.objects[1] for e in self.element.filter("Rigid offset")}
         nodes = set()
         for e in (e for e in self.element + self.drive if hasattr(e, "objects")):
