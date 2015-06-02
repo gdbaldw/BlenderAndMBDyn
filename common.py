@@ -93,9 +93,9 @@ nonlinear_solver_types = [
 
 class Common:
     def write_vector(self, v, f, end=""):
-        f.write(", ".join([FORMAT(x) for x in v]) + end)
+        f.write(", ".join([FORMAT(round(x, 6) if round(x, 6) != -0. else 0) for x in v]) + end)
     def write_matrix(self, m, f, pad=""):
-        f.write(",\n".join([pad + ", ".join(FORMAT(x) for x in r) for r in m]))
+        f.write(",\n".join([pad + ", ".join(FORMAT(round(x, 6) if round(x, 6) != -0. else 0) for x in r) for r in m]))
 
 def subsurf(obj):
     subsurf = [m for m in obj.modifiers if m.type == 'SUBSURF']

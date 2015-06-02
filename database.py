@@ -97,6 +97,9 @@ class Database(Common):
     def pickle(self):
         if not self.scene:
             self.scene = bpy.context.scene
+        bpy.context.scene.mbdyn_name = bpy.context.scene.name
+        for obj in bpy.context.scene.objects:
+            obj.mbdyn_name = obj.name
         def _repr(obj):
             return repr(obj) if repr(obj).startswith("bpy.data") else None
         with BytesIO() as f:
@@ -108,6 +111,8 @@ class Database(Common):
         self.clear()
         def _exec(_repr):
             exec("id_data = " + _repr)
+            name = locals()["id_data"].mbdyn_name
+            exec("id_data = " + _repr.split("[")[0] + "[\"" + name + "\"]")
             return locals()["id_data"]
         if bpy.context.scene.pickled_database:
             with BytesIO(b64decode(bpy.context.scene.pickled_database.encode())) as f:
@@ -303,7 +308,7 @@ class Database(Common):
                     rot = base_node.matrix_world.to_quaternion().to_matrix()
                     globalV = node.matrix_world.translation - base_node.matrix_world.translation
                     localV = rot*globalV
-                    rotT = node.matrix_world.to_quaternion().to_matrix().transposed()
+                    rotT = node.matrix_world.to_quaternion().to_matrix()
                     f.write("\tstructural: " + str(i) + ", dummy,\n\t\t" +
                         str(self.node.index(base_node)) + ", offset,\n\t\t\t")
                     self.write_vector(localV, f, ",\n\t\t\tmatr,\n")

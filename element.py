@@ -33,7 +33,7 @@ if "bpy" in locals():
 else:
     from .common import (FORMAT, aerodynamic_types, beam_types, force_types, genel_types, joint_types, environment_types, node_types,
         structural_static_types, structural_dynamic_types, Ellipsoid, RhombicPyramid, Teardrop, Cylinder, Sphere)
-    from .base import bpy, BPY, root_dot, database, Operator, Entity, Bundle, enum_objects, enum_matrix_3x1, enum_matrix_3x3, enum_constitutive_1D, enum_constitutive_3D, enum_constitutive_6D, enum_drive, enum_element, enum_friction, SelectedObjects
+    from .base import bpy, BPY, root_dot, database, Operator, Entity, Bundle, enum_scenes, enum_objects, enum_matrix_3x1, enum_matrix_3x3, enum_constitutive_1D, enum_constitutive_3D, enum_constitutive_6D, enum_drive, enum_element, enum_friction, SelectedObjects
     from mathutils import Vector
 
 types = aerodynamic_types + beam_types + ["Body"] + force_types + genel_types + joint_types + ["Rotor"] + environment_types + ["Driven"] + node_types
@@ -99,28 +99,6 @@ class Base(Operator):
         frames = [frame for frame in database.frame if frame.objects[0] in obs]
         if elements or drives or frames:
             layout.operator(root_dot + "duplicate_obs")
-    def write_hinge(self, text, name, V1=True, V2=True, M1=True, M2=True):
-        rot_0, globalV_0, Node_0 = self.rigid_offset(0)
-        localV_0 = rot_0*globalV_0
-        rot_1, globalV_1, Node_1 = self.rigid_offset(1)
-        to_hinge = rot_1*(globalV_1 + self.objects[0].matrix_world.translation - self.objects[1].matrix_world.translation)
-        rotT = self.objects[0].matrix_world.to_quaternion().to_matrix().transposed()
-        text.write(
-        "\tjoint: " + FORMAT(database.element.index(self)) + ", " + name + ",\n" +
-        "\t\t" + FORMAT(Node_0))
-        if V1:
-            text.write(", ")
-            self.write_vector(localV_0, text)
-        if M1:
-            text.write(",\n\t\t\thinge, matr,\n")
-            self.write_matrix(rot_0*rotT, text, "\t\t\t\t")
-        text.write(", \n\t\t" + FORMAT(Node_1))
-        if V2:
-            text.write(", ")
-            self.write_vector(to_hinge, text)
-        if M2:
-            text.write(",\n\t\t\thinge, matr,\n")
-            self.write_matrix(rot_1*rotT, text, "\t\t\t\t")
 
 klasses = dict()
 
@@ -140,7 +118,7 @@ class StructuralForce(Entity):
     elem_type = "force"
     def write(self, text):
         rot_0, globalV_0, Node_0 = self.rigid_offset(0)
-        rotT_0 = self.objects[0].matrix_world.to_quaternion().to_matrix().transposed()
+        rotT_0 = self.objects[0].matrix_world.to_quaternion().to_matrix()
         relative_dir = rot_0*rotT_0*Vector((0., 0., 1.))
         relative_arm_0 = rot_0*globalV_0
         string = "\tforce: " + FORMAT(database.element.index(self)) + ", "
@@ -195,7 +173,7 @@ class StructuralInternalForce(Entity):
     elem_type = "force"
     def write(self, text):
         rot_0, globalV_0, Node_0 = self.rigid_offset(0)
-        rotT_0 = self.objects[0].matrix_world.to_quaternion().to_matrix().transposed()
+        rotT_0 = self.objects[0].matrix_world.to_quaternion().to_matrix()
         relative_arm_0 = rot_0*globalV_0
         rot_1, globalV_1, Node_1 = self.rigid_offset(1)
         relative_arm_1 = rot_1*globalV_1
@@ -230,7 +208,7 @@ class StructuralCouple(Entity):
     elem_type = "couple"
     def write(self, text):
         rot_0, globalV_0, Node_0 = self.rigid_offset(0)
-        rotT_0 = self.objects[0].matrix_world.to_quaternion().to_matrix().transposed()
+        rotT_0 = self.objects[0].matrix_world.to_quaternion().to_matrix()
         string = "\tcouple: " + FORMAT(database.element.index(self)) + ", "
         if self.orientation == "follower":
             string += "follower"
@@ -259,7 +237,7 @@ class StructuralInternalCouple(Entity):
     elem_type = "couple"
     def write(self, text):
         rot_0, globalV_0, Node_0 = self.rigid_offset(0)
-        rotT_0 = self.objects[0].matrix_world.to_quaternion().to_matrix().transposed()
+        rotT_0 = self.objects[0].matrix_world.to_quaternion().to_matrix()
         rot_1, globalV_1, Node_1 = self.rigid_offset(1)
         string = "\tcouple: " + FORMAT(database.element.index(self)) + ", "
         if self.orientation == "follower":
@@ -285,7 +263,31 @@ class StructuralInternalCoupleOperator(ForceBase):
 
 klasses[StructuralInternalCoupleOperator.bl_label] = StructuralInternalCoupleOperator
 
-class AxialRotation(Entity):
+class Hinge(Entity):
+    def write_hinge(self, text, name, V1=True, V2=True, M1=True, M2=True):
+        rot_0, globalV_0, Node_0 = self.rigid_offset(0)
+        localV_0 = rot_0*globalV_0
+        rot_1, globalV_1, Node_1 = self.rigid_offset(1)
+        to_hinge = rot_1*(globalV_1 + self.objects[0].matrix_world.translation - self.objects[1].matrix_world.translation)
+        rotT = self.objects[0].matrix_world.to_quaternion().to_matrix()
+        text.write(
+        "\tjoint: " + FORMAT(database.element.index(self)) + ", " + name + ",\n" +
+        "\t\t" + FORMAT(Node_0))
+        if V1:
+            text.write(", ")
+            self.write_vector(localV_0, text)
+        if M1:
+            text.write(",\n\t\t\thinge, matr,\n")
+            self.write_matrix(rot_0*rotT, text, "\t\t\t\t")
+        text.write(", \n\t\t" + FORMAT(Node_1))
+        if V2:
+            text.write(", ")
+            self.write_vector(to_hinge, text)
+        if M2:
+            text.write(",\n\t\t\thinge, matr,\n")
+            self.write_matrix(rot_1*rotT, text, "\t\t\t\t")
+
+class AxialRotation(Hinge):
     elem_type = "joint"
     def write(self, text):
         self.write_hinge(text, "axial rotation")
@@ -338,7 +340,7 @@ class ClampOperator(Base):
 
 klasses[ClampOperator.bl_label] = ClampOperator
 
-class DeformableDisplacementJoint(Entity):
+class DeformableDisplacementJoint(Hinge):
     elem_type = "joint"
     def write(self, text):
         self.write_hinge(text, "deformable displacement joint")
@@ -374,7 +376,7 @@ class DeformableDisplacementJointOperator(ConstitutiveBase):
 
 klasses[DeformableDisplacementJointOperator.bl_label] = DeformableDisplacementJointOperator
 
-class DeformableHinge(Entity):
+class DeformableHinge(Hinge):
     elem_type = "joint"
     def write(self, text):
         self.write_hinge(text, "deformable hinge", V1=False, V2=False)
@@ -396,7 +398,7 @@ class DeformableHingeOperator(ConstitutiveBase):
 
 klasses[DeformableHingeOperator.bl_label] = DeformableHingeOperator
 
-class DeformableJoint(Entity):
+class DeformableJoint(Hinge):
     elem_type = "joint"
     def write(self, text):
         self.write_hinge(text, "deformable joint")
@@ -473,7 +475,7 @@ class InLine(Entity):
         localV0 = rot0*globalV0
         rot_1, globalV_1, Node_1 = self.rigid_offset(1)
         to_point = rot_1*(globalV_1 + self.objects[0].matrix_world.translation - self.objects[1].matrix_world.translation)
-        rot = self.objects[0].matrix_world.to_quaternion().to_matrix().transposed()
+        rot = self.objects[0].matrix_world.to_quaternion().to_matrix()
         text.write("\tjoint: " + FORMAT(database.element.index(self)) + ", inline,\n")
         self.write_node(text, 0, node=True, position=True, orientation=True)
         text.write(",\n\t\t" + FORMAT(Node_1))
@@ -499,7 +501,7 @@ class InPlane(Entity):
         localV0 = rot0*globalV0
         rot1, globalV1, iNode1 = self.rigid_offset(1)
         to_point = rot1*(globalV1 + self.objects[0].matrix_world.translation - self.objects[1].matrix_world.translation)
-        rot = self.objects[0].matrix_world.to_quaternion().to_matrix().transposed()
+        rot = self.objects[0].matrix_world.to_quaternion().to_matrix()
         normal = rot*rot0*Vector((0., 0., 1.))
         text.write(
         "\tjoint: " + FORMAT(database.element.index(self)) + ", inplane,\n" +
@@ -520,7 +522,7 @@ class InPlaneOperator(Base):
 
 klasses[InPlaneOperator.bl_label] = InPlaneOperator
 
-class RevoluteHinge(Entity):
+class RevoluteHinge(Hinge):
     elem_type = "joint"
     def write(self, text):
         self.write_hinge(text, "revolute hinge")
@@ -618,7 +620,7 @@ class RodOperator(ConstitutiveBase):
 
 klasses[RodOperator.bl_label] = RodOperator
 
-class SphericalHinge(Entity):
+class SphericalHinge(Hinge):
     elem_type = "joint"
     def write(self, text):
         self.write_hinge(text, "spherical hinge")
@@ -643,11 +645,11 @@ class TotalJoint(Entity):
         localV_0 = rot_0*globalV_0
         rot_1, globalV_1, Node_1 = self.rigid_offset(1)
         to_joint = rot_1*(globalV_1 + self.objects[0].matrix_world.translation - self.objects[1].matrix_world.translation)
-        rot = self.objects[0].matrix_world.to_quaternion().to_matrix().transposed()
+        rot = self.objects[0].matrix_world.to_quaternion().to_matrix()
         if Node_1 == self.objects[1]:
             rot_position = rot
         else:
-            rot_position = self.objects[1].matrix_world.to_quaternion().to_matrix().transposed()
+            rot_position = self.objects[1].matrix_world.to_quaternion().to_matrix()
         text.write("\tjoint: " + FORMAT(database.element.index(self)) + ", total joint")
         if self.first == "rotate":
             text.write(",\n\t\t" + FORMAT(Node_0) + ", position, ")
@@ -993,9 +995,14 @@ class DuplicateObs(bpy.types.Operator):
     bl_label = "Duplicate Obs"
     bl_idname = root_dot + "duplicate_obs"
     bl_options = {'REGISTER', 'INTERNAL'}
+    full_copy = bpy.props.BoolProperty(default=False, name="Full copy")
+    to_scene = bpy.props.EnumProperty(items=enum_scenes, name="Scene")
     @classmethod
     def poll(cls, context):
         return SelectedObjects(context)
+    def invoke(self, context, event):
+        self.full_copy = False
+        return context.window_manager.invoke_props_dialog(self)
     def execute(self, context):
         obs = SelectedObjects(context)
         elements = [element for element in database.element if hasattr(element, "objects") and
@@ -1019,41 +1026,79 @@ class DuplicateObs(bpy.types.Operator):
                         entity.links[i] = database.drive[-1]
                         drive.users -= 1
                         database.drive[-1].users += 1
-        new_obs = list()
+        new_obs = dict()
         for ob in obs:
             bpy.ops.object.select_all(action='DESELECT')
             ob.select = True
             bpy.ops.object.duplicate()
-            new_obs.append(context.selected_objects[0])
-        entities = elements + drives
-        new_entities = database.element[len_element:] + database.drive[len_drive:]
-        for new_entity in new_entities:
-            if hasattr(new_entity, "objects"):
-                for i, ob in enumerate(new_entity.objects):
-                    if ob in obs:
-                        new_entity.objects[i] = new_obs[obs.index(ob)]
-            for i, link in enumerate(new_entity.links):
-                if link in entities:
-                    link.users -= 1
-                    new_entity.links[i] = new_entities[entities.index(link)]
-                    new_entity.links[i].users += 1
-            if new_entity.type == "Rigid offset":
-                new_entity.objects[0].parent = new_entity.objects[1]
+            new_obs[ob] = context.selected_objects[0]
         frames = [frame for frame in database.frame if frame.objects[0] in obs]
         len_frame = len(database.frame)
         for frame in frames:
             context.scene.frame_index = database.frame.index(frame)
             exec("bpy.ops." + root_dot + "d_" + "_".join(frame.type.lower().split()) + "()")
-        for new_frame in database.frame[len_frame:]:
-            for i, ob in enumerate(new_frame.objects):
-                if ob in obs:
-                    new_frame.objects[i] = new_obs[obs.index(ob)]
+        new_frames = database.frame[len_frame:]
+        for frame in new_frames:
+            old_objects = frame.objects
+            frame.objects = [new_obs[ob] for ob in old_objects if ob in obs]
+        entities = elements + drives
+        new_entities = database.element[len_element:] + database.drive[len_drive:]
+        for entity in new_entities:
+            if hasattr(entity, "objects"):
+                for i, ob in enumerate(entity.objects):
+                    if ob in obs:
+                        entity.objects[i] = new_obs[ob]
+            for i, link in enumerate(entity.links):
+                if link in entities:
+                    link.users -= 1
+                    entity.links[i] = new_entities[entities.index(link)]
+                    entity.links[i].users += 1
+            if entity.type == "Rigid offset":
+                entity.objects[0].parent = entity.objects[1]
+        if self.full_copy:
+            new_links = dict()
+            for entity in new_entities:
+                for i, link in enumerate(entity.links):
+                    if link not in entities:
+                        link.users -= 1
+                        if link not in new_links:
+                            database.to_be_duplicated = link
+                            exec("bpy.ops." + root_dot + "d_" + "_".join(link.type.lower().split()) + "(attach_duplicate=True)")
+                            new_links[link] = database.dup
+                            del database.dup
+                        entity.links[i] = new_links[link]
+                        entity.links[i].users += 1
         bpy.ops.object.select_all(action='DESELECT')
-        for ob in new_obs:
+        for ob in new_obs.values():
             ob.animation_data_clear()
             ob.select = True
+        if self.to_scene != context.scene.name:
+            #parent = dict()
+            #for ob in new_obs.values():
+            #    parent[ob] = ob.parent
+            for ob in new_obs.values():
+                context.scene.objects.unlink(ob)
+            for entity in new_entities + new_frames + list(new_links.values()):
+                database.to_be_unlinked = entity
+                exec("bpy.ops." + root_dot + "u_" + "_".join(entity.type.lower().split()) + "()")
+            context.screen.scene = bpy.data.scenes[self.to_scene]
+            for entity in new_entities + new_frames + list(new_links.values()):
+                database.to_be_linked = entity
+                exec("bpy.ops." + root_dot + "l_" + "_".join(entity.type.lower().split()) + "()")
+            for ob in new_obs.values():
+                context.scene.objects.link(ob)
+            #for ob in new_obs.values():
+            #    ob.parent = parent[ob]
         context.scene.dirty_simulator = True
         return {'FINISHED'}
+    def draw(self, context):
+        self.basis = self.full_copy
+        row = self.layout.row()
+        row.prop(self, "full_copy")
+        if self.full_copy:
+            row.prop(self, "to_scene")
+    def check(self, context):
+        return self.basis != self.full_copy
 BPY.klasses.append(DuplicateObs)
 
 bundle = Bundle(tree, Base, klasses, database.element, "element")

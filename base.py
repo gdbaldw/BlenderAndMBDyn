@@ -38,6 +38,8 @@ category = "MBDyn"
 root_dot = "_".join(category.lower().split()) + "."
 database = Database()
 
+def enum_scenes(self, context):
+    return [(s.name, s.name, "") for s in bpy.data.scenes]
 def enum_objects(self, context):
     return [(o.name, o.name, "") for o in context.scene.objects if o.type == 'MESH']
 def enum_matrix(self, context, matrix_type):
@@ -137,6 +139,8 @@ class BPY:
         bpy.app.handlers.save_pre.append(save_pre)
         bpy.types.Scene.dirty_simulator = bpy.props.BoolProperty(default=True)
         bpy.types.Scene.clean_log = bpy.props.BoolProperty(default=False)
+        bpy.types.Scene.mbdyn_name = bpy.props.StringProperty()
+        bpy.types.Object.mbdyn_name = bpy.props.StringProperty()
     @classmethod
     def unregister(cls):
         for klass in cls.klasses:
@@ -146,6 +150,8 @@ class BPY:
         bpy.app.handlers.load_post.remove(load_post)
         del bpy.types.Scene.dirty_simulator
         del bpy.types.Scene.clean_log
+        del bpy.types.Scene.mbdyn_name
+        del bpy.types.Object.mbdyn_name
 
 class Entity(Common):
     indent_drives = 1
@@ -177,13 +183,13 @@ class Entity(Common):
                 "Object " + name + " is not associated with a Node"),
                 title="MBDyn Error", icon='ERROR')
             raise Exception("***Model Error: Object " + name + " is not associated with a Node")
-        rot = ob.matrix_world.to_quaternion().to_matrix()
+        rot = ob.matrix_world.to_quaternion().to_matrix().transposed()
         globalV = self.objects[i].matrix_world.translation - ob.matrix_world.translation
         return rot, globalV, database.node.index(ob)
     def write_node(self, text, i, node=False, position=False, orientation=False, p_label="", o_label=""):
         rot_i, globalV_i, Node_i = self.rigid_offset(i)
         localV_i = rot_i*globalV_i
-        rotT = self.objects[i].matrix_world.to_quaternion().to_matrix().transposed()
+        rotT = self.objects[i].matrix_world.to_quaternion().to_matrix()
         if node:
             text.write("\t\t" + str(Node_i) + ",\n")
         if position:
@@ -417,6 +423,7 @@ class Operators(list):
                 bl_label = "Duplicate"
                 bl_idname = root_dot + "d_" + "_".join(name.lower().split())
                 bl_options = {'REGISTER', 'INTERNAL'}
+                attach_duplicate = bpy.props.BoolProperty(default=False)
                 @classmethod
                 def poll(cls, context):
                     return True
@@ -425,9 +432,49 @@ class Operators(list):
                     self.index = len(uilist)
                     uilist.add()
                     self.set_index(context, self.index)
-                    entity = self.entity_list[index].duplicate()
+                    if self.attach_duplicate:
+                        entity = database.to_be_duplicated.duplicate()
+                        del database.to_be_duplicated
+                    else:
+                        entity = self.entity_list[index].duplicate()
                     self.entity_list.append(entity)
                     uilist[self.index].name = entity.name
+                    context.scene.dirty_simulator = True
+                    self.set_index(context, self.index)
+                    if self.attach_duplicate:
+                        database.dup = entity
+                        self.attach_duplicate = False
+                    return {'FINISHED'}
+            class Unlink(bpy.types.Operator, klass):
+                bl_label = "Unlink"
+                bl_idname = root_dot + "u_" + "_".join(name.lower().split())
+                bl_options = {'REGISTER', 'INTERNAL'}
+                @classmethod
+                def poll(cls, context):
+                    return hasattr(database, "to_be_unlinked")
+                def execute(self, context):
+                    self.set_index(context, self.entity_list.index(database.to_be_unlinked))
+                    del database.to_be_unlinked
+                    index, uilist = self.get_uilist(context)
+                    uilist.remove(index)
+                    self.entity_list.pop(index)
+                    context.scene.dirty_simulator = True
+                    self.set_index(context, 0 if index == 0 and 0 < len(uilist) else index-1)
+                    return{'FINISHED'}
+            class Link(bpy.types.Operator, klass):
+                bl_idname = root_dot + "l_" + "_".join(name.lower().split())
+                bl_options = {'REGISTER', 'INTERNAL'}
+                @classmethod
+                def poll(cls, context):
+                    return hasattr(database, "to_be_linked")
+                def execute(self, context):
+                    index, uilist = self.get_uilist(context)
+                    self.index = len(uilist)
+                    uilist.add()
+                    self.set_index(context, self.index)
+                    self.entity_list.append(database.to_be_linked)
+                    del database.to_be_linked
+                    uilist[self.index].name = self.name
                     context.scene.dirty_simulator = True
                     self.set_index(context, self.index)
                     return {'FINISHED'}
@@ -441,7 +488,7 @@ class Operators(list):
                     layout.operator(root_dot + "d_" + self.bl_idname[8:])
                     if self.module == "element":
                         layout.operator(root_dot + "reassign")
-            self.extend([Create, Edit, Duplicate, Menu])
+            self.extend([Create, Edit, Duplicate, Unlink, Link, Menu])
     def register(self):
         for klass in self:
             bpy.utils.register_class(klass)
