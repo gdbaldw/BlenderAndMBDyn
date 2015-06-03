@@ -91,7 +91,7 @@ class MatrixBase(Base):
         self.entity.scale = self.scale
         self.entity.factor = self.factor
     def draw(self, context):
-        self.basis = [self.subtype, self.scale]
+        self.basis = (self.subtype, self.scale)
         layout = self.layout
         layout.prop(self, "subtype")
         if self.subtype == "matr":
@@ -103,7 +103,7 @@ class MatrixBase(Base):
             for i in range(self.N):
                 layout.prop(self.floats[i], "value", text="x" + FORMAT(i+1))
     def check(self, context):
-        return [None for a, b in zip(self.basis, [self.subtype, self.scale]) if a != b]
+        return self.basis != (self.subtype, self.scale)
 
 class Matrix3x1(Entity):
     def string(self):
@@ -126,7 +126,7 @@ class Matrix3x1Operator(MatrixBase):
         ("default", "Default", "")],
         name="Subtype")
     def draw(self, context):
-        self.basis = [self.subtype, self.scale]
+        self.basis = (self.subtype, self.scale)
         layout = self.layout
         layout.prop(self, "subtype")
         if self.subtype not in "null default".split():
@@ -189,7 +189,7 @@ class Matrix3x3Operator(MatrixBase):
         ("eye", "Identity", "Identity matrix"),
         ], name="Subtype", default="eye")
     def draw(self, context):
-        self.basis = [self.subtype, self.scale]
+        self.basis = (self.subtype, self.scale)
         layout = self.layout
         layout.prop(self, "subtype")
         if self.subtype != "null":
@@ -256,7 +256,7 @@ class Matrix6x6Operator(MatrixBase):
     def poll(cls, context):
         return True
     def draw(self, context):
-        self.basis = [self.subtype, self.scale]
+        self.basis = (self.subtype, self.scale)
         layout = self.layout
         layout.prop(self, "subtype")
         if self.subtype != "null":

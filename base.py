@@ -121,6 +121,9 @@ def save_pre(*args, **kwargs):
 class BPY:
     class Floats(bpy.types.PropertyGroup):
         value = bpy.props.FloatProperty(min=-9.9e10, max=9.9e10, step=100, precision=6)
+    class Names(bpy.types.PropertyGroup):
+        value = bpy.props.StringProperty(name="")
+        edit = bpy.props.BoolProperty(name="")
     class DriveNames(bpy.types.PropertyGroup):
         value = bpy.props.EnumProperty(items=enum_drive, name="Drive")
         edit = bpy.props.BoolProperty(name="")
@@ -129,7 +132,7 @@ class BPY:
         edit = bpy.props.BoolProperty(name="")
     class ObjectNames(bpy.types.PropertyGroup):
         value = bpy.props.EnumProperty(items=enum_objects, name="Object")
-    klasses = [Floats, DriveNames, FunctionNames, ObjectNames]
+    klasses = [Floats, Names, DriveNames, FunctionNames, ObjectNames]
     @classmethod
     def register(cls):
         for klass in cls.klasses:
@@ -445,6 +448,35 @@ class Operators(list):
                         database.dup = entity
                         self.attach_duplicate = False
                     return {'FINISHED'}
+            class Users(bpy.types.Operator, klass):
+                bl_label = "Users"
+                bl_idname = root_dot + "s_" + "_".join(name.lower().split())
+                bl_options = {'REGISTER', 'INTERNAL'}
+                entity_names = bpy.props.CollectionProperty(type=BPY.Names, name="Users")
+                @classmethod
+                def poll(cls, context):
+                    return True
+                def invoke(self, context, event):
+                    self.entity_names.clear()
+                    self.index, uilist = self.get_uilist(context)
+                    self.users = database.users_of(self.entity_list[self.index])
+                    for user in self.users:
+                        name = self.entity_names.add()
+                        name.value = user.name
+                    return context.window_manager.invoke_props_dialog(self)
+                def execute(self, context):
+                    for name, user in zip(self.entity_names, self.users):
+                        if name.edit:
+                            exec("bpy.ops." + root_dot + "e_" + "_".join(user.type.lower().split()) + "('INVOKE_DEFAULT')")
+                    return {'FINISHED'}
+                def draw(self, context):
+                    layout = self.layout
+                    for name in self.entity_names:
+                        row = layout.row()
+                        row.prop(name, "edit", toggle=True)
+                        row.label(name.value)
+                def check(self, context):
+                    return False
             class Unlink(bpy.types.Operator, klass):
                 bl_label = "Unlink"
                 bl_idname = root_dot + "u_" + "_".join(name.lower().split())
@@ -484,11 +516,12 @@ class Operators(list):
                 def draw(self, context):
                     layout = self.layout
                     layout.operator_context = 'INVOKE_DEFAULT'
-                    layout.operator(root_dot + "e_" + self.bl_idname[8:])
-                    layout.operator(root_dot + "d_" + self.bl_idname[8:])
+                    layout.operator(root_dot + "e_" + self.bl_idname[len(root_dot)+2:])
+                    layout.operator(root_dot + "s_" + self.bl_idname[len(root_dot)+2:])
+                    layout.operator(root_dot + "d_" + self.bl_idname[len(root_dot)+2:])
                     if self.module == "element":
                         layout.operator(root_dot + "reassign")
-            self.extend([Create, Edit, Duplicate, Unlink, Link, Menu])
+            self.extend([Create, Edit, Duplicate, Users, Unlink, Link, Menu])
     def register(self):
         for klass in self:
             bpy.utils.register_class(klass)
@@ -497,7 +530,7 @@ class Operators(list):
             bpy.utils.unregister_class(klass)
 
 class UI(list):
-    def __init__(self, entity_tree, klass, entity_list, entity_name):
+    def __init__(self, entity_tree, klass, entity_list, module_name):
         menu = root_dot + "_".join(entity_tree[0].lower().split())
         klass.entity_list = entity_list
         self.make_list = klass.make_list
@@ -522,14 +555,14 @@ class UI(list):
                 self.entity_list[index].name = name
             name = bpy.props.StringProperty(update=update)
         class List(bpy.types.UIList):
-            bl_idname = entity_name
+            bl_idname = module_name
             def draw_item(self, context, layout, data, item, icon, active_data, active_property, index, flt_flag):
                 layout.prop(item, "name", text="", emboss=False, icon='OBJECT_DATAMODE')
         class Delete(bpy.types.Operator, klass):
-            bl_idname = entity_name + ".delete"
+            bl_idname = module_name + ".delete"
             bl_options = {'REGISTER', 'INTERNAL'}
             bl_label = "Delete"
-            bl_description = "Delete the selected " + entity_name
+            bl_description = "Delete the selected " + module_name
             @classmethod
             def poll(self, context):
                 index, uilist = super().get_uilist(context)
@@ -549,17 +582,17 @@ class UI(list):
             bl_space_type = 'VIEW_3D'
             bl_region_type = 'TOOLS'
             bl_category = category
-            bl_idname = "_".join([category, entity_name])
+            bl_idname = "_".join([category, module_name])
             def draw(self, context):
                 layout = self.layout
                 self.draw_panel_pre(context, layout)
                 scene = context.scene
                 row = layout.row()
-                row.template_list(entity_name, entity_name + "_list",
-                    scene, entity_name + "_uilist", scene, entity_name + "_index" )
+                row.template_list(module_name, module_name + "_list",
+                    scene, module_name + "_uilist", scene, module_name + "_index" )
                 col = row.column(align=True)
                 col.menu(menu, icon='ZOOMIN', text="")
-                col.operator(entity_name + ".delete", icon='ZOOMOUT', text="")
+                col.operator(module_name + ".delete", icon='ZOOMOUT', text="")
                 index, uilist = self.get_uilist(context)
                 if 0 < len(uilist):
                     col.menu(root_dot + "m_" +
@@ -576,8 +609,8 @@ class UI(list):
         self.delete_list()
 
 class Bundle(list):
-    def __init__(self, tree, klass, klasses, entity_list, entity_name):
-        self.append(UI(tree, klass, entity_list, entity_name))
+    def __init__(self, tree, klass, klasses, entity_list, module_name):
+        self.append(UI(tree, klass, entity_list, module_name))
         self.append(TreeMenu(tree))
         self.append(Operators(klasses, entity_list))
     def register(self):

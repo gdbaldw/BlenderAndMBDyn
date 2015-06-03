@@ -35,6 +35,7 @@ else:
         structural_static_types, structural_dynamic_types, Ellipsoid, RhombicPyramid, Teardrop, Cylinder, Sphere)
     from .base import bpy, BPY, root_dot, database, Operator, Entity, Bundle, enum_scenes, enum_objects, enum_matrix_3x1, enum_matrix_3x3, enum_constitutive_1D, enum_constitutive_3D, enum_constitutive_6D, enum_drive, enum_element, enum_friction, SelectedObjects
     from mathutils import Vector
+    from copy import copy
 
 types = aerodynamic_types + beam_types + ["Body"] + force_types + genel_types + joint_types + ["Rotor"] + environment_types + ["Driven"] + node_types
 
@@ -76,7 +77,8 @@ class Base(Operator):
                     element = database.element[self.element_index]
                     for ob in element.objects:
                         ob.select = True
-                    context.scene.objects.active = element.objects[0]
+                    if element.objects and element.objects[0].name in context.scene.objects:
+                        context.scene.objects.active = element.objects[0]
                     element.remesh()
         bpy.types.Scene.element_index = bpy.props.IntProperty(default=-1, update=select_and_activate)
     @classmethod
@@ -98,7 +100,7 @@ class Base(Operator):
             drive.objects and drive.objects[0] in obs]
         frames = [frame for frame in database.frame if frame.objects[0] in obs]
         if elements or drives or frames:
-            layout.operator(root_dot + "duplicate_obs")
+            layout.menu(root_dot + "selected_objects")
 
 klasses = dict()
 
@@ -334,7 +336,18 @@ class ClampOperator(Base):
     bl_label = "Clamp"
     @classmethod
     def poll(cls, context):
-        return super().base_poll(cls, context, 1)
+        return not SelectedObjects(context) or super().base_poll(cls, context, 1)
+    def prereqs(self, context):
+        if not SelectedObjects(context):
+            bpy.ops.mesh.primitive_cube_add()
+        self.object = SelectedObjects(context)[0]
+    def assign(self, context):
+        self.entity = database.element[context.scene.element_index]
+        self.object = self.entity.objects[0]
+    def draw(self, context):
+        layout = self.layout
+        layout.prop(self.object, "location")
+        layout.prop(self.object, "rotation_euler")
     def create_entity(self):
         return Clamp(self.name)
 
@@ -781,15 +794,33 @@ class ViscousBody(Entity):
     def remesh(self):
         Sphere(self.objects[0])
 
-class ViscousBodyOperator(ConstitutiveBase):
+class ViscousBodyOperator(Base):
     bl_label = "Viscous body"
     constitutive_name = bpy.props.EnumProperty(items=enum_constitutive_6D, name="Constitutive 6D")
     constitutive_edit = bpy.props.BoolProperty(name="")
     @classmethod
     def poll(cls, context):
-        return super().base_poll(cls, context, 1)
+        return not SelectedObjects(context) or super().base_poll(cls, context, 1)
     def prereqs(self, context):
         self.constitutive_exists(context, "6D")
+        if not SelectedObjects(context):
+            bpy.ops.mesh.primitive_cube_add()
+        self.object = SelectedObjects(context)[0]
+    def assign(self, context):
+        self.entity = database.element[context.scene.element_index]
+        self.constitutive_name = self.entity.links[0].name
+        self.object = self.entity.objects[0]
+    def store(self, context):
+        self.entity = database.element[self.index]
+        self.entity.objects = SelectedObjects(context)
+        self.entity.unlink_all()
+        self.link_constitutive(context, self.constitutive_name, self.constitutive_edit)
+        self.entity.increment_links()
+    def draw(self, context):
+        layout = self.layout
+        self.draw_link(layout, "constitutive_name", "constitutive_edit")
+        layout.prop(self.object, "location")
+        layout.prop(self.object, "rotation_euler")
     def create_entity(self):
         return ViscousBody(self.name)
 
@@ -815,13 +846,17 @@ class BodyOperator(Base):
     matrix_edit = bpy.props.BoolProperty(name="")
     @classmethod
     def poll(cls, context):
-        return super().base_poll(cls, context, 1)
+        return not SelectedObjects(context) or super().base_poll(cls, context, 1)
     def prereqs(self, context):
         self.matrix_exists(context, "3x3")
+        if not SelectedObjects(context):
+            bpy.ops.mesh.primitive_cube_add()
+        self.object = SelectedObjects(context)[0]
     def assign(self, context):
         self.entity = database.element[context.scene.element_index]
         self.mass = self.entity.mass
         self.matrix_name = self.entity.links[0].name
+        self.object = self.entity.objects[0]
     def store(self, context):
         self.entity = database.element[self.index]
         self.entity.objects = SelectedObjects(context)
@@ -833,6 +868,8 @@ class BodyOperator(Base):
         layout = self.layout
         layout.prop(self, "mass")
         self.draw_link(layout, "matrix_name", "matrix_edit")
+        layout.prop(self.object, "location")
+        layout.prop(self.object, "rotation_euler")
     def create_entity(self):
         return Body(self.name)
 
@@ -991,9 +1028,33 @@ class Reassign(bpy.types.Operator):
             layout.prop(obj_name, "value", text="Obj-" + str(i))
 BPY.klasses.append(Reassign)
 
-class DuplicateObs(bpy.types.Operator):
-    bl_label = "Duplicate Obs"
-    bl_idname = root_dot + "duplicate_obs"
+class AssociatedEntities(bpy.types.Operator):
+    bl_label = "Associated"
+    bl_idname = root_dot + "associated_entities"
+    bl_options = {'REGISTER', 'INTERNAL'}
+    object_names = bpy.props.CollectionProperty(type=BPY.ObjectNames, name="Objects")
+    @classmethod
+    def poll(cls, context):
+        return True
+    def invoke(self, context, event):
+        self.entity = database.element[context.scene.element_index]
+        self.object_names.clear()
+        for obj in self.entity.objects:
+            obj_name = self.object_names.add()
+            obj_name.value = obj.name
+        return context.window_manager.invoke_props_dialog(self)
+    def execute(self, context):
+        self.entity.objects = [context.scene.objects[obj_name.value] for obj_name in self.object_names]
+        return {'FINISHED'}
+    def draw(self, context):
+        layout = self.layout
+        for i, obj_name in enumerate(self.object_names):
+            layout.prop(obj_name, "value", text="Obj-" + str(i))
+#BPY.klasses.append(AssociatedEntities)
+
+class DuplicateObjects(bpy.types.Operator):
+    bl_label = "Duplicate"
+    bl_idname = root_dot + "duplicate_objects"
     bl_options = {'REGISTER', 'INTERNAL'}
     full_copy = bpy.props.BoolProperty(default=False, name="Full copy")
     to_scene = bpy.props.EnumProperty(items=enum_scenes, name="Scene")
@@ -1057,7 +1118,9 @@ class DuplicateObs(bpy.types.Operator):
                 entity.objects[0].parent = entity.objects[1]
         if self.full_copy:
             new_links = dict()
-            for entity in new_entities:
+            may_have_links = copy(new_entities)
+            while may_have_links:
+                entity = may_have_links.pop()
                 for i, link in enumerate(entity.links):
                     if link not in entities:
                         link.users -= 1
@@ -1068,6 +1131,7 @@ class DuplicateObs(bpy.types.Operator):
                             del database.dup
                         entity.links[i] = new_links[link]
                         entity.links[i].users += 1
+                    may_have_links.extend(link.links)
         bpy.ops.object.select_all(action='DESELECT')
         for ob in new_obs.values():
             ob.animation_data_clear()
@@ -1099,6 +1163,46 @@ class DuplicateObs(bpy.types.Operator):
             row.prop(self, "to_scene")
     def check(self, context):
         return self.basis != self.full_copy
-BPY.klasses.append(DuplicateObs)
+BPY.klasses.append(DuplicateObjects)
+
+class Users(bpy.types.Operator):
+    bl_label = "Users"
+    bl_idname = root_dot + "users"
+    bl_options = {'REGISTER', 'INTERNAL'}
+    entity_names = bpy.props.CollectionProperty(type=BPY.Names, name="Users")
+    @classmethod
+    def poll(cls, context):
+        return SelectedObjects(context)
+    def invoke(self, context, event):
+        self.entity_names.clear()
+        self.users = database.entities_using(SelectedObjects(context))
+        for user in self.users:
+            name = self.entity_names.add()
+            name.value = user.name
+        return context.window_manager.invoke_props_dialog(self)
+    def execute(self, context):
+        for name, user in zip(self.entity_names, self.users):
+            if name.edit:
+                exec("bpy.ops." + root_dot + "e_" + "_".join(user.type.lower().split()) + "('INVOKE_DEFAULT')")
+        return {'FINISHED'}
+    def draw(self, context):
+        layout = self.layout
+        for name in self.entity_names:
+            row = layout.row()
+            row.prop(name, "edit", toggle=True)
+            row.label(name.value)
+    def check(self, context):
+        return False
+BPY.klasses.append(Users)
+
+class Menu(bpy.types.Menu):
+    bl_label = "Selected Objects"
+    bl_idname = root_dot + "selected_objects"
+    def draw(self, context):
+        layout = self.layout
+        layout.operator_context = 'INVOKE_DEFAULT'
+        layout.operator(root_dot + "users")
+        layout.operator(root_dot + "duplicate_objects")
+BPY.klasses.append(Menu)
 
 bundle = Bundle(tree, Base, klasses, database.element, "element")

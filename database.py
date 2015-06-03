@@ -94,6 +94,19 @@ class Database(Common):
         self.structural_static_nodes.clear()
         self.structural_dummy_nodes.clear()
         self.scene = None
+    def all_entities(self):
+        return (self.element + self.drive + self.driver + self.friction + self.shape + self.function +
+            self.ns_node + self.constitutive + self.matrix + self.frame + self.definition + self.simulator)
+    def entities_using(self, objects):
+        set_objects = set(objects)
+        entities = list()
+        for entity in self.all_entities():
+            if hasattr(entity, "objects"):
+                if not set_objects.isdisjoint(set(entity.objects)):
+                    entities.append(entity)
+        return entities
+    def users_of(self, entity):
+        return list({e for e in self.all_entities() if entity in e.links})
     def pickle(self):
         if not self.scene:
             self.scene = bpy.context.scene
