@@ -884,13 +884,27 @@ class RigidOffsetOperator(Base):
     @classmethod
     def poll(cls, context):
         obs = SelectedObjects(context)
-        test = len(obs) == 2 and not (database.element.filter("Rigid offset", obs[0])
+        test = len(obs) in [1, 2] and not (database.element.filter("Rigid offset", obs[0])
             or database.element.filter("Dummy node", obs[0]))
         return test
+    def prereqs(self, context):
+        tmp = SelectedObjects(context)
+        if len(tmp) == 1:
+            bpy.ops.mesh.primitive_cube_add()
+            self.objects = [SelectedObjects(context)[0], tmp[0]]
+        else:
+            self.objects = tmp
+        self.objects[0].parent = self.objects[1]
+    def assign(self, context):
+        self.entity = database.element[context.scene.element_index]
+        self.objects = self.entity.objects
     def store(self, context):
         self.entity = database.element[self.index]
-        self.entity.objects = SelectedObjects(context)
-        self.entity.objects[0].parent = self.entity.objects[1]
+        self.entity.objects = self.objects
+    def draw(self, context):
+        layout = self.layout
+        layout.prop(self.objects[0], "location")
+        layout.prop(self.objects[0], "rotation_euler")
     def create_entity(self):
         return RigidOffset(self.name)
 
@@ -1005,7 +1019,7 @@ class DrivenOperator(Base):
 klasses[DrivenOperator.bl_label] = DrivenOperator
 
 class Reassign(bpy.types.Operator):
-    bl_label = "Reassign"
+    bl_label = "Reassign objects"
     bl_idname = root_dot + "reassign"
     bl_options = {'REGISTER', 'INTERNAL'}
     object_names = bpy.props.CollectionProperty(type=BPY.ObjectNames, name="Objects")
@@ -1021,36 +1035,18 @@ class Reassign(bpy.types.Operator):
         return context.window_manager.invoke_props_dialog(self)
     def execute(self, context):
         self.entity.objects = [context.scene.objects[obj_name.value] for obj_name in self.object_names]
+        context.scene.element_index = context.scene.element_index
         return {'FINISHED'}
     def draw(self, context):
+        self.basis = [n.value for n in self.object_names]
         layout = self.layout
-        for i, obj_name in enumerate(self.object_names):
-            layout.prop(obj_name, "value", text="Obj-" + str(i))
+        for i, name in enumerate(self.object_names):
+            layout.prop(name, "value", text="Obj-" + str(i))
+            layout.prop(context.scene.objects[name.value], "location")
+            layout.prop(context.scene.objects[name.value], "rotation_euler")
+    def check(self, context):
+        return self.basis != [n.value for n in self.object_names]
 BPY.klasses.append(Reassign)
-
-class AssociatedEntities(bpy.types.Operator):
-    bl_label = "Associated"
-    bl_idname = root_dot + "associated_entities"
-    bl_options = {'REGISTER', 'INTERNAL'}
-    object_names = bpy.props.CollectionProperty(type=BPY.ObjectNames, name="Objects")
-    @classmethod
-    def poll(cls, context):
-        return True
-    def invoke(self, context, event):
-        self.entity = database.element[context.scene.element_index]
-        self.object_names.clear()
-        for obj in self.entity.objects:
-            obj_name = self.object_names.add()
-            obj_name.value = obj.name
-        return context.window_manager.invoke_props_dialog(self)
-    def execute(self, context):
-        self.entity.objects = [context.scene.objects[obj_name.value] for obj_name in self.object_names]
-        return {'FINISHED'}
-    def draw(self, context):
-        layout = self.layout
-        for i, obj_name in enumerate(self.object_names):
-            layout.prop(obj_name, "value", text="Obj-" + str(i))
-#BPY.klasses.append(AssociatedEntities)
 
 class DuplicateObjects(bpy.types.Operator):
     bl_label = "Duplicate"
@@ -1058,25 +1054,41 @@ class DuplicateObjects(bpy.types.Operator):
     bl_options = {'REGISTER', 'INTERNAL'}
     full_copy = bpy.props.BoolProperty(default=False, name="Full copy")
     to_scene = bpy.props.EnumProperty(items=enum_scenes, name="Scene")
+    entity_names = bpy.props.CollectionProperty(type=BPY.Names, name="Users")
     @classmethod
     def poll(cls, context):
         return SelectedObjects(context)
     def invoke(self, context, event):
         self.full_copy = False
+        self.entity_names.clear()
+        self.users = database.entities_originating_from(SelectedObjects(context))
+        for user in self.users:
+            name = self.entity_names.add()
+            name.value = user.name
+            name.select = True
         return context.window_manager.invoke_props_dialog(self)
     def execute(self, context):
         obs = SelectedObjects(context)
-        elements = [element for element in database.element if hasattr(element, "objects") and
-            element.objects and element.objects[0] in obs]
-        for element in database.element:
-            if element.type == 'Driven' and element.links[1] in elements:
-                elements.append(element)
+        elements, drives, frames = list(), list(), list()
+        for user in [u for u, n in zip(self.users, self.entity_names) if n.select]:
+            module = user.__module__.split(".")[-1]
+            if module == "frame":
+                frames.append(user)
+            elif module == "drive":
+                drives.append(user)
+            else:
+                elements.append(user)
+        #elements = [element for element in database.element if hasattr(element, "objects") and
+        #    element.objects and element.objects[0] in obs]
+        #for element in database.element:
+        #    if element.type == 'Driven' and element.links[1] in elements:
+        #        elements.append(element)
         len_element = len(database.element)
         for element in elements:
             context.scene.element_index = database.element.index(element)
             exec("bpy.ops." + root_dot + "d_" + "_".join(element.type.lower().split()) + "()")
-        drives = [drive for drive in database.drive if hasattr(drive, "objects") and
-            drive.objects and drive.objects[0] in obs]
+        #drives = [drive for drive in database.drive if hasattr(drive, "objects") and
+        #    drive.objects and drive.objects[0] in obs]
         len_drive = len(database.drive)
         for drive in drives:
             context.scene.drive_index = database.drive.index(drive)
@@ -1093,7 +1105,7 @@ class DuplicateObjects(bpy.types.Operator):
             ob.select = True
             bpy.ops.object.duplicate()
             new_obs[ob] = context.selected_objects[0]
-        frames = [frame for frame in database.frame if frame.objects[0] in obs]
+        #frames = [frame for frame in database.frame if frame.objects[0] in obs]
         len_frame = len(database.frame)
         for frame in frames:
             context.scene.frame_index = database.frame.index(frame)
@@ -1137,9 +1149,9 @@ class DuplicateObjects(bpy.types.Operator):
             ob.animation_data_clear()
             ob.select = True
         if self.to_scene != context.scene.name:
-            #parent = dict()
-            #for ob in new_obs.values():
-            #    parent[ob] = ob.parent
+            parent = dict()
+            for ob in new_obs.values():
+                parent[ob] = ob.parent
             for ob in new_obs.values():
                 context.scene.objects.unlink(ob)
             for entity in new_entities + new_frames + list(new_links.values()):
@@ -1151,16 +1163,21 @@ class DuplicateObjects(bpy.types.Operator):
                 exec("bpy.ops." + root_dot + "l_" + "_".join(entity.type.lower().split()) + "()")
             for ob in new_obs.values():
                 context.scene.objects.link(ob)
-            #for ob in new_obs.values():
-            #    ob.parent = parent[ob]
+            for ob in new_obs.values():
+                ob.parent = parent[ob]
         context.scene.dirty_simulator = True
         return {'FINISHED'}
     def draw(self, context):
         self.basis = self.full_copy
-        row = self.layout.row()
+        layout = self.layout
+        row = layout.row()
         row.prop(self, "full_copy")
         if self.full_copy:
             row.prop(self, "to_scene")
+        for name in self.entity_names:
+            row = layout.row()
+            row.prop(name, "select", toggle=True)
+            row.label(name.value)
     def check(self, context):
         return self.basis != self.full_copy
 BPY.klasses.append(DuplicateObjects)
@@ -1182,14 +1199,15 @@ class Users(bpy.types.Operator):
         return context.window_manager.invoke_props_dialog(self)
     def execute(self, context):
         for name, user in zip(self.entity_names, self.users):
-            if name.edit:
+            if name.select:
+                context.scene[user.__module__.split(".")[-1] + "_index"] = user.entity_list.index(user)
                 exec("bpy.ops." + root_dot + "e_" + "_".join(user.type.lower().split()) + "('INVOKE_DEFAULT')")
         return {'FINISHED'}
     def draw(self, context):
         layout = self.layout
         for name in self.entity_names:
             row = layout.row()
-            row.prop(name, "edit", toggle=True)
+            row.prop(name, "select", toggle=True)
             row.label(name.value)
     def check(self, context):
         return False

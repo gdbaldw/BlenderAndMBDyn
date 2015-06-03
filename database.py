@@ -104,6 +104,19 @@ class Database(Common):
             if hasattr(entity, "objects"):
                 if not set_objects.isdisjoint(set(entity.objects)):
                     entities.append(entity)
+        for element in self.element:
+            if element.type == 'Driven' and element.links[1] in elements:
+                elements.append(element)
+        return entities
+    def entities_originating_from(self, objects):
+        entities = list()
+        for entity in self.all_entities():
+            if hasattr(entity, "objects"):
+                if entity.objects[0] in objects:
+                    entities.append(entity)
+        for element in self.element:
+            if element.type == 'Driven' and element.links[1] in elements:
+                elements.append(element)
         return entities
     def users_of(self, entity):
         return list({e for e in self.all_entities() if entity in e.links})

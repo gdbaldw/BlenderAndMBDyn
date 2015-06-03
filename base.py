@@ -123,7 +123,7 @@ class BPY:
         value = bpy.props.FloatProperty(min=-9.9e10, max=9.9e10, step=100, precision=6)
     class Names(bpy.types.PropertyGroup):
         value = bpy.props.StringProperty(name="")
-        edit = bpy.props.BoolProperty(name="")
+        select = bpy.props.BoolProperty(name="")
     class DriveNames(bpy.types.PropertyGroup):
         value = bpy.props.EnumProperty(items=enum_drive, name="Drive")
         edit = bpy.props.BoolProperty(name="")
@@ -400,13 +400,14 @@ class Operators(list):
                     uilist.add()
                     self.set_index(context, self.index)
                     self.entity_list.append(self.create_entity())
+                    self.entity_list[-1].entity_list = self.entity_list
                     uilist[self.index].name = self.name
                     self.store(context)
                     context.scene.dirty_simulator = True
                     self.set_index(context, self.index)
                     return {'FINISHED'}
             class Edit(bpy.types.Operator, klass):
-                bl_label = "Edit"
+                bl_label = " ".join(["Edit:", name, "instance"])
                 bl_idname = root_dot + "e_" + "_".join(name.lower().split())
                 bl_options = {'REGISTER', 'INTERNAL'}
                 @classmethod
@@ -466,14 +467,14 @@ class Operators(list):
                     return context.window_manager.invoke_props_dialog(self)
                 def execute(self, context):
                     for name, user in zip(self.entity_names, self.users):
-                        if name.edit:
+                        if name.select:
                             exec("bpy.ops." + root_dot + "e_" + "_".join(user.type.lower().split()) + "('INVOKE_DEFAULT')")
                     return {'FINISHED'}
                 def draw(self, context):
                     layout = self.layout
                     for name in self.entity_names:
                         row = layout.row()
-                        row.prop(name, "edit", toggle=True)
+                        row.prop(name, "select", toggle=True)
                         row.label(name.value)
                 def check(self, context):
                     return False
@@ -489,7 +490,8 @@ class Operators(list):
                     del database.to_be_unlinked
                     index, uilist = self.get_uilist(context)
                     uilist.remove(index)
-                    self.entity_list.pop(index)
+                    entity = self.entity_list.pop(index)
+                    del entity.entity_list
                     context.scene.dirty_simulator = True
                     self.set_index(context, 0 if index == 0 and 0 < len(uilist) else index-1)
                     return{'FINISHED'}
@@ -505,6 +507,7 @@ class Operators(list):
                     uilist.add()
                     self.set_index(context, self.index)
                     self.entity_list.append(database.to_be_linked)
+                    self.entity_list[-1].entity_list = self.entity_list
                     del database.to_be_linked
                     uilist[self.index].name = self.name
                     context.scene.dirty_simulator = True
@@ -557,7 +560,7 @@ class UI(list):
         class List(bpy.types.UIList):
             bl_idname = module_name
             def draw_item(self, context, layout, data, item, icon, active_data, active_property, index, flt_flag):
-                layout.prop(item, "name", text="", emboss=False, icon='OBJECT_DATAMODE')
+                layout.prop(item, "name", text="", emboss=False)
         class Delete(bpy.types.Operator, klass):
             bl_idname = module_name + ".delete"
             bl_options = {'REGISTER', 'INTERNAL'}
