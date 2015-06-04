@@ -14,7 +14,6 @@
 #    BlenderAndMBDyn is distributed in the hope that it will be useful,
 #    but WITHOUT ANY WARRANTY; without even the implied warranty of
 #    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#    GNU General Public License for more details.
 #
 #    You should have received a copy of the GNU General Public License
 #    along with BlenderAndMBDyn.  If not, see <http://www.gnu.org/licenses/>.
@@ -32,7 +31,7 @@ if "bpy" in locals():
     imp.reload(enum_matrix_3x3)
 else:
     from .common import (FORMAT, aerodynamic_types, beam_types, force_types, genel_types, joint_types, environment_types, node_types,
-        structural_static_types, structural_dynamic_types, Ellipsoid, RhombicPyramid, Teardrop, Cylinder, Sphere)
+        structural_static_types, structural_dynamic_types, Ellipsoid, RhombicPyramid, Teardrop, Cylinder, Sphere, RectangularCuboid)
     from .base import bpy, BPY, root_dot, database, Operator, Entity, Bundle, enum_scenes, enum_objects, enum_matrix_3x1, enum_matrix_3x3, enum_constitutive_1D, enum_constitutive_3D, enum_constitutive_6D, enum_drive, enum_element, enum_friction, SelectedObjects
     from mathutils import Vector
     from copy import copy
@@ -62,6 +61,8 @@ class Base(Operator):
         else:
             test = not database.element.filter(cls.bl_label)
         return test
+    def prereqs(self, context):
+        pass
     def assign(self, context):
         self.entity = database.element[context.scene.element_index]
     def store(self, context):
@@ -90,8 +91,6 @@ class Base(Operator):
         return context.scene.element_index, context.scene.element_uilist
     def set_index(self, context, value):
         context.scene.element_index = value
-    def prereqs(self, context):
-        pass
     def draw_panel_post(self, context, layout):
         obs = SelectedObjects(context)
         elements = [element for element in database.element if hasattr(element, "objects") and
@@ -367,7 +366,8 @@ class ConstitutiveBase(Base):
         self.constitutive_name = self.entity.links[0].name
     def store(self, context):
         self.entity = database.element[self.index]
-        self.entity.objects = SelectedObjects(context)
+        if not hasattr(self.entity, "objects"):
+            self.entity.objects = SelectedObjects(context)
         self.entity.unlink_all()
         self.link_constitutive(context, self.constitutive_name, self.constitutive_edit)
         self.entity.increment_links()
@@ -919,16 +919,26 @@ class DummyNodeOperator(Base):
     @classmethod
     def poll(cls, context):
         obs = SelectedObjects(context)
-        test = len(obs) == 2 and not (database.element.filter("Rigid offset", obs[0])
+        return len(obs) == 2 and not (database.element.filter("Rigid offset", obs[0])
             or database.element.filter("Dummy node", obs[0]))
-        return test
     def create_entity(self):
         return DummyNode(self.name)
 
 klasses[DummyNodeOperator.bl_label] = DummyNodeOperator
 
 class BeamSegment(Entity):
-        ...
+    elem_type = "beam2"
+    def write(self, text):
+        if [e for e in database.element if e.type == "Three node beam" and self in e.links]:
+            return
+        text.write("\tbeam2: " + str(database.element.index(self)) + ",\n")
+        for i in range(len(self.objects)):
+            self.write_node(text, i, node=True, position=True, orientation=True, p_label="position", o_label="orientation")
+            text.write(",\n")
+        text.write("\t\tfrom nodes, " + self.links[0].string() + ";\n")
+    def remesh(self):
+        for obj in self.objects:
+            RectangularCuboid(obj)
 
 class BeamSegmentOperator(ConstitutiveBase):
     bl_label = "Beam segment"
@@ -943,6 +953,64 @@ class BeamSegmentOperator(ConstitutiveBase):
         return BeamSegment(self.name)
 
 klasses[BeamSegmentOperator.bl_label] = BeamSegmentOperator
+
+class ThreeNodeBeam(Entity):
+    elem_type = "beam3"
+    def write(self, text):
+        text.write("\tbeam3: " + str(database.element.index(self)) + ",\n")
+        assert self.links[0].objects[1] == self.links[1].objects[0], "Disconnected beam segments"
+        self.objects = self.links[0].objects + self.links[1].objects[1:]
+        for i in range(len(self.objects)):
+            self.write_node(text, i, node=True, position=True, orientation=True, p_label="position", o_label="orientation")
+            text.write(",\n")
+        text.write("\t\tfrom nodes, " + self.links[0].links[0].string())
+        text.write(",\n\t\tfrom nodes, " + self.links[1].links[0].string() + ";\n")
+        del self.objects
+    def remesh(self):
+        for link in self.links:
+            link.remesh()
+
+class ThreeNodeBeamOperator(Base):
+    bl_label = "Three node beam"
+    edit = bpy.props.BoolVectorProperty(name="", size=2)
+    @classmethod
+    def poll(cls, context):
+        obs = SelectedObjects(context)
+        if len(obs) != 3:
+            return False
+        beam_segments = list()
+        for ob in obs:
+            beam_segments.extend(database.element.filter("Beam segment", ob))
+        return len(beam_segments) == 2 and (
+            (beam_segments[0].objects[1] == beam_segments[1].objects[0]) or
+            (beam_segments[1].objects[1] == beam_segments[0].objects[0]))
+    def prereqs(self, context):
+        self.beam_segments = list()
+        for ob in SelectedObjects(context):
+            self.beam_segments.extend(database.element.filter("Beam segment", ob))
+        if len(self.beam_segments) == 2:
+            if not self.beam_segments[0].objects[1] == self.beam_segments[1].objects[0]:
+                self.beam_segments.reverse()
+    def assign(self, context):
+        self.entity = database.element[context.scene.element_index]
+        self.beam_segments = copy(self.entity.links)
+    def store(self, context):
+        self.entity = database.element[self.index]
+        self.entity.objects = self.beam_segments[0].objects + self.beam_segments[1].objects[1:]
+        self.entity.unlink_all()
+        for element, edit in zip(self.beam_segments, self.edit):
+            self.link_element(context, element.name, edit)
+        self.entity.increment_links()
+    def draw(self, context):
+        layout = self.layout
+        for i, element in enumerate(self.beam_segments):
+            row = layout.row()
+            row.prop(self, "edit", index=i, toggle=True)
+            row.label(element.name)
+    def create_entity(self):
+        return ThreeNodeBeam(self.name)
+
+klasses[ThreeNodeBeamOperator.bl_label] = ThreeNodeBeamOperator
 
 class Gravity(Entity):
     elem_type = "gravity"

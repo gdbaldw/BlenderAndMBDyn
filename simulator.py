@@ -377,23 +377,25 @@ class Simulate(bpy.types.Operator, Base):
             return {'PASS_THROUGH'}
         else:
             self.f2.close()
-            if self.t_hold < self.t_final:
-                wm.popup_menu(lambda self, c: self.layout.label("Check console for message"), title="MBDyn Error", icon='INFO')
-            if self.f1:
-                self.f1.seek(0)
-                print(self.f1.read())
+            self.f1.seek(0)
+            s = self.f1.read().decode()
             self.f1.close()
+            if self.process.poll():
+                self.report({'ERROR'}, s)
+            else:
+                context.scene.clean_log = True
+                if s:
+                    self.report({'INFO'}, s)
             wm.event_timer_remove(self.timer)
             wm.progress_end()
-            context.scene.clean_log = True
             return {'FINISHED'}
     def execute(self, context):
         sim = database.simulator[context.scene.simulator_index]
         directory = os.path.splitext(context.blend_data.filepath)[0]
-        command = sim.executable_path + " -s -f " + os.path.join(directory, context.scene.name + ".mbd") + " &"
+        command = sim.executable_path + " -s -f " + os.path.join(directory, context.scene.name + ".mbd")
         print(command)
         self.f1 = TemporaryFile()
-        process = Popen(command, shell=True, stdout=self.f1)
+        self.process = Popen(command, shell=True, stdout=self.f1, stderr=self.f1)
         out_file = os.path.join(directory, context.scene.name + ".out")
         self.command = "tail -n 1 " + out_file + " | awk '{print $3}'"
         print(self.command)

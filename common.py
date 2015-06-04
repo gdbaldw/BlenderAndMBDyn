@@ -183,3 +183,17 @@ def Cylinder(obj):
     bm.free()
     subsurf(obj)
 
+def RectangularCuboid(obj):
+    bm = bmesh.new()
+    for v in [(x, y, z) for z in [-0.2, 0.2] for y in [-0.1, 0.1] for x in [-0.3, 0.3]]:
+        bm.verts.new(v)
+    if hasattr(bm.verts, "ensure_lookup_table"):
+        bm.verts.ensure_lookup_table()
+    for f in [(1,0,2,3),(4,5,7,6),(0,1,5,4),(1,3,7,5),(3,2,6,7),(2,0,4,6)]:
+        bm.faces.new([bm.verts[i] for i in f])
+    crease = bm.edges.layers.crease.new()
+    for e in bm.edges:
+        e[crease] = 1.0
+    bm.to_mesh(obj.data)
+    subsurf(obj)
+    bm.free()
