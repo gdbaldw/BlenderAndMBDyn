@@ -29,6 +29,7 @@ if "bpy" in locals():
     imp.reload(Common)
 else:
     import bpy
+    import addon_utils
     from .database import Database
     from .common import Common, method_types, nonlinear_solver_types
     from collections import OrderedDict
@@ -133,6 +134,7 @@ class BPY:
     class ObjectNames(bpy.types.PropertyGroup):
         value = bpy.props.EnumProperty(items=enum_objects, name="Object")
     klasses = [Floats, Names, DriveNames, FunctionNames, ObjectNames]
+    executable_path = "mbdyn"
     @classmethod
     def register(cls):
         for klass in cls.klasses:
@@ -524,6 +526,7 @@ class Operators(list):
                     layout.operator(root_dot + "d_" + self.bl_idname[len(root_dot)+2:])
                     if self.module == "element":
                         layout.operator(root_dot + "reassign")
+                        layout.operator(root_dot + "plot")
             self.extend([Create, Edit, Duplicate, Users, Unlink, Link, Menu])
     def register(self):
         for klass in self:

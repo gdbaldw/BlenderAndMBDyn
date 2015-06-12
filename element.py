@@ -35,6 +35,11 @@ else:
     from .base import bpy, BPY, root_dot, database, Operator, Entity, Bundle, enum_scenes, enum_objects, enum_matrix_3x1, enum_matrix_3x3, enum_constitutive_1D, enum_constitutive_3D, enum_constitutive_6D, enum_drive, enum_element, enum_friction, SelectedObjects
     from mathutils import Vector
     from copy import copy
+    import os
+    import subprocess
+    from tempfile import TemporaryFile
+    from pickle import Pickler
+    from io import StringIO
 
 types = aerodynamic_types + beam_types + ["Body"] + force_types + genel_types + joint_types + ["Rotor"] + environment_types + ["Driven"] + node_types
 
@@ -117,6 +122,7 @@ for t in types:
 
 class StructuralForce(Entity):
     elem_type = "force"
+    file_ext = "frc"
     def write(self, text):
         rot_0, globalV_0, Node_0 = self.rigid_offset(0)
         rotT_0 = self.objects[0].matrix_world.to_quaternion().to_matrix()
@@ -172,6 +178,7 @@ klasses[StructuralForceOperator.bl_label] = StructuralForceOperator
 
 class StructuralInternalForce(Entity):
     elem_type = "force"
+    file_ext = "frc"
     def write(self, text):
         rot_0, globalV_0, Node_0 = self.rigid_offset(0)
         rotT_0 = self.objects[0].matrix_world.to_quaternion().to_matrix()
@@ -207,6 +214,7 @@ klasses[StructuralInternalForceOperator.bl_label] = StructuralInternalForceOpera
 
 class StructuralCouple(Entity):
     elem_type = "couple"
+    file_ext = "frc"
     def write(self, text):
         rot_0, globalV_0, Node_0 = self.rigid_offset(0)
         rotT_0 = self.objects[0].matrix_world.to_quaternion().to_matrix()
@@ -236,6 +244,7 @@ klasses[StructuralCoupleOperator.bl_label] = StructuralCoupleOperator
 
 class StructuralInternalCouple(Entity):
     elem_type = "couple"
+    file_ext = "frc"
     def write(self, text):
         rot_0, globalV_0, Node_0 = self.rigid_offset(0)
         rotT_0 = self.objects[0].matrix_world.to_quaternion().to_matrix()
@@ -290,6 +299,7 @@ class Hinge(Entity):
 
 class AxialRotation(Hinge):
     elem_type = "joint"
+    file_ext = "jnt"
     def write(self, text):
         self.write_hinge(text, "axial rotation")
         text.write(",\n" + self.links[0].string(True) + ";\n")
@@ -324,6 +334,7 @@ klasses[AxialRotationOperator.bl_label] = AxialRotationOperator
 
 class Clamp(Entity):
     elem_type = "joint"
+    file_ext = "jnt"
     def write(self, text):
         text.write(
         "\tjoint: " + FORMAT(database.element.index(self)) + ", clamp,\n" +
@@ -354,6 +365,7 @@ klasses[ClampOperator.bl_label] = ClampOperator
 
 class DeformableDisplacementJoint(Hinge):
     elem_type = "joint"
+    file_ext = "jnt"
     def write(self, text):
         self.write_hinge(text, "deformable displacement joint")
         text.write(",\n\t\t" + self.links[0].string() + ";\n")
@@ -391,6 +403,7 @@ klasses[DeformableDisplacementJointOperator.bl_label] = DeformableDisplacementJo
 
 class DeformableHinge(Hinge):
     elem_type = "joint"
+    file_ext = "jnt"
     def write(self, text):
         self.write_hinge(text, "deformable hinge", V1=False, V2=False)
         text.write(",\n\t\t" + self.links[0].string() + ";\n")
@@ -413,6 +426,7 @@ klasses[DeformableHingeOperator.bl_label] = DeformableHingeOperator
 
 class DeformableJoint(Hinge):
     elem_type = "joint"
+    file_ext = "jnt"
     def write(self, text):
         self.write_hinge(text, "deformable joint")
         text.write(",\n\t\t" + self.links[0].string() + ";\n")
@@ -435,6 +449,7 @@ klasses[DeformableJointOperator.bl_label] = DeformableJointOperator
 
 class Distance(Entity):
     elem_type = "joint"
+    file_ext = "jnt"
     def write(self, text):
         text.write("\tjoint: " + FORMAT(database.element.index(self)) + ", distance,\n")
         for i in range(2):
@@ -483,6 +498,7 @@ klasses[DistanceOperator.bl_label] = DistanceOperator
 
 class InLine(Entity):
     elem_type = "joint"
+    file_ext = "jnt"
     def write(self, text):
         rot0, globalV0, iNode0 = self.rigid_offset(0)
         localV0 = rot0*globalV0
@@ -509,6 +525,7 @@ klasses[InLineOperator.bl_label] = InLineOperator
 
 class InPlane(Entity):
     elem_type = "joint"
+    file_ext = "jnt"
     def write(self, text):
         rot0, globalV0, iNode0 = self.rigid_offset(0)
         localV0 = rot0*globalV0
@@ -537,6 +554,7 @@ klasses[InPlaneOperator.bl_label] = InPlaneOperator
 
 class RevoluteHinge(Hinge):
     elem_type = "joint"
+    file_ext = "jnt"
     def write(self, text):
         self.write_hinge(text, "revolute hinge")
         if self.enable_theta:
@@ -612,6 +630,7 @@ klasses[RevoluteHingeOperator.bl_label] = RevoluteHingeOperator
 
 class Rod(Entity):
     elem_type = "joint"
+    file_ext = "jnt"
     def write(self, text):
         text.write("\tjoint: " + FORMAT(database.element.index(self)) + ", rod,\n")
         for i in range(2):
@@ -635,6 +654,7 @@ klasses[RodOperator.bl_label] = RodOperator
 
 class SphericalHinge(Hinge):
     elem_type = "joint"
+    file_ext = "jnt"
     def write(self, text):
         self.write_hinge(text, "spherical hinge")
         text.write(";\n")
@@ -653,6 +673,7 @@ klasses[SphericalHingeOperator.bl_label] = SphericalHingeOperator
 
 class TotalJoint(Entity):
     elem_type = "joint"
+    file_ext = "jnt"
     def write(self, text):
         rot_0, globalV_0, Node_0 = self.rigid_offset(0)
         localV_0 = rot_0*globalV_0
@@ -785,6 +806,7 @@ klasses[TotalJointOperator.bl_label] = TotalJointOperator
 
 class ViscousBody(Entity):
     elem_type = "joint"
+    file_ext = "jnt"
     def write(self, text):
         text.write(
         "\tjoint: " + FORMAT(database.element.index(self)) + ", viscous body,\n\t\t" +
@@ -928,6 +950,7 @@ klasses[DummyNodeOperator.bl_label] = DummyNodeOperator
 
 class BeamSegment(Entity):
     elem_type = "beam2"
+    file_ext = "act"
     def write(self, text):
         if [e for e in database.element if e.type == "Three node beam" and self in e.links]:
             return
@@ -956,6 +979,7 @@ klasses[BeamSegmentOperator.bl_label] = BeamSegmentOperator
 
 class ThreeNodeBeam(Entity):
     elem_type = "beam3"
+    file_ext = "act"
     def write(self, text):
         text.write("\tbeam3: " + str(database.element.index(self)) + ",\n")
         assert self.links[0].objects[1] == self.links[1].objects[0], "Disconnected beam segments"
@@ -1014,6 +1038,7 @@ klasses[ThreeNodeBeamOperator.bl_label] = ThreeNodeBeamOperator
 
 class Gravity(Entity):
     elem_type = "gravity"
+    file_ext = "grv"
     def write(self, text):
         text.write("\tgravity: " + self.links[0].string() + ", " + self.links[1].string() + ";\n")
 
@@ -1115,6 +1140,76 @@ class Reassign(bpy.types.Operator):
     def check(self, context):
         return self.basis != [n.value for n in self.object_names]
 BPY.klasses.append(Reassign)
+
+class Plot(bpy.types.Operator):
+    bl_label = "Plot output"
+    bl_idname = root_dot + "plot"
+    bl_options = {'REGISTER', 'INTERNAL'}
+    prereqs_met = bpy.props.BoolProperty(default=False)
+    label_names = bpy.props.CollectionProperty(type=BPY.Names, name="Users")
+    @classmethod
+    def poll(cls, context):
+        return context.scene.clean_log and hasattr(database.element[context.scene.element_index], "file_ext")
+    def invoke(self, context, event):
+        self.entity = database.element[context.scene.element_index]
+        import pandas as pd
+        if not self.prereqs_met:
+            for prereq in "pandas matplotlib.pyplot".split():
+                if subprocess.call(("python", "-c", "import " + prereq)):
+                    raise ImportError("No module named " + prereq)
+            self.prereqs_met = True
+        base = os.path.join(os.path.splitext(context.blend_data.filepath)[0], context.scene.name)
+        if 'frequency' not in BPY.plot_data:
+            with open(".".join((base, "log")), 'r') as f:
+                for line in f:
+                    if line.startswith("output frequency:"):
+                        BPY.plot_data['frequency'] = int(line.split()[-1])
+                        break
+        if 'out' not in BPY.plot_data:
+            BPY.plot_data['out'] = pd.read_table(".".join((base, 'out')), sep=" ", skiprows=2, usecols=[i for i in range(2, 9)])
+            BPY.plot_data['timeseries'] = BPY.plot_data['out']['Time'][::BPY.plot_data['frequency']]
+        #for ext in "act aer air frc grv ine jnt mov".split():
+        try:
+            assert self.entity.file_ext not in BPY.plot_data
+            labels = list()
+            with open(".".join((base, self.entity.file_ext)), 'r') as f:
+                lines = f.readlines()
+                labels = list()
+                for line in lines:
+                    label = line.split()[0]
+                    if not labels or labels[0] != label:
+                        labels.append(label)
+                    else:
+                        break
+            p = dict()
+            for i, label in enumerate(labels):
+                p[label] = pd.read_table(StringIO("".join(lines[i::len(labels)])), sep=" ", header=None, skipinitialspace=True).iloc[:,1:]
+            BPY.plot_data[self.entity.file_ext] = pd.Panel(p)
+        except (AssertionError, FileNotFoundError):
+            pass
+        self.dataframe = BPY.plot_data[self.entity.file_ext][str(database.element.index(self.entity))].dropna(1, 'all')
+        self.label_names.clear()
+        for i in range(self.dataframe.shape[1]):
+            name = self.label_names.add()
+            name.value = str(i + 1)
+            name.select = False
+        return context.window_manager.invoke_props_dialog(self)
+    def execute(self, context):
+        select = [name.select for name in self.label_names]
+        dataframe = self.dataframe.T[select].T.rename(BPY.plot_data['timeseries'])
+        plot_script = os.path.join(os.path.dirname(os.path.abspath(__file__)), "plot.py")
+        with TemporaryFile('w') as f:
+            dataframe.to_csv(f)
+            f.seek(0)
+            subprocess.Popen(("python", plot_script), stdin=f)
+        return{'FINISHED'}
+    def draw(self, context):
+        layout = self.layout
+        for name in self.label_names:
+            row = layout.row()
+            row.prop(name, "select")
+            row.label(name.value)
+BPY.klasses.append(Plot)
 
 class DuplicateObjects(bpy.types.Operator):
     bl_label = "Duplicate"

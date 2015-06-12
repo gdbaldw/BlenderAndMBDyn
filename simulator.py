@@ -32,7 +32,7 @@ else:
     from .common import FORMAT
     from bpy_extras.io_utils import ExportHelper
     from mathutils import Matrix
-    from subprocess import call, Popen
+    import subprocess
     from tempfile import TemporaryFile
     from time import sleep, clock
     import os
@@ -112,7 +112,7 @@ class InitialValue(Entity):
 
 class InitialValueOperator(Base):
     bl_label = "Initial value"
-    executable_path = bpy.props.StringProperty(name="MBDyn", description="Path to the MBDyn executible", default="mbdyn")
+    executable_path = bpy.props.StringProperty(name="MBDyn", description="Path to the MBDyn executible")
     initial_time = bpy.props.FloatProperty(name="Initial time", default=0.0, min=0.0, precision=6)
     forever = bpy.props.BoolProperty(name="Forever")
     final_time = bpy.props.FloatProperty(name="Final time", default=10.0, min=0.0, precision=6)
@@ -146,7 +146,7 @@ class InitialValueOperator(Base):
     assembly_edit = bpy.props.BoolProperty(name="")
     job_control_name = bpy.props.EnumProperty(items=enum_job_control, name="Job control")
     job_control_edit = bpy.props.BoolProperty(name="")
-    set_default_output = bpy.props.BoolProperty(name="Set default output")
+    set_default_output = bpy.props.BoolProperty(name="Set default output", default=True)
     default_output_name = bpy.props.EnumProperty(items=enum_default_output, name="Default output")
     default_output_edit = bpy.props.BoolProperty(name="")
     set_default_aerodynamic_output = bpy.props.BoolProperty(name="Set default aerodynamic output")
@@ -175,9 +175,10 @@ class InitialValueOperator(Base):
         self.default_output_exists(context)
         self.default_aerodynamic_output_exists(context)
         self.default_beam_output_exists(context)
+        self.executable_path = BPY.executable_path
     def assign(self, context):
         self.entity = database.simulator[context.scene.simulator_index]
-        self.executable_path = self.entity.executable_path
+        self.executable_path = BPY.executable_path
         self.initial_time = self.entity.initial_time
         self.forever = self.entity.forever
         self.final_time = self.entity.final_time
@@ -220,6 +221,7 @@ class InitialValueOperator(Base):
             self.default_beam_output_name = next(link).name
     def store(self, context):
         self.entity = database.simulator[self.index]
+        BPY.executable_path = self.executable_path
         self.entity.executable_path = self.executable_path
         self.entity.initial_time = self.initial_time
         self.entity.forever = self.forever
@@ -358,55 +360,45 @@ class Simulate(bpy.types.Operator, Base):
     bl_options = {'REGISTER', 'INTERNAL'}
     bl_label = "Run simulation"
     bl_description = "Run MBDyn for the input file"
-    timer = None
-    count = 0.01
     def modal(self, context, event):
-        if event.type != 'TIMER':
-            return {'PASS_THROUGH'}
         wm = context.window_manager
-        if self.t_hold < self.t_final and self.t_hold != self.t_now:
+        poll = self.process.poll()
+        if poll == None:
             self.t_hold = self.t_now
-            call(self.command, shell=True, stdout=self.f2)
-            try:
-                self.f2.seek(0)
-                self.t_now = float(self.f2.read().splitlines()[-1])
+            output = subprocess.check_output(("tail", "-n", "1", self.out_file))
+            if output:
+                self.t_now = float(output.split()[2])
                 percent = 100.*(1.-(self.t_final - self.t_now)/self.t_range)
                 wm.progress_update(percent)
-            except:
-                pass
             return {'PASS_THROUGH'}
+        self.f.seek(0)
+        s = self.f.read().decode()
+        self.f.close()
+        if poll:
+            self.report({'ERROR'}, s)
         else:
-            self.f2.close()
-            self.f1.seek(0)
-            s = self.f1.read().decode()
-            self.f1.close()
-            if self.process.poll():
-                self.report({'ERROR'}, s)
-            else:
-                context.scene.clean_log = True
-                if s:
-                    self.report({'INFO'}, s)
-            wm.event_timer_remove(self.timer)
-            wm.progress_end()
-            return {'FINISHED'}
+            context.scene.clean_log = True
+            BPY.plot_data = dict()
+            if s:
+                self.report({'INFO'}, s)
+        wm.event_timer_remove(self.timer)
+        wm.progress_end()
+        return {'FINISHED'}
     def execute(self, context):
         sim = database.simulator[context.scene.simulator_index]
         directory = os.path.splitext(context.blend_data.filepath)[0]
-        command = sim.executable_path + " -s -f " + os.path.join(directory, context.scene.name + ".mbd")
-        print(command)
-        self.f1 = TemporaryFile()
-        self.process = Popen(command, shell=True, stdout=self.f1, stderr=self.f1)
-        out_file = os.path.join(directory, context.scene.name + ".out")
-        self.command = "tail -n 1 " + out_file + " | awk '{print $3}'"
-        print(self.command)
+        command = [sim.executable_path, "-s", "-f", os.path.join(directory, context.scene.name + ".mbd")]
+        print(" ".join(command))
+        self.f = TemporaryFile()
+        self.process = subprocess.Popen(command, stdout=self.f, stderr=self.f)
+        self.out_file = os.path.join(directory, context.scene.name + ".out")
         self.t_hold, self.t_now, self.t_final = (-float("inf"), sim.initial_time,
             sim.final_time if not sim.forever else float("inf"))
         self.t_range = self.t_final - self.t_now
-        call("touch " + out_file, shell=True)
-        self.f2 = TemporaryFile()
+        subprocess.call(("touch", self.out_file))
         wm = context.window_manager
         wm.progress_begin(0., 100.)
-        self.timer = wm.event_timer_add(0.0001, context.window)
+        self.timer = wm.event_timer_add(0.01, context.window)
         wm.modal_handler_add(self)
         return{'RUNNING_MODAL'}
 BPY.klasses.append(Simulate)

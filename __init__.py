@@ -40,7 +40,6 @@ if "bpy" in locals():
     imp.reload(TreeMenu)
     imp.reload(Operators)
     imp.reload(UI)
-    imp.reload(database)
     imp.reload(category)
     imp.reload(root_dot)
     imp.reload(element)
@@ -55,7 +54,7 @@ if "bpy" in locals():
     imp.reload(frame)
     imp.reload(Matrix)
 else:
-    from .base import bpy, BPY, TreeMenu, Operators, UI, database, category, root_dot
+    from .base import bpy, BPY, TreeMenu, Operators, UI, category, root_dot
     from . import element
     from . import drive
     from . import driver
@@ -71,7 +70,6 @@ else:
     from mathutils import Matrix
 
 from bpy_extras.io_utils import ImportHelper, ExportHelper
-from subprocess import call, Popen
 from tempfile import TemporaryFile
 from time import sleep, clock
 import os
