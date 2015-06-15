@@ -38,7 +38,8 @@ aerodynamic_types = [
     "Aerodynamic body",
     "Aerodynamic beam2",
     "Aerodynamic beam3",
-    "Generic aerodynamic force"]
+    "Generic aerodynamic force",
+    "Induced velocity"]
 beam_types = [
     "Beam segment",
     "Three node beam"]

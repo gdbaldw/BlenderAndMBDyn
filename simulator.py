@@ -364,11 +364,9 @@ class Simulate(bpy.types.Operator, Base):
         wm = context.window_manager
         poll = self.process.poll()
         if poll == None:
-            self.t_hold = self.t_now
             output = subprocess.check_output(("tail", "-n", "1", self.out_file))
-            if output:
-                self.t_now = float(output.split()[2])
-                percent = 100.*(1.-(self.t_final - self.t_now)/self.t_range)
+            if output and 2 < len(output.split()):
+                percent = 100.*(1.-(self.t_final - float(output.split()[2]))/self.t_range)
                 wm.progress_update(percent)
             return {'PASS_THROUGH'}
         self.f.seek(0)
@@ -392,9 +390,8 @@ class Simulate(bpy.types.Operator, Base):
         self.f = TemporaryFile()
         self.process = subprocess.Popen(command, stdout=self.f, stderr=self.f)
         self.out_file = os.path.join(directory, context.scene.name + ".out")
-        self.t_hold, self.t_now, self.t_final = (-float("inf"), sim.initial_time,
-            sim.final_time if not sim.forever else float("inf"))
-        self.t_range = self.t_final - self.t_now
+        self.t_final = sim.final_time if not sim.forever else float("inf")
+        self.t_range = self.t_final - sim.initial_time
         subprocess.call(("touch", self.out_file))
         wm = context.window_manager
         wm.progress_begin(0., 100.)

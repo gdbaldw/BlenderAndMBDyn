@@ -526,7 +526,7 @@ class Operators(list):
                     layout.operator(root_dot + "d_" + self.bl_idname[len(root_dot)+2:])
                     if self.module == "element":
                         layout.operator(root_dot + "reassign")
-                        layout.operator(root_dot + "plot")
+                        layout.operator(root_dot + "plot_element")
             self.extend([Create, Edit, Duplicate, Users, Unlink, Link, Menu])
     def register(self):
         for klass in self:
@@ -581,6 +581,9 @@ class UI(list):
                     link.users -= 1
                 if entity.type == "Rigid offset":
                     entity.objects[0].parent = None
+                elif entity.type == "Three node beam":
+                    for link in entity.links:
+                        del link.consumer
                 context.scene.dirty_simulator = True
                 self.set_index(context, 0 if index == 0 and 0 < len(uilist) else index-1)
                 return{'FINISHED'}

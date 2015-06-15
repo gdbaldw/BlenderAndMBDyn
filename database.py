@@ -218,7 +218,7 @@ class Database(Common):
         aerodynamic_element_count = len([e for e in self.element if e.type in aerodynamic_types])
         rotor_count = len([e for e in self.element if e.type in ["Rotor"]])
         genel_count = len([e for e in self.element if e.type in genel_types])
-        beam_count = len([e for e in self.element if e.type in beam_types])
+        beam_count = len([e for e in self.element if e.type in beam_types and not hasattr(e, "consumer")])
         air_properties = bool([e for e in self.element if e.type in ["Air properties"]])
         gravity = bool([e for e in self.element if e.type in ["Gravity"]])
         self.file_driver_count = 0
