@@ -174,7 +174,7 @@ class StructuralForceOperator(ForceBase):
     bl_label = "Structural force"
     @classmethod
     def poll(cls, context):
-        return super().base_poll(cls, context, 1)
+        return len(SelectedObjects(context)) == 1
     def create_entity(self):
         return StructuralForce(self.name)
 
@@ -211,7 +211,7 @@ class StructuralInternalForceOperator(ForceBase):
     bl_label = "Structural internal force"
     @classmethod
     def poll(cls, context):
-        return super().base_poll(cls, context, 2)
+        return len(SelectedObjects(context)) == 2
     def create_entity(self):
         return StructuralInternalForce(self.name)
 
@@ -242,7 +242,7 @@ class StructuralCoupleOperator(ForceBase):
     bl_label = "Structural couple"
     @classmethod
     def poll(cls, context):
-        return super().base_poll(cls, context, 1)
+        return len(SelectedObjects(context)) == 1
     def create_entity(self):
         return StructuralCouple(self.name)
 
@@ -274,7 +274,7 @@ class StructuralInternalCoupleOperator(ForceBase):
     bl_label = "Structural internal couple"
     @classmethod
     def poll(cls, context):
-        return super().base_poll(cls, context, 2)
+        return len(SelectedObjects(context)) == 2
     def create_entity(self):
         return StructuralInternalCouple(self.name)
 
@@ -416,7 +416,7 @@ class DeformableHinge(Hinge):
         Cylinder(self.objects[0])
 
 class DeformableHingeOperator(ConstitutiveBase):
-    bl_label = "Deformable joint"
+    bl_label = "Deformable hinge"
     constitutive_name = bpy.props.EnumProperty(items=enum_constitutive_3D, name="Constitutive 3D")
     constitutive_edit = bpy.props.BoolProperty(name="")
     @classmethod
@@ -514,7 +514,7 @@ class InLine(Joint):
         RhombicPyramid(self.objects[0])
 
 class InLineOperator(Base):
-    bl_label = "In line"
+    bl_label = "Inline"
     @classmethod
     def poll(cls, context):
         return super().base_poll(cls, context, 2)
@@ -541,7 +541,7 @@ class InPlane(Joint):
         RhombicPyramid(self.objects[0])
 
 class InPlaneOperator(Base):
-    bl_label = "In plane"
+    bl_label = "Inplane"
     @classmethod
     def poll(cls, context):
         return super().base_poll(cls, context, 2)
