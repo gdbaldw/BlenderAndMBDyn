@@ -1211,7 +1211,8 @@ class PlotElement(bpy.types.Operator, Plot):
         self.load(context, [self.entity.file_ext], pd)
         self.label_names.clear()
         if not hasattr(self.entity, "consumer"):
-            self.dataframe = BPY.plot_data[self.entity.file_ext][str(database.element.index(self.entity))].dropna(1, 'all')
+            key = "1" if self.entity.file_ext == "grv" else str(database.element.index(self.entity))
+            self.dataframe = BPY.plot_data[self.entity.file_ext][key].dropna(1, 'all')
             for i in range(self.dataframe.shape[1]):
                 name = self.label_names.add()
                 name.value = self.entity.labels[i] if i < len(self.entity.labels) else str(i + 2)

@@ -38,9 +38,26 @@ else:
     from .common import Common, aerodynamic_types, beam_types, force_types, genel_types, joint_types, environment_types, node_types, rigid_body_types, structural_static_types, structural_dynamic_types
 
 from io import BytesIO
-from pickle import Pickler, Unpickler
+import pickle
 from base64 import b64encode, b64decode
 from mathutils import Vector
+
+class Pickler(pickle.Pickler):
+    def persistent_id(self, obj):
+        return repr(obj) if repr(obj).startswith("bpy.data") else None
+
+class Unpickler(pickle.Unpickler):
+    def persistent_load(self, pid):
+        exec("id_data = " + pid)
+        name = locals()["id_data"].mbdyn_name
+        exec("id_data = " + pid.split("[")[0] + "[\"" + name + "\"]")
+        return locals()["id_data"]
+    def find_class(self, module, name):
+        if module.startswith("BlenderAndMBDyn"):
+            module = ".".join((__package__, module.split(".", 1)[1]))
+        elif module == "builtins" and name in ("exec", "eval"):
+            raise pickle.UnpicklingError("global " + ".".join((module, name)) + " is forbidden")
+        return super().find_class(module, name)
 
 bpy.types.Scene.pickled_database = bpy.props.StringProperty()
 
@@ -126,24 +143,15 @@ class Database(Common):
         bpy.context.scene.mbdyn_name = bpy.context.scene.name
         for obj in bpy.context.scene.objects:
             obj.mbdyn_name = obj.name
-        def _repr(obj):
-            return repr(obj) if repr(obj).startswith("bpy.data") else None
         with BytesIO() as f:
             p = Pickler(f)
-            p.persistent_id = _repr
             p.dump(self)
             self.scene.pickled_database = b64encode(f.getvalue()).decode()
     def unpickle(self):
         self.clear()
-        def _exec(_repr):
-            exec("id_data = " + _repr)
-            name = locals()["id_data"].mbdyn_name
-            exec("id_data = " + _repr.split("[")[0] + "[\"" + name + "\"]")
-            return locals()["id_data"]
         if bpy.context.scene.pickled_database:
             with BytesIO(b64decode(bpy.context.scene.pickled_database.encode())) as f:
                 up = Unpickler(f)
-                up.persistent_load = _exec
                 for k, v in vars(up.load()).items():
                     if type(v) in [list, Entities]:
                         self.__dict__[k].extend(v)
