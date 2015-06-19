@@ -33,15 +33,9 @@ bl_info = {
     "wiki_url": "",
     "category": "STEM"}
 
-if "bpy" in locals():
+if "BPY" in locals():
     import imp
-    imp.reload(bpy)
     imp.reload(BPY)
-    imp.reload(TreeMenu)
-    imp.reload(Operators)
-    imp.reload(UI)
-    imp.reload(category)
-    imp.reload(root_dot)
     imp.reload(element)
     imp.reload(drive)
     imp.reload(driver)
@@ -52,9 +46,8 @@ if "bpy" in locals():
     imp.reload(constitutive)
     imp.reload(matrix)
     imp.reload(frame)
-    imp.reload(Matrix)
 else:
-    from .base import bpy, BPY, TreeMenu, Operators, UI, category, root_dot
+    from .base import BPY
     from . import element
     from . import drive
     from . import driver
@@ -67,42 +60,6 @@ else:
     from . import frame
     from . import definition
     from . import simulator
-    from mathutils import Matrix
-
-from bpy_extras.io_utils import ImportHelper, ExportHelper
-from tempfile import TemporaryFile
-from time import sleep, clock
-import os
-
-class ImportFile(bpy.types.Operator):
-    bl_idname = root_dot+"import"
-    bl_options = {'REGISTER', 'INTERNAL'}
-    bl_label = "Import .mov file"
-    bl_description = "Import .mov file from externally run MBDyn model"
-    def execute(self, context):
-        return{'FINISHED'}
-
-class AppendModel(bpy.types.Operator):
-    bl_idname = root_dot+"append"
-    bl_options = {'REGISTER', 'INTERNAL'}
-    bl_label = "Append model"
-    bl_description = "Append MBDyn model from .blend file"
-    def execute(self, context):
-        return{'FINISHED'}
-
-class Actions(bpy.types.Panel):
-    bl_space_type = "VIEW_3D"
-    bl_region_type = "TOOLS"
-    bl_category = category
-    bl_label = "Actions"
-    bl_idname = "_".join([category, "actions"])
-    bl_options = {'DEFAULT_CLOSED'}
-    def draw(self, context):
-        layout = self.layout
-        layout.operator(root_dot+"import")
-        layout.operator(root_dot+"append")
-
-klasses = [] # [ImportFile, AppendModel, Actions]
 
 modules = [element, constitutive, drive, driver, frame, friction, function, matrix, ns_node, shape, definition, simulator]
 
@@ -110,15 +67,11 @@ def register():
     BPY.register()
     for module in modules:
         module.bundle.register()
-    for klass in klasses:
-        bpy.utils.register_class(klass)
 
 def unregister():
     BPY.unregister()
     for module in modules:
         module.bundle.unregister()
-    for klass in klasses:
-        bpy.utils.unregister_class(klass)
 
 if __name__ == "__main__":
     register()

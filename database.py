@@ -48,6 +48,8 @@ class Pickler(pickle.Pickler):
 
 class Unpickler(pickle.Unpickler):
     def persistent_load(self, pid):
+        if not pid.startswith("bpy.data") and len(pid.split()) == 1:
+            raise pickle.UnpicklingError(pid + " is forbidden")
         exec("id_data = " + pid)
         name = locals()["id_data"].mbdyn_name
         exec("id_data = " + pid.split("[")[0] + "[\"" + name + "\"]")
