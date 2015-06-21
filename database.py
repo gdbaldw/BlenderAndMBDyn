@@ -41,6 +41,7 @@ from io import BytesIO
 import pickle
 from base64 import b64encode, b64decode
 from mathutils import Vector
+from collections import deque
 
 class Pickler(pickle.Pickler):
     def persistent_id(self, obj):
@@ -84,7 +85,7 @@ class Database(Common):
         self.simulator = Entities()
         self.node = list()
         self.drive_callers = list()
-        self.node_dict = dict()
+        self.node_dict = dict()  #To be deleted, no longer used
         self.rigid_dict = dict()
         self.dummy_dict = dict()
         self.structural_dynamic_nodes = set()
@@ -106,7 +107,7 @@ class Database(Common):
         self.simulator.clear()
         self.node.clear()
         self.drive_callers.clear()
-        self.node_dict.clear()
+        self.node_dict.clear()  #To be deleted, no longer used
         self.rigid_dict.clear()
         self.dummy_dict.clear()
         self.structural_dynamic_nodes.clear()
@@ -291,65 +292,71 @@ class Database(Common):
             f.write("\trotors: " + str(rotor_count) + ";\n")
         if self.file_driver_count:
             f.write("\tfile drivers: " + str(self.file_driver_count) + ";\n")
+    def write_structural_node(self, f, node, frame):
+        frame_label = str(self.frame.index(frame)) if frame else "global"
+        location, orientation = node.matrix_world.translation, node.matrix_world.to_quaternion().to_matrix()
+        if frame:
+            location = location - frame.objects[0].matrix_world.translation
+            orientation = frame.objects[0].matrix_world.to_quaternion().to_matrix().transposed()*orientation
+        f.write("\t\treference, " + frame_label + ", ")
+        self.write_vector(location, f, ",\n")
+        f.write("\t\treference, " + frame_label + ", matr,\n")
+        self.write_matrix(orientation, f, "\t"*3)
+        f.write(",\n" +
+            "\t\treference, " + frame_label + ", null,\n" +
+            "\t\treference, " + frame_label + ", null;\n")
     def write(self, f):
-        frame_dict = dict()
+        frame_for, frames, parent_of = dict(), list(), dict()
+        for frame in self.frame:
+            frame_for.update({ob : frame for ob in frame.objects[1:]})
+            frames.append(frame)
+            parent_of.update({frame : parent for parent in self.frame if frame.objects[0] in parent.objects[1:]})
         if self.frame:
             f.write("\n")
-            for i, frame in enumerate(self.frame):
-                frame_dict.update({ob : str(i) for ob in frame.objects[1:]})
-                parent_label = "global"
-                for ip, parent_frame in enumerate(self.frame):
-                    if frame.objects[0] in parent_frame.objects[1:]:
-                        parent_label = str(ip)
-                        break
-                rot = frame.objects[0].matrix_world.to_quaternion().to_matrix()
+        while frames:
+            frame = frames.pop()
+            if frame in parent_of and parent_of[frame] in frames:
+                frames.appendleft(frame)
+            else:
+                parent = parent_of[frame] if frame in parent_of else None
+                parent_label = str(self.frame.index(parent_of[frame])) if parent else "global"
                 vectors = list()
                 for link in frame.links:
                     if link.subtype in "null default".split():
-                        vectors.append(rot*Vector([0., 0., 0.]))
+                        vectors.append(Vector([0., 0., 0.]))
                     else:
-                        vectors.append(rot*Vector(link.floats) * (link.factor if link.scale else 1))
-                f.write("reference: " + str(i) + ",\n" + "\treference, global, ")
-                self.write_vector(list(frame.objects[0].matrix_world.translation), f, ",\n")
-                f.write("\treference, global, matr,\n")
-                self.write_matrix(rot, f, "\t\t")
+                        vectors.append(Vector(link.floats) * (link.factor if link.scale else 1))
+                location = frame.objects[0].matrix_world.translation - (parent.objects[0].matrix_world.translation if parent else Vector([0., 0., 0.]))
+                rot = frame.objects[0].matrix_world.to_quaternion().to_matrix()
+                rot_parent = parent_of[frame].objects[0].matrix_world.to_quaternion().to_matrix() if parent else rot
+                orientation = rot_parent.transposed()*rot if parent else rot
+                f.write("reference: " + str(self.frame.index(frame)) + ",\n" + "\treference, " + parent_label + ", ")
+                self.write_vector(rot_parent.transposed()*location if parent else location, f, ",\n")
+                f.write("\treference, " + parent_label + ", matr,\n")
+                self.write_matrix(orientation, f, "\t\t")
                 f.write(",\n\treference, " + parent_label + ", ")
-                self.write_vector(vectors[0], f, ",\n")
+                self.write_vector(orientation*vectors[0], f, ",\n")
                 f.write("\treference, " + parent_label + ", ")
-                self.write_vector(vectors[1], f, ";\n")
+                self.write_vector(orientation*vectors[1], f, ";\n")
         if self.node:
             f.write("\nbegin: nodes;\n")
-            for i, node in enumerate(self.node):
-                    if node in self.structural_dynamic_nodes:
-                        f.write("\tstructural: " + str(i) + ", dynamic,\n")
-                    elif node in self.structural_static_nodes:
-                        f.write("\tstructural: " + str(i) + ", static,\n")
-                    else:
-                        continue
-                    rot = node.matrix_world.to_quaternion().to_matrix()
-                    if node in frame_dict:
-                        frame_label = frame_dict[node]
-                    else:
-                        frame_label = "global"
-                    f.write("\t\treference, global, ")
-                    self.write_vector(list(node.matrix_world.translation), f, ",\n")
-                    f.write("\t\treference, global, matr,\n")
-                    self.write_matrix(rot, f, "\t"*3)
-                    f.write(",\n" +
-                        "\t\treference, " + frame_label + ", null,\n" +
-                        "\t\treference, " + frame_label + ", null;\n")
-            for i, node in enumerate(self.node):
-                if node in self.structural_dummy_nodes:
-                    base_node = dummy_dict[node]
-                    rot = base_node.matrix_world.to_quaternion().to_matrix()
-                    globalV = node.matrix_world.translation - base_node.matrix_world.translation
-                    localV = rot*globalV
-                    rotT = node.matrix_world.to_quaternion().to_matrix()
-                    f.write("\tstructural: " + str(i) + ", dummy,\n\t\t" +
-                        str(self.node.index(base_node)) + ", offset,\n\t\t\t")
-                    self.write_vector(localV, f, ",\n\t\t\tmatr,\n")
-                    self.write_matrix(rot*rotT, f, "\t\t\t\t")
-                    f.write(";\n")
+            for node in self.structural_static_nodes:
+                f.write("\tstructural: " + str(self.node.index(node)) + ", static,\n")
+                self.write_structural_node(f, node, frame_for[node] if node in frame_for else None)
+            for node in self.structural_dynamic_nodes:
+                f.write("\tstructural: " + str(self.node.index(node)) + ", dynamic,\n")
+                self.write_structural_node(f, node, frame_for[node] if node in frame_for else None)
+            for node in self.structural_dummy_nodes:
+                base_node = dummy_dict[node]
+                rot = base_node.matrix_world.to_quaternion().to_matrix()
+                globalV = node.matrix_world.translation - base_node.matrix_world.translation
+                localV = rot*globalV
+                rotT = node.matrix_world.to_quaternion().to_matrix()
+                f.write("\tstructural: " + str(self.node.index(node)) + ", dummy,\n\t\t" +
+                    str(self.node.index(base_node)) + ", offset,\n\t\t\t")
+                self.write_vector(localV, f, ",\n\t\t\tmatr,\n")
+                self.write_matrix(rot*rotT, f, "\t\t\t\t")
+                f.write(";\n")
             """
             for i, ns_node in enumerate(self.ns_node):
                 if ns_node.type == "Electric":
@@ -373,16 +380,18 @@ class Database(Common):
         if self.element:
             self.element[0].indent_drives *= 0
             self.element[0].indent_drives += 1
-        if self.drive_callers:
+        drive_callers = [drive for drive in self.drive_callers if drive.users]
+        if drive_callers:
             f.write("\n")
-            for drive in self.drive_callers:
+            for drive in drive_callers:
                 name = drive.name.replace(" ", "").replace(".", "__")
                 f.write("set: integer " + name + " = " + str(self.drive.index(drive)) + ";\n\tdrive caller: " + name + ", " + drive.string() + ";\n")
-        if self.function:
+        functions = [function for function in self.function if function.users]
+        if functions:
             f.write("\n")
             for function in self.function:
                 function.written = False
-            for function in self.function:
+            for function in functions:
                 function.write(f)
         if self.element:
             self.element[0].indent_drives *= 0

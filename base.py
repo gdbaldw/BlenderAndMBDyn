@@ -194,7 +194,7 @@ class Entity(Common):
     def write_node(self, text, i, node=False, position=False, orientation=False, p_label="", o_label=""):
         rot_i, globalV_i, Node_i = self.rigid_offset(i)
         localV_i = rot_i*globalV_i
-        rotT = self.objects[i].matrix_world.to_quaternion().to_matrix()
+        rot = self.objects[i].matrix_world.to_quaternion().to_matrix()
         if node:
             text.write("\t\t" + str(Node_i) + ",\n")
         if position:
@@ -207,7 +207,7 @@ class Entity(Common):
             if o_label:
                 text.write(o_label + ", ")
             text.write("matr,\n")
-            self.write_matrix(rot_i*rotT, text, "\t\t\t\t")
+            self.write_matrix(rot_i*rot, text, "\t\t\t\t")
     def duplicate(self):
         new_entity = copy(self)
         if hasattr(self, "objects"):

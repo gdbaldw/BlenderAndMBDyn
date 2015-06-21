@@ -408,15 +408,10 @@ class Animate(bpy.types.Operator, Base):
     steps = bpy.props.IntProperty(name="Steps between animation", default=1, min=1)
     def invoke(self, context, event):
         scene = context.scene
-        database.node_dict.clear()
         directory = os.path.splitext(context.blend_data.filepath)[0]
-        with open(os.path.join(directory, context.scene.name + ".log")) as f:
-            split_lines = (line.split() for line in f.readlines())
-            nodes = ((int(fields[2]), fields[6]) for fields in split_lines if fields[:2] == ["structural", "node:"])
-            for i, node in enumerate(nodes):
-                database.node_dict[node[0]] = i
-                for data_path in "location rotation_euler".split():
-                    database.node[i].keyframe_insert(data_path)
+        for node in database.node:
+            for data_path in "location rotation_euler".split():
+                node.keyframe_insert(data_path)
         with open(os.path.join(directory, context.scene.name + ".mov")) as f:
             self.lines = f.readlines()
         self.marker = int(self.lines[0].split()[0])
@@ -437,16 +432,15 @@ class Animate(bpy.types.Operator, Base):
             if not skip:
                 wm.progress_update(100.*float(n)/self.N)
                 fields = line.split()
-                node_label = int(fields[0])
-                if node_label == self.marker:
+                node_index = int(fields[0])
+                if node_index == self.marker:
                     scene.frame_current += 1
-                i = database.node_dict[node_label]
                 fields = [float(field) for field in fields[1:13]]
                 euler = Matrix([fields[3:6], fields[6:9], fields[9:12]]).to_euler()
-                database.node[i].location = fields[:3]
-                database.node[i].rotation_euler = euler[0], euler[1], euler[2]
+                database.node[node_index].location = fields[:3]
+                database.node[node_index].rotation_euler = euler[0], euler[1], euler[2]
                 for data_path in "location rotation_euler".split():
-                    database.node[i].keyframe_insert(data_path)
+                    database.node[node_index].keyframe_insert(data_path)
         scene.frame_current = frame_initial + 1
         wm.progress_end()
         return{'FINISHED'}
