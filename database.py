@@ -85,7 +85,6 @@ class Database(Common):
         self.simulator = Entities()
         self.node = list()
         self.drive_callers = list()
-        self.node_dict = dict()  #To be deleted, no longer used
         self.rigid_dict = dict()
         self.dummy_dict = dict()
         self.structural_dynamic_nodes = set()
@@ -107,7 +106,6 @@ class Database(Common):
         self.simulator.clear()
         self.node.clear()
         self.drive_callers.clear()
-        self.node_dict.clear()  #To be deleted, no longer used
         self.rigid_dict.clear()
         self.dummy_dict.clear()
         self.structural_dynamic_nodes.clear()

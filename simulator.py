@@ -112,7 +112,7 @@ class InitialValue(Entity):
 
 class InitialValueOperator(Base):
     bl_label = "Initial value"
-    executable_path = bpy.props.StringProperty(name="MBDyn", description="Path to the MBDyn executible")
+    executable_path = bpy.props.StringProperty(name="MBDyn path", description="Path to the MBDyn executible")
     initial_time = bpy.props.FloatProperty(name="Initial time", default=0.0, min=0.0, precision=6)
     forever = bpy.props.BoolProperty(name="Forever")
     final_time = bpy.props.FloatProperty(name="Final time", default=10.0, min=0.0, precision=6)

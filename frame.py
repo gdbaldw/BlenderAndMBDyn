@@ -34,6 +34,7 @@ else:
     from .base import bpy, root_dot, database, Operator, Entity, Bundle, enum_matrix_3x1, SelectedObjects
     from .common import RhombicPyramid
     import bmesh
+    from copy import copy
 
 types = ["Reference frame",]
 
@@ -94,21 +95,22 @@ class FrameOperator(Base):
     angular_velocity_edit = bpy.props.BoolProperty(name="")
     @classmethod
     def poll(self, context):
-        if self.bl_idname.startswith(root_dot + "e_") or self.bl_idname.startswith(root_dot + "d_"):
-            return True
+        frames = copy(database.frame)
+        if self.bl_idname.startswith(root_dot + "e_"):
+            frames.pop(context.scene.frame_index)
         selected = SelectedObjects(context)
-        overlapped = False in [set(selected[1:]).isdisjoint(set(f.objects[1:])) for f in database.frame]
-        duplicate = True in [selected[0] == f.objects[0] for f in database.frame if hasattr(f, "objects")]
+        overlapped = False in [set(selected[1:]).isdisjoint(set(f.objects[1:])) for f in frames]
+        duplicate = True in [selected[0] == f.objects[0] for f in frames if hasattr(f, "objects")]
         if len(selected) < 2 or overlapped or duplicate:
             return False
-        frames = [f.objects for f in database.frame]
+        frame_objects = [f.objects for f in frames]
         head, hold = selected[0], None
-        while frames and head != hold:
+        while frame_objects and head != hold:
             hold = head
-            for frame in frames:
-                if head in frame[1:]:
-                    head = frame[0]
-                    frames.remove(frame)
+            for objects in frame_objects:
+                if head in objects[1:]:
+                    head = objects[0]
+                    frame_objects.remove(objects)
         return head not in selected[1:]
     def prereqs(self, context):
         self.matrix_exists(context, "3x1")

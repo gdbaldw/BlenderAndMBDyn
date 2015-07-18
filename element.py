@@ -1106,9 +1106,9 @@ class DrivenOperator(Base):
 
 klasses[DrivenOperator.bl_label] = DrivenOperator
 
-class Reassign(bpy.types.Operator):
-    bl_label = "Reassign objects"
-    bl_idname = root_dot + "reassign"
+class ObjectSpecifications(bpy.types.Operator):
+    bl_label = "Object specifications"
+    bl_idname = root_dot + "object_specifications"
     bl_options = {'REGISTER', 'INTERNAL'}
     object_names = bpy.props.CollectionProperty(type=BPY.ObjectNames, name="Objects")
     @classmethod
@@ -1134,7 +1134,7 @@ class Reassign(bpy.types.Operator):
             layout.prop(context.scene.objects[name.value], "rotation_euler")
     def check(self, context):
         return self.basis != [n.value for n in self.object_names]
-BPY.klasses.append(Reassign)
+BPY.klasses.append(ObjectSpecifications)
 
 class Plot:
     bl_options = {'REGISTER', 'INTERNAL'}
@@ -1191,13 +1191,10 @@ class Plot:
         return{'FINISHED'}
     def draw(self, context):
         layout = self.layout
-        if self.label_names:
-            for name in self.label_names:
-                row = layout.row()
-                row.prop(name, "select")
-                row.label(name.value)
-        elif hasattr(self.entity, "consumer"):
-            layout.label(" ".join(["Consumed by:", self.entity.consumer.name]))
+        for name in self.label_names:
+            row = layout.row()
+            row.prop(name, "select")
+            row.label(name.value)
 
 class PlotElement(bpy.types.Operator, Plot):
     bl_label = "Plot output"
@@ -1210,13 +1207,12 @@ class PlotElement(bpy.types.Operator, Plot):
         import pandas as pd
         self.load(context, [self.entity.file_ext], pd)
         self.label_names.clear()
-        if not hasattr(self.entity, "consumer"):
-            key = "1" if self.entity.file_ext == "grv" else str(database.element.index(self.entity))
-            self.dataframe = BPY.plot_data[self.entity.file_ext][key].dropna(1, 'all')
-            for i in range(self.dataframe.shape[1]):
-                name = self.label_names.add()
-                name.value = self.entity.labels[i] if i < len(self.entity.labels) else str(i + 2)
-                name.select = False
+        key = "1" if self.entity.file_ext == "grv" else str(database.element.index(self.entity))
+        self.dataframe = BPY.plot_data[self.entity.file_ext][key].dropna(1, 'all')
+        for i in range(self.dataframe.shape[1]):
+            name = self.label_names.add()
+            name.value = self.entity.labels[i] if i < len(self.entity.labels) else str(i + 2)
+            name.select = False
         return context.window_manager.invoke_props_dialog(self)
 BPY.klasses.append(PlotElement)
 

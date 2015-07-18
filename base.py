@@ -166,6 +166,8 @@ class Entity(Common):
         self.links = list()
     def unlink_all(self):
         for link in self.links:
+            if hasattr(link, "consumer"):
+                del link.consumer
             link.users -= 1
         self.links.clear()
     def increment_links(self):
@@ -357,8 +359,7 @@ class TreeMenu(list):
         self.leaf_maker(tree[0], tree[1])
     def leaf_maker(self, base, branch):
         is_a_leaf = OrderedDict()
-        R = iter(range(len(branch)))
-        for i in R:
+        for i in range(len(branch)):
             if isinstance(branch[i], list):
                 assert isinstance(branch[i-1], str)
                 is_a_leaf[branch[i-1]] = False
@@ -412,9 +413,6 @@ class Operators(list):
                 bl_label = " ".join(["Edit:", name, "instance"])
                 bl_idname = root_dot + "e_" + "_".join(name.lower().split())
                 bl_options = {'REGISTER', 'INTERNAL'}
-                @classmethod
-                def poll(cls, context):
-                    return True
                 def invoke(self, context, event):
                     self.prereqs(context)
                     self.index, uilist = self.get_uilist(context)
@@ -525,7 +523,7 @@ class Operators(list):
                     layout.operator(root_dot + "s_" + self.bl_idname[len(root_dot)+2:])
                     layout.operator(root_dot + "d_" + self.bl_idname[len(root_dot)+2:])
                     if self.module == "element":
-                        layout.operator(root_dot + "reassign")
+                        layout.operator(root_dot + "object_specifications")
                         layout.operator(root_dot + "plot_element")
             self.extend([Create, Edit, Duplicate, Users, Unlink, Link, Menu])
     def register(self):
@@ -564,6 +562,16 @@ class UI(list):
             bl_idname = module_name
             def draw_item(self, context, layout, data, item, icon, active_data, active_property, index, flt_flag):
                 layout.prop(item, "name", text="", emboss=False)
+            def filter_items(self, context, data, prop):
+                uilist = getattr(data, prop)
+                bitflags = [self.bitflag_filter_item]*len(uilist)
+                for i, entity in enumerate(entity_list):
+                    if hasattr(entity, "consumer") or self.filter_name not in entity.name:
+                        bitflags[i] = ~bitflags[i]
+                order = [i for i in range(len(uilist))]
+                if self.use_filter_sort_alpha:
+                    order.sort(key=lambda i: uilist[i].name) 
+                return bitflags, order
         class Delete(bpy.types.Operator, klass):
             bl_idname = module_name + ".delete"
             bl_options = {'REGISTER', 'INTERNAL'}
@@ -578,12 +586,11 @@ class UI(list):
                 uilist.remove(index)
                 entity = self.entity_list.pop(index)
                 for link in entity.links:
+                    if hasattr(link, "consumer"):
+                        del link.consumer
                     link.users -= 1
                 if entity.type == "Rigid offset":
                     entity.objects[0].parent = None
-                elif entity.type == "Three node beam":
-                    for link in entity.links:
-                        del link.consumer
                 context.scene.dirty_simulator = True
                 self.set_index(context, 0 if index == 0 and 0 < len(uilist) else index-1)
                 return{'FINISHED'}
