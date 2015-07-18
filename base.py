@@ -564,13 +564,16 @@ class UI(list):
                 layout.prop(item, "name", text="", emboss=False)
             def filter_items(self, context, data, prop):
                 uilist = getattr(data, prop)
-                bitflags = [self.bitflag_filter_item]*len(uilist)
+                entity_list.flags = [True]*len(uilist)
                 for i, entity in enumerate(entity_list):
                     if hasattr(entity, "consumer") or self.filter_name not in entity.name:
-                        bitflags[i] = ~bitflags[i]
+                        entity_list.flags[i] = False
                 order = [i for i in range(len(uilist))]
                 if self.use_filter_sort_alpha:
-                    order.sort(key=lambda i: uilist[i].name) 
+                    order.sort(key=lambda i: uilist[i].name)
+                bitflags = [b for b in map(lambda f: self.bitflag_filter_item if f else ~self.bitflag_filter_item, entity_list.flags)]
+                if self.use_filter_invert:
+                    entity_list.flags = [not f for f in entity_list.flags]
                 return bitflags, order
         class Delete(bpy.types.Operator, klass):
             bl_idname = module_name + ".delete"
@@ -580,7 +583,7 @@ class UI(list):
             @classmethod
             def poll(self, context):
                 index, uilist = super().get_uilist(context)
-                return len(uilist) > 0 and not self.entity_list[index].users
+                return len(uilist) > 0 and not self.entity_list[index].users and entity_list.flags[index]
             def execute(self, context):
                 index, uilist = self.get_uilist(context)
                 uilist.remove(index)
@@ -610,7 +613,7 @@ class UI(list):
                 col.menu(menu, icon='ZOOMIN', text="")
                 col.operator(module_name + ".delete", icon='ZOOMOUT', text="")
                 index, uilist = self.get_uilist(context)
-                if 0 < len(uilist):
+                if 0 < len(uilist) and entity_list.flags[index]:
                     col.menu(root_dot + "m_" +
                         "_".join(self.entity_list[index].type.lower().split()), icon='DOWNARROW_HLT', text="")
                 self.draw_panel_post(context, layout)
