@@ -521,8 +521,9 @@ class Operators(list):
                     layout.operator_context = 'INVOKE_DEFAULT'
                     layout.operator(root_dot + "e_" + self.bl_idname[len(root_dot)+2:])
                     layout.operator(root_dot + "s_" + self.bl_idname[len(root_dot)+2:])
-                    layout.operator(root_dot + "d_" + self.bl_idname[len(root_dot)+2:])
-                    if self.module == "element":
+                    if self.module not in "element frame".split():
+                        layout.operator(root_dot + "d_" + self.bl_idname[len(root_dot)+2:])
+                    if self.module in "element".split():
                         layout.operator(root_dot + "object_specifications")
                         layout.operator(root_dot + "plot_element")
             self.extend([Create, Edit, Duplicate, Users, Unlink, Link, Menu])

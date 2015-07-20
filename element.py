@@ -89,6 +89,7 @@ class Base(Operator):
                         for ob in link.objects:
                             ob.select = True
                         link.remesh()
+                    context.scene.objects.active = element.links[0].objects[0]
         bpy.types.Scene.element_index = bpy.props.IntProperty(default=-1, update=select_and_activate)
     @classmethod
     def delete_list(self):
@@ -969,15 +970,27 @@ class BeamSegmentOperator(ConstitutiveBase):
 
 klasses[BeamSegmentOperator.bl_label] = BeamSegmentOperator
 
+class SegmentPair:
+    @classmethod
+    def segments(cls, context, segment_type="Beam segment"):
+        segments = list()
+        for ob in SelectedObjects(context):
+            segments.extend(database.element.filter(segment_type, ob))
+        if len(segments) == 2 and not segments[0].objects[1] == segments[1].objects[0]:
+            segments.reverse()
+        if len(segments) != 2 or not segments[0].objects[1] == segments[1].objects[0]:
+            return list()
+        return segments
+
 class ThreeNodeBeam(Entity):
     elem_type = "beam3"
     file_ext = "act"
     labels = "F1x F1y F1z M1x M1y M1z F2x F2y F2z M2x M2y M2z".split()
     def write(self, text):
         text.write("\tbeam3: " + str(database.element.index(self)) + ",\n")
-        assert self.links[0].objects[1] == self.links[1].objects[0], "Disconnected beam segments"
+        #assert self.links[0].objects[1] == self.links[1].objects[0], "Disconnected beam segments"
         self.objects = self.links[0].objects + self.links[1].objects[1:]
-        for i in range(len(self.objects)):
+        for i in range(3):
             self.write_node(text, i, node=True, position=True, orientation=True, p_label="position", o_label="orientation")
             text.write(",\n")
         text.write("\t\tfrom nodes, " + self.links[0].links[0].string())
@@ -987,30 +1000,19 @@ class ThreeNodeBeam(Entity):
         for link in self.links:
             link.remesh()
 
-class ThreeNodeBeamOperator(Base):
+class ThreeNodeBeamOperator(Base, SegmentPair):
     bl_label = "Three node beam"
     edit = bpy.props.BoolVectorProperty(name="", size=2)
     @classmethod
     def poll(cls, context):
-        obs = SelectedObjects(context)
-        if len(obs) != 3:
-            return False
-        beam_segments = list()
-        for ob in obs:
-            beam_segments.extend(database.element.filter("Beam segment", ob))
-        return len(beam_segments) == 2 and (
-            (beam_segments[0].objects[1] == beam_segments[1].objects[0]) or
-            (beam_segments[1].objects[1] == beam_segments[0].objects[0]))
+        segments = cls.segments(context, "Beam segment")
+        ret = True if segments else False
+        for s in segments:
+            if hasattr(s, "consumer") and not database.element.index(s.consumer) == context.scene.element_index:
+                ret = False
+        return ret
     def prereqs(self, context):
-        self.beam_segments = list()
-        for ob in SelectedObjects(context):
-            self.beam_segments.extend(database.element.filter("Beam segment", ob))
-        if len(self.beam_segments) == 2:
-            if not self.beam_segments[0].objects[1] == self.beam_segments[1].objects[0]:
-                self.beam_segments.reverse()
-    def assign(self, context):
-        self.entity = database.element[context.scene.element_index]
-        self.beam_segments = copy(self.entity.links)
+        self.beam_segments = self.segments(context, "Beam segment")
     def store(self, context):
         self.entity = database.element[self.index]
         self.entity.objects = self.beam_segments[0].objects + self.beam_segments[1].objects[1:]
@@ -1321,6 +1323,8 @@ class DuplicateObjects(bpy.types.Operator):
                     link.users -= 1
                     entity.links[i] = new_entities[entities.index(link)]
                     entity.links[i].users += 1
+                if hasattr(link, "consumer"):
+                    link.consumer = entity
             if entity.type == "Rigid offset":
                 entity.objects[0].parent = entity.objects[1]
         if self.full_copy:
@@ -1329,7 +1333,7 @@ class DuplicateObjects(bpy.types.Operator):
             while may_have_links:
                 entity = may_have_links.pop()
                 for i, link in enumerate(entity.links):
-                    if link not in entities:
+                    if link not in entities and not hasattr(link, "consumer"):
                         link.users -= 1
                         if link not in new_links:
                             database.to_be_duplicated = link
