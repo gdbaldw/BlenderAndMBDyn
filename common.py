@@ -35,42 +35,42 @@ else:
 FORMAT = "{:.6g}".format
 
 aerodynamic_types = [
-    "Aerodynamic body",
-    "Aerodynamic beam2",
+    ("Aerodynamic body", 1),
+    ("Aerodynamic beam2", 2),
     "Aerodynamic beam3",
     "Generic aerodynamic force",
     "Induced velocity"]
 beam_types = [
-    "Beam segment",
+    ("Beam segment", 2),
     "Three node beam"]
 force_types = [
     "Abstract force",
-    "Structural force",
-    "Structural internal force",
-    "Structural couple",
-    "Structural internal couple"]
+    ("Structural force", 1),
+    ("Structural internal force", 2),
+    ("Structural couple", 1),
+    ("Structural internal couple", 2)]
 genel_types = [
     "Swashplate"]
 joint_types = [
-    "Axial rotation",
-    "Clamp",
-    "Distance",
-    "Deformable displacement joint",
-    "Deformable hinge",
-    "Deformable joint",
-    "Inline",
-    "Inplane",
-    "Revolute hinge",
-    "Rod",
-    "Spherical hinge",
-    "Total joint",
-    "Viscous body"]
+    ("Axial rotation", 2),
+    ("Clamp", 1),
+    ("Distance", 2),
+    ("Deformable displacement joint", 2),
+    ("Deformable hinge", 2),
+    ("Deformable joint", 2),
+    ("Inline", 2),
+    ("Inplane", 2),
+    ("Revolute hinge", 2),
+    ("Rod", 2),
+    ("Spherical hinge", 2),
+    ("Total joint", 2),
+    ("Viscous body", 1)]
 environment_types = [
     "Air properties",
     "Gravity"]
 node_types = [
-    "Rigid offset",
-    "Dummy node",
+    ("Rigid offset", 2),
+    ("Dummy node", 2),
     "Feedback node"]
 
 rigid_body_types = ["Body"]

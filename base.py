@@ -361,11 +361,11 @@ class TreeMenu(list):
         is_a_leaf = OrderedDict()
         for i in range(len(branch)):
             if isinstance(branch[i], list):
-                assert isinstance(branch[i-1], str)
+                assert isinstance(branch[i-1], (str, tuple))
                 is_a_leaf[branch[i-1]] = False
                 self.leaf_maker(branch[i-1], branch[i])
             else:
-                assert isinstance(branch[i], str)
+                assert isinstance(branch[i], (str, tuple))
                 is_a_leaf[branch[i]] = True
         class Menu(bpy.types.Menu):
             bl_label = base
@@ -373,9 +373,11 @@ class TreeMenu(list):
             def draw(self, context):
                 layout = self.layout
                 layout.operator_context = 'INVOKE_DEFAULT'
-                for name, leaf in is_a_leaf.items():
+                for item, leaf in is_a_leaf.items():
+                    name, N = item if isinstance(item, tuple) else (item, None)
                     if leaf:
-                        layout.operator(root_dot + "c_" + "_".join(name.lower().split()))
+                        layout.operator(root_dot + "c_" + "_".join(name.lower().split()), icon='OUTLINER_OB_MESH' if N == len(SelectedObjects(context)) + 1 else 'NONE')
+                        #layout.operator(root_dot + "c_" + "_".join(name.lower().split()))
                     else:
                         layout.menu(root_dot + "_".join(name.lower().split()))
         self.append(Menu)
@@ -388,7 +390,8 @@ class TreeMenu(list):
 
 class Operators(list):
     def __init__(self, klasses, entity_list):
-        for name, klass in klasses.items():
+        for item, klass in klasses.items():
+            name = item[0] if isinstance(item, tuple) else item
             klass.entity_list = entity_list
             klass.module = klass.__module__.split(".")[1]
             class Create(bpy.types.Operator, klass):
@@ -603,6 +606,9 @@ class UI(list):
             bl_region_type = 'TOOLS'
             bl_category = category
             bl_idname = "_".join([category, module_name])
+            @classmethod
+            def poll(self, context):
+                return True
             def draw(self, context):
                 layout = self.layout
                 self.draw_panel_pre(context, layout)
