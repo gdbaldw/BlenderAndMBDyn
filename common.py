@@ -1,17 +1,17 @@
 # --------------------------------------------------------------------------
-# Blender MBDyn
+# BlenderAndMBDyn
 # Copyright (C) 2015 G. Douglas Baldwin - http://www.baldwintechnology.com
 # --------------------------------------------------------------------------
 # ***** BEGIN GPL LICENSE BLOCK *****
 #
-#    This file is part of Blender MBDyn.
+#    This file is part of BlenderAndMBDyn.
 #
-#    Blender MBDyn is free software: you can redistribute it and/or modify
+#    BlenderAndMBDyn is free software: you can redistribute it and/or modify
 #    it under the terms of the GNU General Public License as published by
 #    the Free Software Foundation, either version 3 of the License, or
 #    (at your option) any later version.
 #
-#    Blender MBDyn is distributed in the hope that it will be useful,
+#    BlenderAndMBDyn is distributed in the hope that it will be useful,
 #    but WITHOUT ANY WARRANTY; without even the implied warranty of
 #    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 #    GNU General Public License for more details.
@@ -32,11 +32,14 @@ else:
     from math import sqrt
     import bmesh
 
+FORMAT = "{:.6g}".format
+
 aerodynamic_types = [
     "Aerodynamic body",
     "Aerodynamic beam2",
     "Aerodynamic beam3",
-    "Generic aerodynamic force"]
+    "Generic aerodynamic force",
+    "Induced velocity"]
 beam_types = [
     "Beam segment",
     "Three node beam"]
@@ -55,8 +58,8 @@ joint_types = [
     "Deformable displacement joint",
     "Deformable hinge",
     "Deformable joint",
-    "In line",
-    "In plane",
+    "Inline",
+    "Inplane",
     "Revolute hinge",
     "Rod",
     "Spherical hinge",
@@ -76,82 +79,29 @@ structural_static_types = aerodynamic_types + joint_types + ["Rotor"] + beam_typ
 
 structural_dynamic_types = rigid_body_types
 
+method_types = [
+    "Crank Nicolson",
+    "ms",
+    "Hope",
+    "Third order",
+    "bdf",
+    "Implicit Euler"]
+
+nonlinear_solver_types = [
+    "Newton Raphston",
+    "Line search",
+    "Matrix free"]
+
 class Common:
-    def round_vector(self, v):
-        for i in range(3):
-            v[i] = round(v[i], 5)
-        return v
-    def round_matrix(self, r):
-        for i in range(3):
-            r[i] = self.round_vector(r[i])
-        return r
-    def locationVector_write(self, v, text, end=''):
-        v = self.round_vector(v)
-        text.write(str(v[0])+', '+str(v[1])+', '+str(v[2])+end)
-    def rotationMatrix_write(self, rot, text, pad):
-        rot = self.round_matrix(rot)
-        text.write(
-        pad+', '.join([str(rot[0][j]) for j in range(3)])+',\n'+
-        pad+', '.join([str(rot[1][j]) for j in range(3)])+',\n'+
-        pad+', '.join([str(rot[2][j]) for j in range(3)]))
-    def write_node(self, text, i, node=False, position=False, orientation=False, p_label='', o_label=''):
-        rot_i, globalV_i, Node_i = self.rigid_offset(i)
-        localV_i = rot_i*globalV_i
-        rotT = self.objects[i].matrix_world.to_quaternion().to_matrix().transposed()
-        if node:
-            text.write('\t\t'+str(Node_i)+',\n')
-        if position:
-            text.write('\t\t\t')
-            if p_label:
-                text.write(p_label+', ')
-            self.locationVector_write(localV_i, text)
-        if orientation:
-            text.write(',\n\t\t\t')
-            if o_label:
-                text.write(o_label+', ')
-            text.write('matr,\n')
-            self.rotationMatrix_write(rot_i*rotT, text, '\t\t\t\t')
-    def rigid_offset(self, i):
-        if self.objects[i] in self.database.node:
-            ob = self.objects[i]
-        elif self.objects[i] in self.database.rigid_dict:
-            ob = self.database.rigid_dict[self.objects[i]]
-        else:
-            bpy.context.window_manager.popup_menu(lambda self, c: self.layout.label(
-                "Object "+self.objects[i].name+" is not associated with a Node"),
-                title="MBDyn Error", icon='ERROR')
-            print("***Model Error: Object "+self.objects[i].name+" is not associated with a Node")
-            return
-        rot = ob.matrix_world.to_quaternion().to_matrix()
-        globalV = self.objects[i].matrix_world.translation - ob.matrix_world.translation
-        return rot, globalV, self.database.node.index(ob)
-    def write_hinge(self, text, name, V1=True, V2=True, M1=True, M2=True):
-        rot_0, globalV_0, Node_0 = self.rigid_offset(0)
-        localV_0 = rot_0*globalV_0
-        rot_1, globalV_1, Node_1 = self.rigid_offset(1)
-        to_hinge = rot_1*(globalV_1 + self.objects[0].matrix_world.translation - self.objects[1].matrix_world.translation)
-        rotT = self.objects[0].matrix_world.to_quaternion().to_matrix().transposed()
-        text.write(
-        '\tjoint: '+str(self.database.element.index(self))+', '+name+',\n'+
-        '\t\t'+str(Node_0))
-        if V1:
-            text.write(', ')
-            self.locationVector_write(localV_0, text)
-        if M1:
-            text.write(',\n\t\t\thinge, matr,\n')
-            self.rotationMatrix_write(rot_0*rotT, text, '\t\t\t\t')
-        text.write(', \n\t\t'+str(Node_1))
-        if V2:
-            text.write(', ')
-            self.locationVector_write(to_hinge, text)
-        if M2:
-            text.write(',\n\t\t\thinge, matr,\n')
-            self.rotationMatrix_write(rot_1*rotT, text, '\t\t\t\t')
+    def write_vector(self, v, f, end=""):
+        f.write(", ".join([FORMAT(round(x, 6) if round(x, 6) != -0. else 0) for x in v]) + end)
+    def write_matrix(self, m, f, pad=""):
+        f.write(",\n".join([pad + ", ".join(FORMAT(round(x, 6) if round(x, 6) != -0. else 0) for x in r) for r in m]))
 
 def subsurf(obj):
-    if not [m for m in obj.modifiers if m.type == 'SUBSURF']:
-        obj.modifiers.new("Subsurf", 'SUBSURF')
-        obj.modifiers["Subsurf"].levels = 3
+    subsurf = [m for m in obj.modifiers if m.type == 'SUBSURF']
+    subsurf = subsurf[0] if subsurf else obj.modifiers.new("Subsurf", 'SUBSURF')
+    subsurf.levels = 3
 
 def Ellipsoid(obj, mass, mat):
     if mat.subtype == "eye":
@@ -163,6 +113,8 @@ def Ellipsoid(obj, mass, mat):
     bm = bmesh.new()
     for v in [(x*s[0],y*s[1],z*s[2]) for z in [-1., 1.] for y in [-1., 1.] for x in [-1., 1.]]:
         bm.verts.new(v)
+    if hasattr(bm.verts, "ensure_lookup_table"):
+        bm.verts.ensure_lookup_table()
     for f in [(1,0,2,3),(4,5,7,6),(0,1,5,4),(1,3,7,5),(3,2,6,7),(2,0,4,6)]:
         bm.faces.new([bm.verts[i] for i in f])
     crease = bm.edges.layers.crease.new()
@@ -176,6 +128,8 @@ def Sphere(obj):
     bm = bmesh.new()
     for v in [(x, y, z) for z in [-0.5, 0.5] for y in [-0.5, 0.5] for x in [-0.5, 0.5]]:
         bm.verts.new(v)
+    if hasattr(bm.verts, "ensure_lookup_table"):
+        bm.verts.ensure_lookup_table()
     for f in [(1,0,2,3),(4,5,7,6),(0,1,5,4),(1,3,7,5),(3,2,6,7),(2,0,4,6)]:
         bm.faces.new([bm.verts[i] for i in f])
     bm.to_mesh(obj.data)
@@ -186,6 +140,8 @@ def RhombicPyramid(obj):
     bm = bmesh.new()
     for v in [(.333,0.,0.),(0.,.666,0.),(-.333,0.,0.),(0.,-.666,0.),(0.,0.,1.)]:
         bm.verts.new(v)
+    if hasattr(bm.verts, "ensure_lookup_table"):
+        bm.verts.ensure_lookup_table()
     for f in [(3,2,1,0),(0,1,4),(1,2,4),(2,3,4),(3,0,4)]:
         bm.faces.new([bm.verts[i] for i in f])
     crease = bm.edges.layers.crease.new()
@@ -199,6 +155,8 @@ def Teardrop(obj):
     bm = bmesh.new()
     for v in [(x, y, -.5) for y in [-.5, .5] for x in [-.5, .5]] + [(0.,0.,0.)]:
         bm.verts.new(v)
+    if hasattr(bm.verts, "ensure_lookup_table"):
+        bm.verts.ensure_lookup_table()
     for q in [(2,3,1,0),(0,1,4),(1,3,4),(3,2,4),(2,0,4)]:
         bm.faces.new([bm.verts[i] for i in q])
     crease = bm.edges.layers.crease.new()
@@ -215,6 +173,8 @@ def Cylinder(obj):
         for y in [-1., 1.]:
             for x in [-1., 1.]:
                 bm.verts.new((scale*x,scale*y,scale*z))
+    if hasattr(bm.verts, "ensure_lookup_table"):
+        bm.verts.ensure_lookup_table()
     for q in [(1,0,2,3),(4,5,7,6),(0,1,5,4),(1,3,7,5),(3,2,6,7),(2,0,4,6)]:
         bm.faces.new([bm.verts[i] for i in q])
     crease = bm.edges.layers.crease.new()
@@ -224,3 +184,17 @@ def Cylinder(obj):
     bm.free()
     subsurf(obj)
 
+def RectangularCuboid(obj):
+    bm = bmesh.new()
+    for v in [(x, y, z) for z in [-0.2, 0.2] for y in [-0.1, 0.1] for x in [-0.3, 0.3]]:
+        bm.verts.new(v)
+    if hasattr(bm.verts, "ensure_lookup_table"):
+        bm.verts.ensure_lookup_table()
+    for f in [(1,0,2,3),(4,5,7,6),(0,1,5,4),(1,3,7,5),(3,2,6,7),(2,0,4,6)]:
+        bm.faces.new([bm.verts[i] for i in f])
+    crease = bm.edges.layers.crease.new()
+    for e in bm.edges:
+        e[crease] = 1.0
+    bm.to_mesh(obj.data)
+    subsurf(obj)
+    bm.free()

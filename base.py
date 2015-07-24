@@ -1,17 +1,17 @@
 # --------------------------------------------------------------------------
-# Blender MBDyn
+# BlenderAndMBDyn
 # Copyright (C) 2015 G. Douglas Baldwin - http://www.baldwintechnology.com
 # --------------------------------------------------------------------------
 # ***** BEGIN GPL LICENSE BLOCK *****
 #
-#    This file is part of Blender MBDyn.
+#    This file is part of BlenderAndMBDyn.
 #
-#    Blender MBDyn is free software: you can redistribute it and/or modify
+#    BlenderAndMBDyn is free software: you can redistribute it and/or modify
 #    it under the terms of the GNU General Public License as published by
 #    the Free Software Foundation, either version 3 of the License, or
 #    (at your option) any later version.
 #
-#    Blender MBDyn is distributed in the hope that it will be useful,
+#    BlenderAndMBDyn is distributed in the hope that it will be useful,
 #    but WITHOUT ANY WARRANTY; without even the implied warranty of
 #    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 #    GNU General Public License for more details.
@@ -29,13 +29,18 @@ if "bpy" in locals():
     imp.reload(Common)
 else:
     import bpy
+    import addon_utils
     from .database import Database
-    from .common import Common
+    from .common import Common, method_types, nonlinear_solver_types
+    from collections import OrderedDict
+    from copy import copy
 
 category = "MBDyn"
-root_dot = "_".join(category.lower().split())+"."
+root_dot = "_".join(category.lower().split()) + "."
 database = Database()
 
+def enum_scenes(self, context):
+    return [(s.name, s.name, "") for s in bpy.data.scenes]
 def enum_objects(self, context):
     return [(o.name, o.name, "") for o in context.scene.objects if o.type == 'MESH']
 def enum_matrix(self, context, matrix_type):
@@ -51,9 +56,9 @@ def enum_matrix_6x6(self, context):
     return enum_matrix(self, context, "6x6")
 def enum_matrix_6xN(self, context):
     return enum_matrix(self, context, "6xN")
-def enum_constitutive(self, context, constitutive_dimension):
+def enum_constitutive(self, context, dimension):
     return [(c.name, c.name, "") for i, c in enumerate(context.scene.constitutive_uilist)
-        if database.constitutive[i].type.split()[-1] == constitutive_dimension]
+        if dimension in database.constitutive[i].dimensions]
 def enum_constitutive_1D(self, context):
     return enum_constitutive(self, context, "1D")
 def enum_constitutive_3D(self, context):
@@ -62,138 +67,318 @@ def enum_constitutive_6D(self, context):
     return enum_constitutive(self, context, "6D")
 def enum_drive(self, context):
     return [(d.name, d.name, "") for d in context.scene.drive_uilist]
+def enum_meter_drive(self, context):
+    return [(d.name, d.name, "") for i, d in enumerate(context.scene.drive_uilist) if database.drive[i].type == "Meter drive"]
 def enum_element(self, context):
     return [(e.name, e.name, "") for e in context.scene.element_uilist]
 def enum_function(self, context):
     return [(f.name, f.name, "") for f in context.scene.function_uilist]
 def enum_friction(self, context):
     return [(f.name, f.name, "") for f in context.scene.friction_uilist]
+def enum_general_data(self, context):
+    return [(d.name, d.name, "") for i, d in enumerate(context.scene.definition_uilist) if database.definition[i].type == "General data"]
+def enum_method(self, context):
+    return [(d.name, d.name, "") for i, d in enumerate(context.scene.definition_uilist) if database.definition[i].type in method_types]
+def enum_nonlinear_solver(self, context):
+    return [(d.name, d.name, "") for i, d in enumerate(context.scene.definition_uilist) if database.definition[i].type in nonlinear_solver_types]
+def enum_eigenanalysis(self, context):
+    return [(d.name, d.name, "") for i, d in enumerate(context.scene.definition_uilist) if database.definition[i].type == "Eigenanalysis"]
+def enum_abort_after(self, context):
+    return [(d.name, d.name, "") for i, d in enumerate(context.scene.definition_uilist) if database.definition[i].type == "Abort after"]
+def enum_linear_solver(self, context):
+    return [(d.name, d.name, "") for i, d in enumerate(context.scene.definition_uilist) if database.definition[i].type == "Linear solver"]
+def enum_dummy_steps(self, context):
+    return [(d.name, d.name, "") for i, d in enumerate(context.scene.definition_uilist) if database.definition[i].type == "Dummy steps"]
+def enum_output_data(self, context):
+    return [(d.name, d.name, "") for i, d in enumerate(context.scene.definition_uilist) if database.definition[i].type == "Output data"]
+def enum_real_time(self, context):
+    return [(d.name, d.name, "") for i, d in enumerate(context.scene.definition_uilist) if database.definition[i].type == "Real time"]
+def enum_assembly(self, context):
+    return [(d.name, d.name, "") for i, d in enumerate(context.scene.definition_uilist) if database.definition[i].type == "Assembly"]
+def enum_job_control(self, context):
+    return [(d.name, d.name, "") for i, d in enumerate(context.scene.definition_uilist) if database.definition[i].type == "Job control"]
+def enum_default_output(self, context):
+    return [(d.name, d.name, "") for i, d in enumerate(context.scene.definition_uilist) if database.definition[i].type == "Default output"]
+def enum_default_aerodynamic_output(self, context):
+    return [(d.name, d.name, "") for i, d in enumerate(context.scene.definition_uilist) if database.definition[i].type == "Default aerodynamic output"]
+def enum_default_beam_output(self, context):
+    return [(d.name, d.name, "") for i, d in enumerate(context.scene.definition_uilist) if database.definition[i].type == "Default beam output"]
 
-class Props:
+@bpy.app.handlers.persistent
+def load_post(*args, **kwargs):
+    database.unpickle()
+    for scene in bpy.data.scenes:
+        scene.dirty_simulator = True
+
+@bpy.app.handlers.persistent
+def scene_update_post(*args, **kwargs):
+    if bpy.context.scene != database.scene:
+        database.replace()
+
+@bpy.app.handlers.persistent
+def save_pre(*args, **kwargs):
+    database.pickle()
+
+class BPY:
     class Floats(bpy.types.PropertyGroup):
         value = bpy.props.FloatProperty(min=-9.9e10, max=9.9e10, step=100, precision=6)
+    class Names(bpy.types.PropertyGroup):
+        value = bpy.props.StringProperty(name="")
+        select = bpy.props.BoolProperty(name="")
     class DriveNames(bpy.types.PropertyGroup):
         value = bpy.props.EnumProperty(items=enum_drive, name="Drive")
+        edit = bpy.props.BoolProperty(name="")
+    class FunctionNames(bpy.types.PropertyGroup):
+        value = bpy.props.EnumProperty(items=enum_function, name="Function")
+        edit = bpy.props.BoolProperty(name="")
+    class ObjectNames(bpy.types.PropertyGroup):
+        value = bpy.props.EnumProperty(items=enum_objects, name="Object")
+    klasses = [Floats, Names, DriveNames, FunctionNames, ObjectNames]
+    executable_path = "mbdyn"
     @classmethod
-    def register(self):
-        bpy.utils.register_class(Props.Floats)
-        bpy.utils.register_class(Props.DriveNames)
+    def register(cls):
+        for klass in cls.klasses:
+            bpy.utils.register_class(klass)
+        bpy.app.handlers.load_post.append(load_post)
+        bpy.app.handlers.scene_update_post.append(scene_update_post)
+        bpy.app.handlers.save_pre.append(save_pre)
+        bpy.types.Scene.dirty_simulator = bpy.props.BoolProperty(default=True)
+        bpy.types.Scene.clean_log = bpy.props.BoolProperty(default=False)
+        bpy.types.Scene.mbdyn_name = bpy.props.StringProperty()
+        bpy.types.Object.mbdyn_name = bpy.props.StringProperty()
     @classmethod
-    def unregister(self):
-        bpy.utils.unregister_class(Props.Floats)
-        bpy.utils.unregister_class(Props.DriveNames)
+    def unregister(cls):
+        for klass in cls.klasses:
+            bpy.utils.unregister_class(klass)
+        bpy.app.handlers.save_pre.append(save_pre)
+        bpy.app.handlers.scene_update_post.remove(scene_update_post)
+        bpy.app.handlers.load_post.remove(load_post)
+        del bpy.types.Scene.dirty_simulator
+        del bpy.types.Scene.clean_log
+        del bpy.types.Scene.mbdyn_name
+        del bpy.types.Object.mbdyn_name
 
 class Entity(Common):
-    database = database
+    indent_drives = 1
     def __init__(self, name):
         self.type = name
         self.users = 0
         self.links = list()
     def unlink_all(self):
         for link in self.links:
+            if hasattr(link, "consumer"):
+                del link.consumer
             link.users -= 1
         self.links.clear()
     def increment_links(self):
         for link in self.links:
             link.users += 1
     def write(self, text):
-        text.write("\t"+self.type+".write(): FIXME please\n")
+        text.write("\t" + self.type + ".write(): FIXME please\n")
+    def string(self):
+        return self.type + ".string(): FIXME please\n"
+    def remesh(self):
+        pass
+    def rigid_offset(self, i):
+        if self.objects[i] in database.node:
+            ob = self.objects[i]
+        elif self.objects[i] in database.rigid_dict:
+            ob = database.rigid_dict[self.objects[i]]
+        else:
+            name = self.objects[i].name
+            bpy.context.window_manager.popup_menu(lambda self, c: self.layout.label(
+                "Object " + name + " is not associated with a Node"),
+                title="MBDyn Error", icon='ERROR')
+            raise Exception("***Model Error: Object " + name + " is not associated with a Node")
+        rot = ob.matrix_world.to_quaternion().to_matrix().transposed()
+        globalV = self.objects[i].matrix_world.translation - ob.matrix_world.translation
+        return rot, globalV, database.node.index(ob)
+    def write_node(self, text, i, node=False, position=False, orientation=False, p_label="", o_label=""):
+        rot_i, globalV_i, Node_i = self.rigid_offset(i)
+        localV_i = rot_i*globalV_i
+        rot = self.objects[i].matrix_world.to_quaternion().to_matrix()
+        if node:
+            text.write("\t\t" + str(Node_i) + ",\n")
+        if position:
+            text.write("\t\t\t")
+            if p_label:
+                text.write(p_label + ", ")
+            self.write_vector(localV_i, text)
+        if orientation:
+            text.write(",\n\t\t\t")
+            if o_label:
+                text.write(o_label + ", ")
+            text.write("matr,\n")
+            self.write_matrix(rot_i*rot, text, "\t\t\t\t")
+    def duplicate(self):
+        new_entity = copy(self)
+        if hasattr(self, "objects"):
+            new_entity.objects = copy(self.objects)
+        new_entity.links = copy(self.links)
+        new_entity.increment_links()
+        new_entity.users = 0
+        return new_entity
 
 class SelectedObjects(list):
     def __init__(self, context):
-        super().__init__()
         self.extend([o for o in context.selected_objects if o.type == 'MESH'])
-        active = context.active_object if context.active_object.type == 'MESH' else None
-        if self and active:
+        active = context.active_object if context.active_object in self else None
+        if active:
             self.remove(active)
             self.insert(0, active)
+        else:
+            self.clear()
 
 class Operator:
-    database = database
     def matrix_exists(self, context, matrix_type):
         if not enum_matrix(self, context, matrix_type):
-            exec("bpy.ops."+root_dot+"c_"+matrix_type+"()")
-    def constitutive_exists(self, context, constitutive_dimension):
-        if not enum_constitutive(self, context, constitutive_dimension):
-            exec("bpy.ops."+root_dot+"c_linear_elastic_"+constitutive_dimension.lower()+"()")
+            exec("bpy.ops." + root_dot + "c_" + matrix_type + "()")
+    def constitutive_exists(self, context, dimension):
+        if not enum_constitutive(self, context, dimension):
+            if dimension == "1D":
+                exec("bpy.ops." + root_dot + "c_linear_elastic(dimensions = \"1D\")")
+            else:
+                exec("bpy.ops." + root_dot + "c_linear_elastic(dimensions = \"3D, 6D\")")
     def drive_exists(self, context):
         if not enum_drive(self, context):
-            exec("bpy.ops."+root_dot+"c_unit_drive()")
+            exec("bpy.ops." + root_dot + "c_unit_drive()")
+    def meter_drive_exists(self, context):
+        if not enum_meter_drive(self, context):
+            exec("bpy.ops." + root_dot + "c_meter_drive()")
     def element_exists(self, context):
-        if not enum_drive(self, context):
-            exec("bpy.ops."+root_dot+"c_gravity()")
+        if not enum_element(self, context):
+            exec("bpy.ops." + root_dot + "c_gravity()")
     def function_exists(self, context):
         if not enum_function(self, context):
-            exec("bpy.ops."+root_dot+"c_const()")
+            exec("bpy.ops." + root_dot + "c_const()")
     def friction_exists(self, context):
         if not enum_friction(self, context):
-            exec("bpy.ops."+root_dot+"c_modlugre()")
-    def link_matrix(self, context, matrix_name):
+            exec("bpy.ops." + root_dot + "c_modlugre()")
+    def general_data_exists(self, context):
+        if not enum_general_data(self, context):
+            exec("bpy.ops." + root_dot + "c_general_data()")
+    def method_exists(self, context):
+        if not enum_method(self, context):
+            exec("bpy.ops." + root_dot + "c_crank_nicolson()")
+    def nonlinear_solver_exists(self, context):
+        if not enum_nonlinear_solver(self, context):
+            exec("bpy.ops." + root_dot + "c_newton_raphston()")
+    def eigenanalysis_exists(self, context):
+        if not enum_eigenanalysis(self, context):
+            exec("bpy.ops." + root_dot + "c_eigenanalysis()")
+    def abort_after_exists(self, context):
+        if not enum_abort_after(self, context):
+            exec("bpy.ops." + root_dot + "c_abort_after()")
+    def linear_solver_exists(self, context):
+        if not enum_linear_solver(self, context):
+            exec("bpy.ops." + root_dot + "c_linear_solver()")
+    def dummy_steps_exists(self, context):
+        if not enum_dummy_steps(self, context):
+            exec("bpy.ops." + root_dot + "c_dummy_steps()")
+    def output_data_exists(self, context):
+        if not enum_output_data(self, context):
+            exec("bpy.ops." + root_dot + "c_output_data()")
+    def real_time_exists(self, context):
+        if not enum_real_time(self, context):
+            exec("bpy.ops." + root_dot + "c_real_time()")
+    def assembly_exists(self, context):
+        if not enum_assembly(self, context):
+            exec("bpy.ops." + root_dot + "c_assembly()")
+    def job_control_exists(self, context):
+        if not enum_job_control(self, context):
+            exec("bpy.ops." + root_dot + "c_job_control()")
+    def default_output_exists(self, context):
+        if not enum_default_output(self, context):
+            exec("bpy.ops." + root_dot + "c_default_output()")
+    def default_aerodynamic_output_exists(self, context):
+        if not enum_default_aerodynamic_output(self, context):
+            exec("bpy.ops." + root_dot + "c_default_aerodynamic_output()")
+    def default_beam_output_exists(self, context):
+        if not enum_default_beam_output(self, context):
+            exec("bpy.ops." + root_dot + "c_default_beam_output()")
+    def link_matrix(self, context, matrix_name, edit=True):
         context.scene.matrix_index = next(i for i, x in enumerate(context.scene.matrix_uilist)
             if x.name == matrix_name)
-        matrix = self.database.matrix[context.scene.matrix_index]
-        exec("bpy.ops."+root_dot+"e_"+matrix.type+"('INVOKE_DEFAULT')")
+        matrix = database.matrix[context.scene.matrix_index]
+        if edit:
+            exec("bpy.ops." + root_dot + "e_" + matrix.type + "('INVOKE_DEFAULT')")
         self.entity.links.append(matrix)
-    def link_constitutive(self, context, constitutive_name):
+    def link_constitutive(self, context, constitutive_name, edit=True):
         context.scene.constitutive_index = next(i for i, x in enumerate(context.scene.constitutive_uilist)
             if x.name == constitutive_name)
-        constitutive = self.database.constitutive[context.scene.constitutive_index]
-        exec("bpy.ops."+root_dot+"e_"+"_".join(constitutive.type.lower().split())+"('INVOKE_DEFAULT')")
+        constitutive = database.constitutive[context.scene.constitutive_index]
+        if edit:
+            exec("bpy.ops." + root_dot + "e_" + "_".join(constitutive.type.lower().split()) + "('INVOKE_DEFAULT')")
         self.entity.links.append(constitutive)
-    def link_drive(self, context, drive_name):
+    def link_drive(self, context, drive_name, edit=True):
         context.scene.drive_index = next(i for i, x in enumerate(context.scene.drive_uilist)
             if x.name == drive_name)
-        drive = self.database.drive[context.scene.drive_index]
-        exec("bpy.ops."+root_dot+"e_"+"_".join(drive.type.lower().split())+"('INVOKE_DEFAULT')")
+        drive = database.drive[context.scene.drive_index]
+        if edit:
+            exec("bpy.ops." + root_dot + "e_" + "_".join(drive.type.lower().split()) + "('INVOKE_DEFAULT')")
         self.entity.links.append(drive)
-    def link_element(self, context, element_name):
+    def link_element(self, context, element_name, edit=True):
         context.scene.element_index = next(i for i, x in enumerate(context.scene.element_uilist)
             if x.name == element_name)
-        element = self.database.element[context.scene.element_index]
-        exec("bpy.ops."+root_dot+"e_"+"_".join(element.type.lower().split())+"('INVOKE_DEFAULT')")
+        element = database.element[context.scene.element_index]
+        if edit:
+            exec("bpy.ops." + root_dot + "e_" + "_".join(element.type.lower().split()) + "('INVOKE_DEFAULT')")
         self.entity.links.append(element)
-    def link_function(self, context, function_name):
+    def link_function(self, context, function_name, edit=True):
         context.scene.function_index = next(i for i, x in enumerate(context.scene.function_uilist)
             if x.name == function_name)
-        function = self.database.function[context.scene.function_index]
-        exec("bpy.ops."+root_dot+"e_"+"_".join(function.type.lower().split())+"('INVOKE_DEFAULT')")
+        function = database.function[context.scene.function_index]
+        if edit:
+            exec("bpy.ops." + root_dot + "e_" + "_".join(function.type.lower().split()) + "('INVOKE_DEFAULT')")
         self.entity.links.append(function)
-    def link_friction(self, context, friction_name):
+    def link_friction(self, context, friction_name, edit=True):
         context.scene.friction_index = next(i for i, x in enumerate(context.scene.friction_uilist)
             if x.name == friction_name)
-        friction = self.database.friction[context.scene.friction_index]
-        exec("bpy.ops."+root_dot+"e_"+"_".join(friction.type.lower().split())+"('INVOKE_DEFAULT')")
+        friction = database.friction[context.scene.friction_index]
+        if edit:
+            exec("bpy.ops." + root_dot + "e_" + "_".join(friction.type.lower().split()) + "('INVOKE_DEFAULT')")
         self.entity.links.append(friction)
+    def link_definition(self, context, definition_name, edit=True):
+        context.scene.definition_index = next(i for i, x in enumerate(context.scene.definition_uilist)
+            if x.name == definition_name)
+        definition = database.definition[context.scene.definition_index]
+        if edit:
+            exec("bpy.ops." + root_dot + "e_" + "_".join(definition.type.lower().split()) + "('INVOKE_DEFAULT')")
+        self.entity.links.append(definition)
+    def draw_link(self, layout, link_name, link_edit):
+        row = layout.row()
+        row.prop(self, link_name)
+        row.prop(self, link_edit, toggle=True)
+    def draw_panel_pre(self, context, layout):
+        pass
+    def draw_panel_post(self, context, layout):
+        pass
 
 class TreeMenu(list):
-    def __init__(self, entity_tree):
-        self.leaves = list()
-        self.tree_maker(entity_tree)
-    def tree_maker(self, tree):
-        name_is_a_leaf = list()
-        for branch in tree[1:]:
-            if isinstance(branch, list):
-                if len(branch) == 2 and isinstance(branch[1], list):
-                    name_is_a_leaf.append((branch[0], False))
-                    self.tree_maker(branch)
-                else:
-                    for j in branch:
-                        name_is_a_leaf.append((j, True))
+    def __init__(self, tree):
+        self.leaf_maker(tree[0], tree[1])
+    def leaf_maker(self, base, branch):
+        is_a_leaf = OrderedDict()
+        for i in range(len(branch)):
+            if isinstance(branch[i], list):
+                assert isinstance(branch[i-1], str)
+                is_a_leaf[branch[i-1]] = False
+                self.leaf_maker(branch[i-1], branch[i])
             else:
-                name_is_a_leaf.append((branch, True))
+                assert isinstance(branch[i], str)
+                is_a_leaf[branch[i]] = True
         class Menu(bpy.types.Menu):
-            bl_label = tree[0]
-            bl_idname = root_dot+"_".join(tree[0].lower().split())
+            bl_label = base
+            bl_idname = root_dot + "_".join(base.lower().split())
             def draw(self, context):
                 layout = self.layout
                 layout.operator_context = 'INVOKE_DEFAULT'
-                for name, is_a_leaf in name_is_a_leaf:
-                    if is_a_leaf:
-                        op = layout.operator(root_dot+"c_"+"_".join(name.lower().split()))
+                for name, leaf in is_a_leaf.items():
+                    if leaf:
+                        layout.operator(root_dot + "c_" + "_".join(name.lower().split()))
                     else:
-                        layout.menu(root_dot+"_".join(name.lower().split()))
+                        layout.menu(root_dot + "_".join(name.lower().split()))
         self.append(Menu)
-        self.leaves.extend([name for name, is_a_leaf in name_is_a_leaf if is_a_leaf])
     def register(self):
         for klass in self:
             bpy.utils.register_class(klass)
@@ -205,18 +390,12 @@ class Operators(list):
     def __init__(self, klasses, entity_list):
         for name, klass in klasses.items():
             klass.entity_list = entity_list
-            class Op:
-                def select_and_activate(self, context):
-                    if hasattr(self.entity, "objects") and self.entity.objects:
-                        bpy.ops.object.select_all(action='DESELECT')
-                        for ob in self.entity.objects:
-                            ob.select = True
-                        context.scene.objects.active = self.entity.objects[0]
-            class Create(bpy.types.Operator, klass, Op):
-                bl_idname = root_dot+"c_"+"_".join(name.lower().split())
+            klass.module = klass.__module__.split(".")[1]
+            class Create(bpy.types.Operator, klass):
+                bl_idname = root_dot + "c_" + "_".join(name.lower().split())
                 bl_options = {'REGISTER', 'INTERNAL'}
                 def invoke(self, context, event):
-                    self.defaults(context)
+                    self.prereqs(context)
                     return context.window_manager.invoke_props_dialog(self)
                 def execute(self, context):
                     index, uilist = self.get_uilist(context)
@@ -224,25 +403,130 @@ class Operators(list):
                     uilist.add()
                     self.set_index(context, self.index)
                     self.entity_list.append(self.create_entity())
+                    self.entity_list[-1].entity_list = self.entity_list
                     uilist[self.index].name = self.name
-                    self.entity_name = uilist[self.index].name
                     self.store(context)
-                    self.select_and_activate(context)
-                    database.pickle()
+                    context.scene.dirty_simulator = True
+                    self.set_index(context, self.index)
                     return {'FINISHED'}
-            class Edit(bpy.types.Operator, klass, Op):
-                bl_idname = root_dot+"e_"+"_".join(name.lower().split())
+            class Edit(bpy.types.Operator, klass):
+                bl_label = " ".join(["Edit:", name, "instance"])
+                bl_idname = root_dot + "e_" + "_".join(name.lower().split())
                 bl_options = {'REGISTER', 'INTERNAL'}
                 def invoke(self, context, event):
+                    self.prereqs(context)
+                    self.index, uilist = self.get_uilist(context)
                     self.assign(context)
-                    self.select_and_activate(context)
                     return context.window_manager.invoke_props_dialog(self)
                 def execute(self, context):
                     self.store(context)
-                    self.select_and_activate(context)
-                    database.pickle()
+                    context.scene.dirty_simulator = True
+                    self.set_index(context, self.index)
                     return {'FINISHED'}
-            self.extend([Create, Edit])
+            class Duplicate(bpy.types.Operator, klass):
+                bl_label = "Duplicate"
+                bl_idname = root_dot + "d_" + "_".join(name.lower().split())
+                bl_options = {'REGISTER', 'INTERNAL'}
+                attach_duplicate = bpy.props.BoolProperty(default=False)
+                @classmethod
+                def poll(cls, context):
+                    return True
+                def execute(self, context):
+                    index, uilist = self.get_uilist(context)
+                    self.index = len(uilist)
+                    uilist.add()
+                    self.set_index(context, self.index)
+                    if self.attach_duplicate:
+                        entity = database.to_be_duplicated.duplicate()
+                        del database.to_be_duplicated
+                    else:
+                        entity = self.entity_list[index].duplicate()
+                    self.entity_list.append(entity)
+                    uilist[self.index].name = entity.name
+                    context.scene.dirty_simulator = True
+                    self.set_index(context, self.index)
+                    if self.attach_duplicate:
+                        database.dup = entity
+                        self.attach_duplicate = False
+                    return {'FINISHED'}
+            class Users(bpy.types.Operator, klass):
+                bl_label = "Users"
+                bl_idname = root_dot + "s_" + "_".join(name.lower().split())
+                bl_options = {'REGISTER', 'INTERNAL'}
+                entity_names = bpy.props.CollectionProperty(type=BPY.Names, name="Users")
+                @classmethod
+                def poll(cls, context):
+                    return True
+                def invoke(self, context, event):
+                    self.entity_names.clear()
+                    self.index, uilist = self.get_uilist(context)
+                    self.users = database.users_of(self.entity_list[self.index])
+                    for user in self.users:
+                        name = self.entity_names.add()
+                        name.value = user.name
+                    return context.window_manager.invoke_props_dialog(self)
+                def execute(self, context):
+                    for name, user in zip(self.entity_names, self.users):
+                        if name.select:
+                            exec("bpy.ops." + root_dot + "e_" + "_".join(user.type.lower().split()) + "('INVOKE_DEFAULT')")
+                    return {'FINISHED'}
+                def draw(self, context):
+                    layout = self.layout
+                    for name in self.entity_names:
+                        row = layout.row()
+                        row.prop(name, "select", toggle=True)
+                        row.label(name.value)
+                def check(self, context):
+                    return False
+            class Unlink(bpy.types.Operator, klass):
+                bl_label = "Unlink"
+                bl_idname = root_dot + "u_" + "_".join(name.lower().split())
+                bl_options = {'REGISTER', 'INTERNAL'}
+                @classmethod
+                def poll(cls, context):
+                    return hasattr(database, "to_be_unlinked")
+                def execute(self, context):
+                    self.set_index(context, self.entity_list.index(database.to_be_unlinked))
+                    del database.to_be_unlinked
+                    index, uilist = self.get_uilist(context)
+                    uilist.remove(index)
+                    entity = self.entity_list.pop(index)
+                    del entity.entity_list
+                    context.scene.dirty_simulator = True
+                    self.set_index(context, 0 if index == 0 and 0 < len(uilist) else index-1)
+                    return{'FINISHED'}
+            class Link(bpy.types.Operator, klass):
+                bl_idname = root_dot + "l_" + "_".join(name.lower().split())
+                bl_options = {'REGISTER', 'INTERNAL'}
+                @classmethod
+                def poll(cls, context):
+                    return hasattr(database, "to_be_linked")
+                def execute(self, context):
+                    index, uilist = self.get_uilist(context)
+                    self.index = len(uilist)
+                    uilist.add()
+                    self.set_index(context, self.index)
+                    self.entity_list.append(database.to_be_linked)
+                    self.entity_list[-1].entity_list = self.entity_list
+                    del database.to_be_linked
+                    uilist[self.index].name = self.name
+                    context.scene.dirty_simulator = True
+                    self.set_index(context, self.index)
+                    return {'FINISHED'}
+            class Menu(bpy.types.Menu, klass):
+                bl_label = name
+                bl_idname = root_dot + "m_" + "_".join(name.lower().split())
+                def draw(self, context):
+                    layout = self.layout
+                    layout.operator_context = 'INVOKE_DEFAULT'
+                    layout.operator(root_dot + "e_" + self.bl_idname[len(root_dot)+2:])
+                    layout.operator(root_dot + "s_" + self.bl_idname[len(root_dot)+2:])
+                    if self.module not in "element frame".split():
+                        layout.operator(root_dot + "d_" + self.bl_idname[len(root_dot)+2:])
+                    if self.module in "element".split():
+                        layout.operator(root_dot + "object_specifications")
+                        layout.operator(root_dot + "plot_element")
+            self.extend([Create, Edit, Duplicate, Users, Unlink, Link, Menu])
     def register(self):
         for klass in self:
             bpy.utils.register_class(klass)
@@ -251,7 +535,7 @@ class Operators(list):
             bpy.utils.unregister_class(klass)
 
 class UI(list):
-    def __init__(self, entity_tree, klass, entity_list, entity_name):
+    def __init__(self, entity_tree, klass, entity_list, module_name):
         menu = root_dot + "_".join(entity_tree[0].lower().split())
         klass.entity_list = entity_list
         self.make_list = klass.make_list
@@ -262,65 +546,96 @@ class UI(list):
                 names = [e.name for i, e in enumerate(self.entity_list) if i != index]
                 name = uilist[index].name
                 if name in names:
-                    if '.001' <= name[-4:] and name[-4:] <= '.999':
+                    if ".001" <= name[-4:] and name[-4:] <= ".999":
                         name = name[:-4]
                     if name in names:
-                        name += '.'+str(1).zfill(3)
+                        name += "." + str(1).zfill(3)
                     qty = 1
                     while name in names:
                         qty += 1
-                        name = name[:-4]+'.'+str(qty).zfill(3)
+                        name = name[:-4] + "." + str(qty).zfill(3)
                         if qty >=999:
                             raise ValueError(name)
                     uilist[index].name = name
                 self.entity_list[index].name = name
             name = bpy.props.StringProperty(update=update)
         class List(bpy.types.UIList):
-            bl_idname = entity_name
+            bl_idname = module_name
             def draw_item(self, context, layout, data, item, icon, active_data, active_property, index, flt_flag):
-                layout.prop(item, "name", text="", emboss=False, icon='OBJECT_DATAMODE')
+                layout.prop(item, "name", text="", emboss=False)
+            def filter_items(self, context, data, prop):
+                uilist = getattr(data, prop)
+                entity_list.flags = [True]*len(uilist)
+                for i, entity in enumerate(entity_list):
+                    if hasattr(entity, "consumer") or self.filter_name not in entity.name:
+                        entity_list.flags[i] = False
+                order = [i for i in range(len(uilist))]
+                if self.use_filter_sort_alpha:
+                    order.sort(key=lambda i: uilist[i].name)
+                bitflags = [b for b in map(lambda f: self.bitflag_filter_item if f else ~self.bitflag_filter_item, entity_list.flags)]
+                if self.use_filter_invert:
+                    entity_list.flags = [not f for f in entity_list.flags]
+                return bitflags, order
         class Delete(bpy.types.Operator, klass):
-            bl_idname = entity_name+".delete"
+            bl_idname = module_name + ".delete"
             bl_options = {'REGISTER', 'INTERNAL'}
             bl_label = "Delete"
-            bl_description = "Delete the selected "+entity_name
+            bl_description = "Delete the selected " + module_name
             @classmethod
             def poll(self, context):
                 index, uilist = super().get_uilist(context)
-                return len(uilist) > 0 and not self.entity_list[index].users
+                return len(uilist) > 0 and not self.entity_list[index].users and entity_list.flags[index]
             def execute(self, context):
                 index, uilist = self.get_uilist(context)
                 uilist.remove(index)
-                for link in self.entity_list[index].links:
+                entity = self.entity_list.pop(index)
+                for link in entity.links:
+                    if hasattr(link, "consumer"):
+                        del link.consumer
                     link.users -= 1
-                self.entity_list.pop(index)
-                self.set_index(context, index-1)
+                if entity.type == "Rigid offset":
+                    entity.objects[0].parent = None
+                context.scene.dirty_simulator = True
+                self.set_index(context, 0 if index == 0 and 0 < len(uilist) else index-1)
                 return{'FINISHED'}
         class Panel(bpy.types.Panel, klass):
-            bl_space_type = "VIEW_3D"
-            bl_region_type = "TOOLS"
+            bl_space_type = 'VIEW_3D'
+            bl_region_type = 'TOOLS'
             bl_category = category
-            bl_idname = "_".join([category, entity_name])
+            bl_idname = "_".join([category, module_name])
             def draw(self, context):
                 layout = self.layout
+                self.draw_panel_pre(context, layout)
                 scene = context.scene
                 row = layout.row()
-                row.template_list(entity_name, entity_name+"_list",
-                    scene, entity_name+"_uilist", scene, entity_name+"_index" )
+                row.template_list(module_name, module_name + "_list",
+                    scene, module_name + "_uilist", scene, module_name + "_index" )
                 col = row.column(align=True)
                 col.menu(menu, icon='ZOOMIN', text="")
-                col.operator(entity_name+".delete", icon='ZOOMOUT', text="")
+                col.operator(module_name + ".delete", icon='ZOOMOUT', text="")
                 index, uilist = self.get_uilist(context)
-                if 0 < len(uilist):
-                    op = col.operator(root_dot+"e_"+
-                        '_'.join(self.entity_list[index].type.lower().split()), icon='DOWNARROW_HLT', text="")
+                if 0 < len(uilist) and entity_list.flags[index]:
+                    col.menu(root_dot + "m_" +
+                        "_".join(self.entity_list[index].type.lower().split()), icon='DOWNARROW_HLT', text="")
+                self.draw_panel_post(context, layout)
         self.extend([ListItem, List, Delete, Panel])
     def register(self):
-        for cls in self:
-            bpy.utils.register_class(cls)
+        for klass in self:
+            bpy.utils.register_class(klass)
         self.make_list(self[0])
     def unregister(self):
-        for cls in self:
-            bpy.utils.unregister_class(cls)
+        for klass in self:
+            bpy.utils.unregister_class(klass)
         self.delete_list()
 
+class Bundle(list):
+    def __init__(self, tree, klass, klasses, entity_list, module_name):
+        self.append(UI(tree, klass, entity_list, module_name))
+        self.append(TreeMenu(tree))
+        self.append(Operators(klasses, entity_list))
+    def register(self):
+        for ob in self:
+            ob.register()
+    def unregister(self):
+        for ob in self:
+            ob.unregister()
