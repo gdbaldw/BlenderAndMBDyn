@@ -112,10 +112,10 @@ class InitialValue(Entity):
 
 class InitialValueOperator(Base):
     bl_label = "Initial value"
-    executable_path = bpy.props.StringProperty(name="MBDyn path", description="Path to the MBDyn executible")
-    initial_time = bpy.props.FloatProperty(name="Initial time", default=0.0, min=0.0, precision=6)
+    executable_path = bpy.props.StringProperty(name="MBDyn path", description="Path to the MBDyn executable")
+    initial_time = bpy.props.FloatProperty(name="Initial time", default=0.0, min=0.0, precision=6, description="When to start simulation (s)")
     forever = bpy.props.BoolProperty(name="Forever")
-    final_time = bpy.props.FloatProperty(name="Final time", default=10.0, min=0.0, precision=6)
+    final_time = bpy.props.FloatProperty(name="Final time", default=10.0, min=0.0, precision=6, description="When to end simulation (s)")
     general_data_name = bpy.props.EnumProperty(items=enum_general_data, name="General data")
     general_data_edit = bpy.props.BoolProperty(name="")
     set_method = bpy.props.BoolProperty(name="Set method")
