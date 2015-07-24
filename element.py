@@ -855,9 +855,9 @@ class Body(Entity):
 
 class BodyOperator(Base):
     bl_label = "Body"
-    mass = bpy.props.FloatProperty(name="Mass", description="", min=0.000001, max=9.9e10, precision=6, default=1.0)
-    matrix_name = bpy.props.EnumProperty(items=enum_matrix_3x3, name="Matrix")
-    matrix_edit = bpy.props.BoolProperty(name="")
+    mass = bpy.props.FloatProperty(name="Mass", description="Mass of the body", min=0.000001, max=9.9e10, precision=6, default=1.0)
+    matrix_name = bpy.props.EnumProperty(items=enum_matrix_3x3, name="Matrix", description="Matrix of inertia")
+    matrix_edit = bpy.props.BoolProperty(name="", description="Edit the matrix of inertia right after adding the body")
     @classmethod
     def poll(cls, context):
         return not SelectedObjects(context) or super().base_poll(cls, context, 1)
