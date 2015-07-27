@@ -103,7 +103,7 @@ for t in types:
 
 class NullDrive(Entity):
     def string(self, indent=False):
-        ret = super().indent_drives*"\t" if indent else ""
+        ret = database.drive_indenture*"\t" if indent else ""
         ret += "null"
         return ret
 
@@ -125,7 +125,7 @@ klasses[NullDriveOperator.bl_label] = NullDriveOperator
 
 class DirectDrive(Entity):
     def string(self, indent=False):
-        ret = super().indent_drives*"\t" if indent else ""
+        ret = database.drive_indenture*"\t" if indent else ""
         ret += "direct"
         return ret
 
@@ -138,7 +138,7 @@ klasses[DirectDriveOperator.bl_label] = DirectDriveOperator
 
 class UnitDrive(Entity):
     def string(self, indent=False):
-        ret = super().indent_drives*"\t" if indent else ""
+        ret = database.drive_indenture*"\t" if indent else ""
         ret += "unit"
         return ret
 
@@ -151,7 +151,7 @@ klasses[UnitDriveOperator.bl_label] = UnitDriveOperator
 
 class ConstantDrive(Entity):
     def string(self, indent=False):
-        ret = super().indent_drives*"\t" if indent else ""
+        ret = database.drive_indenture*"\t" if indent else ""
         ret += FORMAT(self.constant)
         return ret
 
@@ -174,7 +174,7 @@ klasses[ConstantDriveOperator.bl_label] = ConstantDriveOperator
 
 class TimeDrive(Entity):
     def string(self, indent=False):
-        ret = super().indent_drives*"\t" if indent else ""
+        ret = database.drive_indenture*"\t" if indent else ""
         ret += "time"
         return ret
 
@@ -187,7 +187,7 @@ klasses[TimeDriveOperator.bl_label] = TimeDriveOperator
 
 class LinearDrive(Entity):
     def string(self, indent=False):
-        ret = super().indent_drives*"\t" if indent else ""
+        ret = database.drive_indenture*"\t" if indent else ""
         ret += "cubic"
         for v in [self.constant, self.linear]:
             ret += ", " + FORMAT(v)
@@ -219,7 +219,7 @@ klasses[LinearDriveOperator.bl_label] = LinearDriveOperator
 
 class ParabolicDrive(Entity):
     def string(self, indent=False):
-        ret = super().indent_drives*"\t" if indent else ""
+        ret = database.drive_indenture*"\t" if indent else ""
         ret += "parabolic"
         for v in [self.constant, self.linear, self.parabolic]:
             ret += ", " + FORMAT(v)
@@ -255,7 +255,7 @@ klasses[ParabolicDriveOperator.bl_label] = ParabolicDriveOperator
 
 class CubicDrive(Entity):
     def string(self, indent=False):
-        ret = super().indent_drives*"\t" if indent else ""
+        ret = database.drive_indenture*"\t" if indent else ""
         ret += "cubic"
         for v in [self.constant, self.linear, self.parabolic, self.cubic]:
             ret += ", " + FORMAT(v)
@@ -295,7 +295,7 @@ klasses[CubicDriveOperator.bl_label] = CubicDriveOperator
 
 class StepDrive(Entity):
     def string(self, indent=False):
-        ret = super().indent_drives*"\t" if indent else ""
+        ret = database.drive_indenture*"\t" if indent else ""
         ret += "step"
         for v in [self.initial_time, self.step_value, self.initial_value]:
             ret += ", " + FORMAT(v)
@@ -331,7 +331,7 @@ klasses[StepDriveOperator.bl_label] = StepDriveOperator
 
 class DoubleStepDrive(Entity):
     def string(self, indent=False):
-        ret = super().indent_drives*"\t" if indent else ""
+        ret = database.drive_indenture*"\t" if indent else ""
         ret += "double step"
         for v in [self.initial_time, self.final_time, self.step_value, self.initial_value]:
             ret += ", " + FORMAT(v)
@@ -371,7 +371,7 @@ klasses[DoubleStepDriveOperator.bl_label] = DoubleStepDriveOperator
 
 class RampDrive(Entity):
     def string(self, indent=False):
-        ret = super().indent_drives*"\t" if indent else ""
+        ret = database.drive_indenture*"\t" if indent else ""
         ret += "ramp"
         for v in [self.slope, self.initial_time]:
             ret += ", " + FORMAT(v)
@@ -424,10 +424,10 @@ klasses[RampDriveOperator.bl_label] = RampDriveOperator
 
 class PiecewiseLinearDrive(Entity):
     def string(self, indent=False):
-        ret = super().indent_drives*"\t" if indent else ""
+        ret = database.drive_indenture*"\t" if indent else ""
         ret += "piecewise linear, " + FORMAT(self.N)
         for i in range(self.N):
-            ret += ",\n" + super().indent_drives*"\t" + FORMAT(self.T[i]) + ", " + FORMAT(self.X[i])
+            ret += ",\n" + database.drive_indenture*"\t" + FORMAT(self.T[i]) + ", " + FORMAT(self.X[i])
         return ret
 
 class PiecewiseLinearDriveOperator(Base):
@@ -477,7 +477,7 @@ klasses[PiecewiseLinearDriveOperator.bl_label] = PiecewiseLinearDriveOperator
 
 class SineDrive(Entity):
     def string(self, indent=False):
-        ret = super().indent_drives*"\t" if indent else ""
+        ret = database.drive_indenture*"\t" if indent else ""
         ret += "sine"
         for v in [self.initial_time, self.omega, self.amplitude]:
             ret += ", " + FORMAT(v)
@@ -538,7 +538,7 @@ klasses[SineDriveOperator.bl_label] = SineDriveOperator
 
 class CosineDrive(Entity):
     def string(self, indent=False):
-        ret = super().indent_drives*"\t" if indent else ""
+        ret = database.drive_indenture*"\t" if indent else ""
         ret += "cosine"
         for v in [self.initial_time, self.omega, self.amplitude]:
             ret += ", " + FORMAT(v)
@@ -558,7 +558,7 @@ klasses[CosineDriveOperator.bl_label] = CosineDriveOperator
 
 class TanhDrive(Entity):
     def string(self, indent=False):
-        ret = super().indent_drives*"\t" if indent else ""
+        ret = database.drive_indenture*"\t" if indent else ""
         ret += "tanh"
         for v in [self.initial_time, self.amplitude, self.slope, self.initial_value]:
             ret += ", " + FORMAT(v)
@@ -598,9 +598,9 @@ klasses[TanhDriveOperator.bl_label] = TanhDriveOperator
 
 class FourierSeriesDrive(Entity):
     def string(self, indent=False):
-        ret = super().indent_drives*"\t" if indent else ""
+        ret = database.drive_indenture*"\t" if indent else ""
         ret += "fourier series"
-        indenture = super().indent_drives*"\t"
+        indenture = database.drive_indenture*"\t"
         for v in [self.initial_time, self.omega, self.N]:
             ret += ", " + FORMAT(v)
         ret += ",\n" + indenture + FORMAT(self.A[0])
@@ -683,9 +683,9 @@ klasses[FourierSeriesDriveOperator.bl_label] = FourierSeriesDriveOperator
 
 class FrequencySweepDrive(Entity):
     def string(self, indent=False):
-        ret = super().indent_drives*"\t" if indent else ""
+        ret = database.drive_indenture*"\t" if indent else ""
         ret += "frequency sweep, " + FORMAT(self.initial_time)
-        indenture = super().indent_drives*"\t"
+        indenture = database.drive_indenture*"\t"
         ret += ",\n" + self.links[0].string(True)
         ret += ",\n" + self.links[1].string(True)
         ret += ",\n" + indenture + FORMAT(self.initial_value)
@@ -750,7 +750,7 @@ klasses[FrequencySweepDriveOperator.bl_label] = FrequencySweepDriveOperator
 
 class ExponentialDrive(Entity):
     def string(self, indent=False):
-        ret = super().indent_drives*"\t" if indent else ""
+        ret = database.drive_indenture*"\t" if indent else ""
         ret += "exponential"
         for v in [self.amplitude, self.time_constant, self.initial_time, self.initial_value]:
             ret += ", " + FORMAT(v)
@@ -790,7 +790,7 @@ klasses[ExponentialDriveOperator.bl_label] = ExponentialDriveOperator
 
 class RandomDrive(Entity):
     def string(self, indent=False):
-        ret = super().indent_drives*"\t" if indent else ""
+        ret = database.drive_indenture*"\t" if indent else ""
         ret += "random"
         for v in [self.amplitude, self.mean, self.initial_time]:
             ret += ", " + FORMAT(v)
@@ -860,7 +860,7 @@ klasses[RandomDriveOperator.bl_label] = RandomDriveOperator
 
 class MeterDrive(Entity):
     def string(self, indent=False):
-        ret = super().indent_drives*"\t" if indent else ""
+        ret = database.drive_indenture*"\t" if indent else ""
         ret += "meter, " + FORMAT(self.initial_time)
         if self.forever:
             ret += ", forever"
@@ -907,7 +907,7 @@ klasses[MeterDriveOperator.bl_label] = MeterDriveOperator
 
 class StringDrive(Entity):
     def string(self, indent=False):
-        ret = super().indent_drives*"\t" if indent else ""
+        ret = database.drive_indenture*"\t" if indent else ""
         ret += "string, \"" + self.expression_string + "\""
         return ret
 
@@ -930,7 +930,7 @@ klasses[StringDriveOperator.bl_label] = StringDriveOperator
 
 class MultDrive(Entity):
     def string(self, indent=False):
-        ret = super().indent_drives*"\t" if indent else ""
+        ret = database.drive_indenture*"\t" if indent else ""
         ret += "mult"
         ret += ",\n" + self.links[0].string(True)
         ret += ",\n" + self.links[1].string(True)
@@ -968,7 +968,7 @@ klasses[MultDriveOperator.bl_label] = MultDriveOperator
 
 class NodeDrive(Entity):
     def string(self, indent=False):
-        ret = super().indent_drives*"\t" if indent else ""
+        ret = database.drive_indenture*"\t" if indent else ""
         ret += "node"
         if self.objects[0] in database.node:
             ob = self.objects[0]
@@ -1022,7 +1022,7 @@ klasses[NodeDriveOperator.bl_label] = NodeDriveOperator
 
 class ElementDrive(Entity):
     def string(self, indent=False):
-        ret = super().indent_drives*"\t" if indent else ""
+        ret = database.drive_indenture*"\t" if indent else ""
         ret += "element, " + FORMAT(database.element.index(self.links[0])) + ", " + self.links[0].type
         if self.symbolic_name:
             ret += ", string, \"" + selfsymbolic_name + "\""
@@ -1067,7 +1067,7 @@ klasses[ElementDriveOperator.bl_label] = ElementDriveOperator
 
 class DriveDrive(Entity):
     def string(self, indent=False):
-        ret = super().indent_drives*"\t" if indent else ""
+        ret = database.drive_indenture*"\t" if indent else ""
         ret += "drive"
         ret += ",\n" + self.links[0].string(True)
         ret += ",\n" + self.links[1].string(True)
@@ -1105,10 +1105,10 @@ klasses[DriveDriveOperator.bl_label] = DriveDriveOperator
 
 class ArrayDrive(Entity):
     def string(self, indent=False):
-        ret = super().indent_drives*"\t" if indent else ""
+        ret = database.drive_indenture*"\t" if indent else ""
         ret += "array, " + FORMAT(self.N)
         for i in range(self.N):
-            ret += ",\n" + self.links[i].string(True)
+            ret += ",\n\t" + self.links[i].string(True)
         return ret
 
 class ArrayDriveOperator(Base):

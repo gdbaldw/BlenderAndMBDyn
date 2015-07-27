@@ -375,9 +375,7 @@ class Database(Common):
                 if driver.users:
                     driver.write(f)
             f.write("end: drivers;\n")
-        if self.element:
-            self.element[0].indent_drives *= 0
-            self.element[0].indent_drives += 1
+        self.drive_indenture = 1
         drive_callers = [drive for drive in self.drive_callers if drive.users]
         if drive_callers:
             f.write("\n")
@@ -392,8 +390,7 @@ class Database(Common):
             for function in functions:
                 function.write(f)
         if self.element:
-            self.element[0].indent_drives *= 0
-            self.element[0].indent_drives += 2
+            self.drive_indenture = 2
             f.write("\nbegin: elements;\n")
             try:
                 for element_type in aerodynamic_types + beam_types + ["Body"] + force_types + genel_types + joint_types + ["Rotor"] + environment_types + ["Driven"]:
@@ -404,3 +401,4 @@ class Database(Common):
                 print(e)
                 f.write(str(e) + "\n")
             f.write("end: elements;\n")
+        del self.drive_indenture

@@ -159,7 +159,6 @@ class BPY:
         del bpy.types.Object.mbdyn_name
 
 class Entity(Common):
-    indent_drives = 1
     def __init__(self, name):
         self.type = name
         self.users = 0

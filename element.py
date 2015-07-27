@@ -42,7 +42,7 @@ else:
 
 types = aerodynamic_types + beam_types + ["Body"] + force_types + genel_types + joint_types + environment_types + ["Driven"] + node_types
 
-tree = ["Add Structure",
+tree = ["Add Element",
     ["Aerodynamic", aerodynamic_types,
     "Beam", beam_types,
     ("Body", 1),
@@ -55,7 +55,7 @@ tree = ["Add Structure",
     ]]
 
 class Base(Operator):
-    bl_label = "Structure"
+    bl_label = "Element"
     edit_object_specifications = bpy.props.BoolProperty(default=False)
     exclusive = False
     N_objects = 2
@@ -654,7 +654,7 @@ class TotalJoint(Joint):
             else:
                 text.write(", inactive")
         text.write(", component")
-        super().indent_drives += 2
+        database.drive_indenture += 2
         for i, b in enumerate([self.displacement_x, self.displacement_y, self.displacement_z]):
             if b:
                 text.write(",\n" + self.links[i].string(True))
@@ -672,7 +672,7 @@ class TotalJoint(Joint):
                 text.write(",\n" + self.links[3+i].string(True))
             else:
                 text.write(",\n\t\t\t\tinactive")
-        super().indent_drives -= 2
+        database.drive_indenture -= 2
         text.write(";\n")
     def remesh(self):
         Sphere(self.objects[0])
@@ -960,8 +960,9 @@ class GravityOperator(Base):
     drive_name = bpy.props.EnumProperty(items=enum_drive, name="Drive")
     drive_edit = bpy.props.BoolProperty(name="")
     @classmethod
-    def poll(self, context):
-        return not database.element.filter("Gravity")
+    def poll(cls, context):
+        print(cls.bl_idname)
+        return cls.bl_idname.startswith(root_dot+"e_") or not database.element.filter("Gravity")
     def prereqs(self, context):
         self.matrix_exists(context, "3x1")
         self.drive_exists(context)
