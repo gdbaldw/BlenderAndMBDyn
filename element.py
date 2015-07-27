@@ -149,7 +149,7 @@ class StructuralForce(Entity):
 class ForceBase(Base):
     orientation = bpy.props.EnumProperty(items=[("follower", "Follower", ""), ("absolute", "Absolute", "")], name="Orientation", default="follower")
     drive_name = bpy.props.EnumProperty(items=enum_drive, name="Drive")
-    drive_edit = bpy.props.BoolProperty(name="")
+    drive_edit = bpy.props.BoolProperty(name="", description="Edit the drive")
     def prereqs(self, context):
         self.drive_exists(context)
         self.sufficient_objects(context)
