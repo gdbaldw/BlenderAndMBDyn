@@ -153,7 +153,7 @@ class LinearElasticGenericOperator(Base):
     stiffness = bpy.props.FloatProperty(name="Stiffness", description="", min=0.000001, max=9.9e10, precision=6, default=1.0)
     stiffness_matrix_3x3_name = bpy.props.EnumProperty(items=enum_matrix_3x3, name="Stiffness")
     stiffness_matrix_6x6_name = bpy.props.EnumProperty(items=enum_matrix_6x6, name="Stiffness")
-    stiffness_matrix_edit = bpy.props.BoolProperty(name="")
+    stiffness_matrix_edit = bpy.props.BoolProperty(name="", description="Edit the stiffness matrix")
     @classmethod
     def poll(cls, context):
         return True
@@ -207,7 +207,7 @@ class LinearElasticGenericAxialTorsionCouplingOperator(Base):
     dimensions = bpy.props.EnumProperty(items=[("6D", "6D", "")], name="Dimension(s)")
     coupling_coefficient = bpy.props.FloatProperty(name="Coupling coefficient", description="", min=0.000001, max=9.9e10, precision=6, default=1.0)
     stiffness_matrix_6x1_name = bpy.props.EnumProperty(items=enum_matrix_6x1, name="Stiffness")
-    stiffness_matrix_edit = bpy.props.BoolProperty(name="")
+    stiffness_matrix_edit = bpy.props.BoolProperty(name="", description="Edit the stiffness matrix")
     @classmethod
     def poll(cls, context):
         return True
@@ -384,7 +384,7 @@ class LinearElasticBistopOperator(Base):
     stiffness = bpy.props.FloatProperty(name="Stiffness", description="", min=0.000001, max=9.9e10, precision=6, default=1.0)
     stiffness_matrix_3x3_name = bpy.props.EnumProperty(items=enum_matrix_3x3, name="Stiffness")
     stiffness_matrix_6x6_name = bpy.props.EnumProperty(items=enum_matrix_6x6, name="Stiffness")
-    stiffness_matrix_edit = bpy.props.BoolProperty(name="")
+    stiffness_matrix_edit = bpy.props.BoolProperty(name="", description="Edit the stiffness matrix")
     initial_status = bpy.props.EnumProperty(items=[("active", "Active", ""), ("inactive", "Inactive", "")], name="Initial status")
     activating_condition_name = bpy.props.EnumProperty(items=enum_drive, name="Activating condition")
     activating_condition_edit = bpy.props.BoolProperty(name="")
@@ -534,7 +534,7 @@ class IsotropicHardeningElasticOperator(Base):
     stiffness = bpy.props.FloatProperty(name="Stiffness", description="", min=0.000001, max=9.9e10, precision=6, default=1.0)
     stiffness_matrix_3x3_name = bpy.props.EnumProperty(items=enum_matrix_3x3, name="Stiffness")
     stiffness_matrix_6x6_name = bpy.props.EnumProperty(items=enum_matrix_6x6, name="Stiffness")
-    stiffness_matrix_edit = bpy.props.BoolProperty(name="")
+    stiffness_matrix_edit = bpy.props.BoolProperty(name="", description="Edit the stiffness matrix")
     reference_strain = bpy.props.FloatProperty(name="Reference strain", description="", min=0.000001, max=9.9e10, precision=6, default=1.0)
     use_linear_stiffness = bpy.props.BoolProperty("Use linear stiffness", default=False)
     linear_stiffness = bpy.props.FloatProperty(name="Reference strain", description="", min=0.000001, max=9.9e10, precision=6, default=1.0)
@@ -850,7 +850,7 @@ class LinearViscoelasticGenericOperator(Base):
     stiffness = bpy.props.FloatProperty(name="Stiffness", description="", min=0.000001, max=9.9e10, precision=6, default=1.0)
     stiffness_matrix_3x3_name = bpy.props.EnumProperty(items=enum_matrix_3x3, name="Stiffness")
     stiffness_matrix_6x6_name = bpy.props.EnumProperty(items=enum_matrix_6x6, name="Stiffness")
-    stiffness_matrix_edit = bpy.props.BoolProperty(name="")
+    stiffness_matrix_edit = bpy.props.BoolProperty(name="", description="Edit the stiffness matrix")
     proportional = bpy.props.BoolProperty(name="Proportional", default=False)
     factor = bpy.props.FloatProperty(name="Factor", description="", min=0.000001, max=9.9e10, precision=6, default=1.0)
     viscosity = bpy.props.FloatProperty(name="Viscosity", description="", min=0.000001, max=9.9e10, precision=6, default=1.0)
@@ -956,7 +956,7 @@ class LinearTimeVariantViscoelasticGenericOperator(Base):
     stiffness = bpy.props.FloatProperty(name="Stiffness", description="", min=0.000001, max=9.9e10, precision=6, default=1.0)
     stiffness_matrix_3x3_name = bpy.props.EnumProperty(items=enum_matrix_3x3, name="Stiffness")
     stiffness_matrix_6x6_name = bpy.props.EnumProperty(items=enum_matrix_6x6, name="Stiffness")
-    stiffness_matrix_edit = bpy.props.BoolProperty(name="")
+    stiffness_matrix_edit = bpy.props.BoolProperty(name="", description="Edit the stiffness matrix")
     proportional = bpy.props.BoolProperty(name="Proportional", default=False)
     factor = bpy.props.FloatProperty(name="Factor", description="", min=0.000001, max=9.9e10, precision=6, default=1.0)
     viscosity = bpy.props.FloatProperty(name="Viscosity", description="", min=0.000001, max=9.9e10, precision=6, default=1.0)
@@ -1056,7 +1056,7 @@ class LinearViscoelasticGenericAxialTorsionCouplingOperator(Base):
     dimensions = bpy.props.EnumProperty(items=[("6D", "6D", "")], name="Dimension(s)")
     coupling_coefficient = bpy.props.FloatProperty(name="Coupling coefficient", description="", min=0.000001, max=9.9e10, precision=6, default=1.0)
     stiffness_matrix_6x1_name = bpy.props.EnumProperty(items=enum_matrix_6x1, name="Stiffness")
-    stiffness_matrix_edit = bpy.props.BoolProperty(name="")
+    stiffness_matrix_edit = bpy.props.BoolProperty(name="", description="Edit the stiffness matrix")
     proportional = bpy.props.BoolProperty(name="Proportional", default=False)
     factor = bpy.props.FloatProperty(name="Factor", description="", min=0.000001, max=9.9e10, precision=6, default=1.0)
     viscosity_matrix_6x1_name = bpy.props.EnumProperty(items=enum_matrix_6x1, name="Viscosity")
@@ -1367,7 +1367,7 @@ class LinearViscoelasticBistopOperator(Base):
     stiffness = bpy.props.FloatProperty(name="Stiffness", description="", min=0.000001, max=9.9e10, precision=6, default=1.0)
     stiffness_matrix_3x3_name = bpy.props.EnumProperty(items=enum_matrix_3x3, name="Stiffness")
     stiffness_matrix_6x6_name = bpy.props.EnumProperty(items=enum_matrix_6x6, name="Stiffness")
-    stiffness_matrix_edit = bpy.props.BoolProperty(name="")
+    stiffness_matrix_edit = bpy.props.BoolProperty(name="", description="Edit the stiffness matrix")
     viscosity = bpy.props.FloatProperty(name="Viscosity", description="", min=0.000001, max=9.9e10, precision=6, default=1.0)
     viscosity_matrix_3x3_name = bpy.props.EnumProperty(items=enum_matrix_3x3, name="Viscosity")
     viscosity_matrix_6x6_name = bpy.props.EnumProperty(items=enum_matrix_6x6, name="Viscosity")
