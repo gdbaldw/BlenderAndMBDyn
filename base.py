@@ -563,13 +563,17 @@ class UI(list):
             name = bpy.props.StringProperty(update=update)
         class List(bpy.types.UIList):
             bl_idname = module_name
+            types = bpy.props.EnumProperty(items=[("All", "All", ""), ], name="", description="Show only items of this type", default="All")
+            use_filter_consumed = bpy.props.BoolProperty(name="", description="Show consumed items", default=False)
+            filter_name = bpy.props.StringProperty(name="", description="Only show items containing this string")
             def draw_item(self, context, layout, data, item, icon, active_data, active_property, index, flt_flag):
                 layout.prop(item, "name", text="", emboss=False)
             def filter_items(self, context, data, prop):
                 uilist = getattr(data, prop)
                 entity_list.flags = [True]*len(uilist)
                 for i, entity in enumerate(entity_list):
-                    if hasattr(entity, "consumer") or self.filter_name not in entity.name:
+                    if ((not self.use_filter_consumed and hasattr(entity, "consumer"))
+                        or self.filter_name not in entity.name):
                         entity_list.flags[i] = False
                 order = [i for i in range(len(uilist))]
                 if self.use_filter_sort_alpha:
@@ -578,6 +582,20 @@ class UI(list):
                 if self.use_filter_invert:
                     entity_list.flags = [not f for f in entity_list.flags]
                 return bitflags, order
+            def draw_filter(self, context, layout):
+                row = layout.row()
+                align = row.row(True)
+                column = align.column(True)
+                colrow = column.row(True)
+                colrow.prop(self, "filter_name", text="")
+                colrow.prop(self, "use_filter_invert", icon_only=True, icon='ZOOM_IN')
+                colrow = column.row(True)
+                colrow.prop(self, "types")
+                if self.bl_idname == "element":
+                    colrow.prop(self, "use_filter_consumed", icon_only=True, icon='PLUS')
+                align = row.column(True)
+                align.prop(self, "use_filter_sort_alpha", icon_only=True)
+                align.prop(self, "use_filter_sort_reverse", icon_only=True, icon='TRIA_DOWN')
         class Delete(bpy.types.Operator, klass):
             bl_idname = module_name + ".delete"
             bl_options = {'REGISTER', 'INTERNAL'}

@@ -39,6 +39,7 @@ else:
     from tempfile import TemporaryFile
     from pickle import Pickler
     from io import StringIO
+    from collections import OrderedDict
 
 types = aerodynamic_types + beam_types + ["Body"] + force_types + genel_types + joint_types + environment_types + ["Driven"] + node_types
 
@@ -53,6 +54,26 @@ tree = ["Add Element",
     "Driven",
     "Node", node_types,
     ]]
+
+"""test = list()
+e = iter(tree[1])
+
+def leaf_maker(base, branch):
+    is_a_leaf = OrderedDict()
+    for i in range(len(branch)):
+        if isinstance(branch[i], list):
+            assert isinstance(branch[i-1], (str, tuple))
+            is_a_leaf[branch[i-1]] = False
+            is_a_leaf.update(leaf_maker(branch[i-1], branch[i]))
+        else:
+            assert isinstance(branch[i], (str, tuple))
+            is_a_leaf[branch[i]] = True
+    return is_a_leaf
+        
+test_dict = OrderedDict()
+test_dict.update(leaf_maker(tree[0], tree[1]))
+print(test_dict)
+"""
 
 class Base(Operator):
     bl_label = "Element"
