@@ -51,7 +51,7 @@ control_tree = ["Control", control_types]
 
 types = problem_types + control_types
 
-tree = ["Definition tree", problem_tree + control_tree]
+tree = ["Add definition", problem_tree + control_tree]
 
 klasses = dict()
 
@@ -267,7 +267,7 @@ class GeneralProblemOperator(Base):
             if self.set_factor_max_iterations:
                 row.prop(self, "factor_max_iterations")
         elif self.strategy == "change":
-            self.draw_link(layout, "time_step_pattern_name", "time_step_pattern_edit")
+            self.draw_link(layout, "time_step_pattern_name", "time_step_pattern_edit", "drive")
         if self.strategy != "no change":
             layout.prop(self, "min_time_step")
             row = layout.row()
@@ -365,11 +365,11 @@ class MSHopeOperator(Base):
     def draw(self, context):
         self.basis = self.set_algebraic_radius
         layout = self.layout
-        self.draw_link(layout, "differential_radius_drive_name", "differential_radius_drive_edit")
+        self.draw_link(layout, "differential_radius_drive_name", "differential_radius_drive_edit", "drive")
         row = layout.row()
         row.prop(self, "set_algebraic_radius")
         if self.set_algebraic_radius:
-            self.draw_link(row, "algebraic_radius_drive_name", "algebraic_radius_drive_edit")
+            self.draw_link(row, "algebraic_radius_drive_name", "algebraic_radius_drive_edit", "drive")
     def check(self, context):
         return self.basis != self.set_algebraic_radius
 
@@ -421,7 +421,7 @@ class ThirdOrderOperator(Base):
         row = layout.row()
         row.prop(self, "ad_hoc")
         if not self.ad_hoc:
-            self.draw_link(row, "differential_radius_drive_name", "differential_radius_drive_edit")
+            self.draw_link(row, "differential_radius_drive_name", "differential_radius_drive_edit", "drive")
     def check(self, context):
         return self.basis != self.ad_hoc
     def create_entity(self):
@@ -1186,7 +1186,7 @@ class DummyStepsOperator(Base):
         layout.prop(self, "dummy_steps_max_iterations")
         layout.prop(self, "dummy_steps_number")
         layout.prop(self, "dummy_steps_ratio")
-        self.draw_link(layout, "dummy_steps_method_name", "dummy_steps_method_edit")
+        self.draw_link(layout, "dummy_steps_method_name", "dummy_steps_method_edit", "definition")
     def create_entity(self):
         return DummySteps(self.name)
 
@@ -1590,7 +1590,7 @@ class JobControlOperator(Base):
             if not self.forever:
                 row.prop(self, "timeout")
         layout.prop(self, "default_orientation")
-        self.draw_link(layout, "meter_drive_name", "meter_drive_edit")
+        self.draw_link(layout, "meter_drive_name", "meter_drive_edit", "drive")
         layout.prop(self, "output_precision")
         layout.prop(self, "static_model")
     def check(self, context):

@@ -126,7 +126,7 @@ class ModlugreOperator(Base):
         row.prop(self, "plane_hinge")
         if self.plane_hinge:
             row.prop(self, "radius")
-        self.draw_link(layout, "function_name", "function_edit")
+        self.draw_link(layout, "function_name", "function_edit", "function")
     def create_entity(self):
         return Modlugre(self.name)
 

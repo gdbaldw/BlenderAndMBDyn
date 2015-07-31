@@ -274,53 +274,53 @@ class InitialValueOperator(Base):
         row.prop(self, "forever")
         if not self.forever:
             row.prop(self, "final_time")
-        self.draw_link(layout, "general_data_name", "general_data_edit")
+        self.draw_link(layout, "general_data_name", "general_data_edit", "definition")
         row = layout.row()
         row.prop(self, "set_method")
         if self.set_method:
-            self.draw_link(row, "method_name", "method_edit")
+            self.draw_link(row, "method_name", "method_edit", "definition")
         row = layout.row()
         row.prop(self, "set_nonlinear_solver")
         if self.set_nonlinear_solver:
-            self.draw_link(row, "nonlinear_solver_name", "nonlinear_solver_edit")
+            self.draw_link(row, "nonlinear_solver_name", "nonlinear_solver_edit", "definition")
         row = layout.row()
         row.prop(self, "set_eigenanalysis")
         if self.set_eigenanalysis:
-            self.draw_link(row, "eigenanalysis_name", "eigenanalysis_edit")
+            self.draw_link(row, "eigenanalysis_name", "eigenanalysis_edit", "definition")
         row = layout.row()
         row.prop(self, "set_abort_after")
         if self.set_abort_after:
-            self.draw_link(row, "abort_after_name", "abort_after_edit")
+            self.draw_link(row, "abort_after_name", "abort_after_edit", "definition")
         row = layout.row()
         row.prop(self, "set_linear_solver")
         if self.set_linear_solver:
-            self.draw_link(row, "linear_solver_name", "linear_solver_edit")
+            self.draw_link(row, "linear_solver_name", "linear_solver_edit", "definition")
         row = layout.row()
         row.prop(self, "set_dummy_steps")
         if self.set_dummy_steps:
-            self.draw_link(row, "dummy_steps_name", "dummy_steps_edit")
-        self.draw_link(layout, "output_data_name", "output_data_edit")
+            self.draw_link(row, "dummy_steps_name", "dummy_steps_edit", "definition")
+        self.draw_link(layout, "output_data_name", "output_data_edit", "definition")
         row = layout.row()
         row.prop(self, "set_real_time")
         if self.set_real_time:
-            self.draw_link(row, "real_time_name", "real_time_edit")
+            self.draw_link(row, "real_time_name", "real_time_edit", "definition")
         row = layout.row()
         row.prop(self, "set_assembly")
         if self.set_assembly:
-            self.draw_link(row, "assembly_name", "assembly_edit")
-        self.draw_link(layout, "job_control_name", "job_control_edit")
+            self.draw_link(row, "assembly_name", "assembly_edit", "definition")
+        self.draw_link(layout, "job_control_name", "job_control_edit", "definition")
         row = layout.row()
         row.prop(self, "set_default_output")
         if self.set_default_output:
-            self.draw_link(row, "default_output_name", "default_output_edit")
+            self.draw_link(row, "default_output_name", "default_output_edit", "definition")
         row = layout.row()
         row.prop(self, "set_default_aerodynamic_output")
         if self.set_default_aerodynamic_output:
-            self.draw_link(row, "default_aerodynamic_output_name", "default_aerodynamic_output_edit")
+            self.draw_link(row, "default_aerodynamic_output_name", "default_aerodynamic_output_edit", "definition")
         row = layout.row()
         row.prop(self, "set_default_beam_output")
         if self.set_default_beam_output:
-            self.draw_link(row, "default_beam_output_name", "default_beam_output_edit")
+            self.draw_link(row, "default_beam_output_name", "default_beam_output_edit", "definition")
     def check(self, context):
         return self.basis != (self.forever, self.set_method, self.set_nonlinear_solver, self.set_eigenanalysis, self.set_abort_after, self.set_linear_solver, self.set_dummy_steps, self.set_real_time, self.set_assembly, self.set_default_output, self.set_default_aerodynamic_output, self.set_default_beam_output)
     def create_entity(self):

@@ -412,8 +412,8 @@ class BinaryOperator(Base):
         self.entity.increment_links()
     def draw(self, context):
         layout = self.layout
-        self.draw_link(layout, "f1_name", "f1_edit")
-        self.draw_link(layout, "f2_name", "f2_edit")
+        self.draw_link(layout, "f1_name", "f1_edit", "function")
+        self.draw_link(layout, "f2_name", "f2_edit", "function")
 
 class SumOperator(BinaryOperator):
     bl_label = "Sum"

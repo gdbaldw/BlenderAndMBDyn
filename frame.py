@@ -127,8 +127,8 @@ class FrameOperator(Base):
         self.entity.increment_links()
     def draw(self, context):
         layout = self.layout
-        self.draw_link(layout, "linear_velocity_name", "linear_velocity_edit")
-        self.draw_link(layout, "angular_velocity_name", "angular_velocity_edit")
+        self.draw_link(layout, "linear_velocity_name", "linear_velocity_edit", "matrix")
+        self.draw_link(layout, "angular_velocity_name", "angular_velocity_edit", "matrix")
     def create_entity(self):
         return Frame(self.name)
 

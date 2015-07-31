@@ -735,8 +735,8 @@ class FrequencySweepDriveOperator(Base):
         layout = self.layout
         layout.prop(self, "initial_time")
         layout.prop(self, "initial_value")
-        self.draw_link(layout, "angular_velocity_drive_name", "angular_velocity_drive_edit")
-        self.draw_link(layout, "amplitude_drive_name", "amplitude_drive_edit")
+        self.draw_link(layout, "angular_velocity_drive_name", "angular_velocity_drive_edit", "drive")
+        self.draw_link(layout, "amplitude_drive_name", "amplitude_drive_edit", "drive")
         layout.prop(self, "forever")
         if not self.forever:
             layout.prop(self, "final_time")
@@ -959,8 +959,8 @@ class MultDriveOperator(Base):
         self.entity.increment_links()
     def draw(self, context):
         layout = self.layout
-        self.draw_link(layout, "drive_1_name", "drive_1_edit")
-        self.draw_link(layout, "drive_2_name", "drive_2_edit")
+        self.draw_link(layout, "drive_1_name", "drive_1_edit", "drive")
+        self.draw_link(layout, "drive_2_name", "drive_2_edit", "drive")
     def create_entity(self):
         return MultDrive(self.name)
 
@@ -1014,7 +1014,7 @@ class NodeDriveOperator(Base):
     def draw(self, context):
         layout = self.layout
         layout.prop(self, "symbolic_name")
-        self.draw_link(layout, "drive_name", "drive_edit")
+        self.draw_link(layout, "drive_name", "drive_edit", "drive")
     def create_entity(self):
         return NodeDrive(self.name)
 
@@ -1059,7 +1059,7 @@ class ElementDriveOperator(Base):
         layout = self.layout
         self.draw_link(layout, "element_name", "element_edit")
         layout.prop(self, "symbolic_name")
-        self.draw_link(layout, "drive_name", "drive_edit")
+        self.draw_link(layout, "drive_name", "drive_edit", "drive")
     def create_entity(self):
         return ElementDrive(self.name)
 
@@ -1096,8 +1096,8 @@ class DriveDriveOperator(Base):
         self.entity.increment_links()
     def draw(self, context):
         layout = self.layout
-        self.draw_link(layout, "drive_1_name", "drive_1_edit")
-        self.draw_link(layout, "drive_2_name", "drive_2_edit")
+        self.draw_link(layout, "drive_1_name", "drive_1_edit", "drive")
+        self.draw_link(layout, "drive_2_name", "drive_2_edit", "drive")
     def create_entity(self):
         return DriveDrive(self.name)
 

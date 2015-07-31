@@ -188,9 +188,9 @@ class LinearElasticGenericOperator(Base):
         if self.dimensions == "1D":
             layout.prop(self, "stiffness")
         elif self.dimensions == "3D":
-            self.draw_link(layout, "stiffness_matrix_3x3_name", "stiffness_matrix_edit")
+            self.draw_link(layout, "stiffness_matrix_3x3_name", "stiffness_matrix_edit", "matrix")
         else:
-            self.draw_link(layout, "stiffness_matrix_6x6_name", "stiffness_matrix_edit")
+            self.draw_link(layout, "stiffness_matrix_6x6_name", "stiffness_matrix_edit", "matrix")
     def check(self, context):
         return self.basis != self.dimensions
     def create_entity(self):
@@ -230,7 +230,7 @@ class LinearElasticGenericAxialTorsionCouplingOperator(Base):
         layout = self.layout
         self.draw_dimensions(layout)
         layout.prop(self, "coupling_coefficient")
-        self.draw_link(layout, "stiffness_matrix_6x1_name", "stiffness_matrix_edit")
+        self.draw_link(layout, "stiffness_matrix_6x1_name", "stiffness_matrix_edit", "matrix")
     def create_entity(self):
         return LinearElasticGenericAxialTorsionCoupling(self.name)
 
@@ -298,7 +298,7 @@ class CubicElasticGenericOperator(Base):
             layout.prop(self, "stiffness_3")
         else:
             for c in "123":
-                self.draw_link(layout, "stiffness_matrix_3x1_" + c + "_name", "stiffness_matrix_3x1_" + c + "_edit")
+                self.draw_link(layout, "stiffness_matrix_3x1_" + c + "_name", "stiffness_matrix_3x1_" + c + "_edit", "matrix")
     def check(self, context):
         return self.basis != self.dimensions
     def create_entity(self):
@@ -431,12 +431,12 @@ class LinearElasticBistopOperator(Base):
         if self.dimensions == "1D":
             layout.prop(self, "stiffness")
         elif self.dimensions == "3D":
-            self.draw_link(layout, "stiffness_matrix_3x3_name", "stiffness_matrix_edit")
+            self.draw_link(layout, "stiffness_matrix_3x3_name", "stiffness_matrix_edit", "matrix")
         else:
-            self.draw_link(layout, "stiffness_matrix_6x6_name", "stiffness_matrix_edit")
+            self.draw_link(layout, "stiffness_matrix_6x6_name", "stiffness_matrix_edit", "matrix")
         layout.prop(self, "initial_status")
         for s in "activating deactivating".split():
-            self.draw_link(layout, s + "_condition_name", s + "_condition_edit")
+            self.draw_link(layout, s + "_condition_name", s + "_condition_edit", "drive")
     def check(self, context):
         return self.basis != self.dimensions
     def create_entity(self):
@@ -506,7 +506,7 @@ class DoubleLinearElasticOperator(Base):
             layout.prop(self, "stiffness_2")
         else:
             for c in "12":
-                self.draw_link(layout, "stiffness_matrix_3x1_" + c + "_name", "stiffness_matrix_3x1_" + c + "_edit")
+                self.draw_link(layout, "stiffness_matrix_3x1_" + c + "_name", "stiffness_matrix_3x1_" + c + "_edit", "matrix")
         layout.prop(self, "upper_strain")
         layout.prop(self, "lower_strain")
     def check(self, context):
@@ -578,9 +578,9 @@ class IsotropicHardeningElasticOperator(Base):
         if self.dimensions == "1D":
             layout.prop(self, "stiffness")
         elif self.dimensions == "3D":
-            self.draw_link(layout, "stiffness_matrix_3x3_name", "stiffness_matrix_edit")
+            self.draw_link(layout, "stiffness_matrix_3x3_name", "stiffness_matrix_edit", "matrix")
         else:
-            self.draw_link(layout, "stiffness_matrix_6x6_name", "stiffness_matrix_edit")
+            self.draw_link(layout, "stiffness_matrix_6x6_name", "stiffness_matrix_edit", "matrix")
         layout.prop(self, "reference_strain")
         layout.prop(self, "use_linear_stiffness")
         if self.use_linear_stiffness:
@@ -622,7 +622,7 @@ class ScalarFunctionElasticIsotropicOperator(Base):
     def draw(self, context):
         layout = self.layout
         self.draw_dimensions(layout)
-        self.draw_link(layout, "function_name", "function_edit")
+        self.draw_link(layout, "function_name", "function_edit", "function")
     def create_entity(self):
         return ScalarFunctionElasticIsotropic(self.name)
 
@@ -763,9 +763,9 @@ class LinearViscousGenericOperator(Base):
         if self.dimensions == "1D":
             layout.prop(self, "viscosity")
         elif self.dimensions == "3D":
-            self.draw_link(layout, "viscosity_matrix_3x3_name", "viscosity_matrix_edit")
+            self.draw_link(layout, "viscosity_matrix_3x3_name", "viscosity_matrix_edit", "matrix")
         else:
-            self.draw_link(layout, "viscosity_matrix_6x6_name", "viscosity_matrix_edit")
+            self.draw_link(layout, "viscosity_matrix_6x6_name", "viscosity_matrix_edit", "matrix")
     def check(self, context):
         return self.basis != self.dimensions
     def create_entity(self):
@@ -907,9 +907,9 @@ class LinearViscoelasticGenericOperator(Base):
         if self.dimensions == "1D":
             layout.prop(self, "stiffness")
         elif self.dimensions == "3D":
-            self.draw_link(layout, "stiffness_matrix_3x3_name", "stiffness_matrix_edit")
+            self.draw_link(layout, "stiffness_matrix_3x3_name", "stiffness_matrix_edit", "matrix")
         else:
-            self.draw_link(layout, "stiffness_matrix_6x6_name", "stiffness_matrix_edit")
+            self.draw_link(layout, "stiffness_matrix_6x6_name", "stiffness_matrix_edit", "matrix")
         row = layout.row()
         row.prop(self, "proportional")
         if self.proportional:
@@ -918,9 +918,9 @@ class LinearViscoelasticGenericOperator(Base):
             if self.dimensions == "1D":
                 layout.prop(self, "viscosity")
             elif self.dimensions == "3D":
-                self.draw_link(layout, "viscosity_matrix_3x3_name", "viscosity_matrix_edit")
+                self.draw_link(layout, "viscosity_matrix_3x3_name", "viscosity_matrix_edit", "matrix")
             else:
-                self.draw_link(layout, "viscosity_matrix_6x6_name", "viscosity_matrix_edit")
+                self.draw_link(layout, "viscosity_matrix_6x6_name", "viscosity_matrix_edit", "matrix")
     def check(self, context):
         return self.basis != (self.dimensions, self.proportional)
     def create_entity(self):
@@ -1017,10 +1017,10 @@ class LinearTimeVariantViscoelasticGenericOperator(Base):
         if self.dimensions == "1D":
             layout.prop(self, "stiffness")
         elif self.dimensions == "3D":
-            self.draw_link(layout, "stiffness_matrix_3x3_name", "stiffness_matrix_edit")
+            self.draw_link(layout, "stiffness_matrix_3x3_name", "stiffness_matrix_edit", "matrix")
         else:
-            self.draw_link(layout, "stiffness_matrix_6x6_name", "stiffness_matrix_edit")
-        self.draw_link(layout, "stiffness_scale_name", "stiffness_scale_edit")
+            self.draw_link(layout, "stiffness_matrix_6x6_name", "stiffness_matrix_edit", "matrix")
+        self.draw_link(layout, "stiffness_scale_name", "stiffness_scale_edit", "drive")
         row = layout.row()
         row.prop(self, "proportional")
         if self.proportional:
@@ -1029,10 +1029,10 @@ class LinearTimeVariantViscoelasticGenericOperator(Base):
             if self.dimensions == "1D":
                 layout.prop(self, "viscosity")
             elif self.dimensions == "3D":
-                self.draw_link(layout, "viscosity_matrix_3x3_name", "viscosity_matrix_edit")
+                self.draw_link(layout, "viscosity_matrix_3x3_name", "viscosity_matrix_edit", "matrix")
             else:
-                self.draw_link(layout, "viscosity_matrix_6x6_name", "viscosity_matrix_edit")
-        self.draw_link(layout, "viscosity_scale_name", "viscosity_scale_edit")
+                self.draw_link(layout, "viscosity_matrix_6x6_name", "viscosity_matrix_edit", "matrix")
+        self.draw_link(layout, "viscosity_scale_name", "viscosity_scale_edit", "drive")
     def check(self, context):
         return self.basis != (self.dimensions, self.proportional)
     def create_entity(self):
@@ -1090,13 +1090,13 @@ class LinearViscoelasticGenericAxialTorsionCouplingOperator(Base):
         self.basis = self.proportional
         layout = self.layout
         self.draw_dimensions(layout)
-        self.draw_link(layout, "stiffness_matrix_6x1_name", "stiffness_matrix_edit")
+        self.draw_link(layout, "stiffness_matrix_6x1_name", "stiffness_matrix_edit", "matrix")
         row = layout.row()
         row.prop(self, "proportional")
         if self.proportional:
             row.prop(self, "factor")
         else:
-            self.draw_link(layout, "viscosity_matrix_6x1_name", "viscosity_matrix_edit")
+            self.draw_link(layout, "viscosity_matrix_6x1_name", "viscosity_matrix_edit", "matrix")
     def check(self, context):
         return self.basis != self.proportional
     def create_entity(self):
@@ -1175,8 +1175,8 @@ class CubicViscoelasticGenericOperator(Base):
             layout.prop(self, "viscosity")
         else:
             for c in "123":
-                self.draw_link(layout, "stiffness_matrix_3x1_" + c + "_name", "stiffness_matrix_3x1_" + c + "_edit")
-            self.draw_link(layout, "viscosity_matrix_3x1_name", "viscosity_matrix_3x1_edit")
+                self.draw_link(layout, "stiffness_matrix_3x1_" + c + "_name", "stiffness_matrix_3x1_" + c + "_edit", "matrix")
+            self.draw_link(layout, "viscosity_matrix_3x1_name", "viscosity_matrix_3x1_edit", "matrix")
     def check(self, context):
         return self.basis != self.dimensions
     def create_entity(self):
@@ -1276,12 +1276,12 @@ class DoubleLinearViscoelasticOperator(Base):
                 row.prop(self, "viscosity_2")
         else:
             for c in "12":
-                self.draw_link(layout, "stiffness_matrix_3x1_" + c + "_name", "stiffness_matrix_3x1_" + c + "_edit")
-            self.draw_link(layout, "viscosity_matrix_3x1_1_name", "viscosity_matrix_3x1_1_edit")
+                self.draw_link(layout, "stiffness_matrix_3x1_" + c + "_name", "stiffness_matrix_3x1_" + c + "_edit", "matrix")
+            self.draw_link(layout, "viscosity_matrix_3x1_1_name", "viscosity_matrix_3x1_1_edit", "matrix")
             row = layout.row()
             row.prop(self, "second_damping")
             if self.second_damping:
-                self.draw_link(row, "viscosity_matrix_3x1_2_name", "viscosity_matrix_3x1_2_edit")
+                self.draw_link(row, "viscosity_matrix_3x1_2_name", "viscosity_matrix_3x1_2_edit", "matrix")
         layout.prop(self, "upper_strain")
         layout.prop(self, "lower_strain")
     def check(self, context):
@@ -1426,13 +1426,13 @@ class LinearViscoelasticBistopOperator(Base):
             layout.prop(self, "viscosity")
         elif self.dimensions == "3D":
             for s in "stiffness viscosity".split():
-                self.draw_link(layout, s + "_matrix_3x3_name", "_matrix_edit")
+                self.draw_link(layout, s + "_matrix_3x3_name", "_matrix_edit", "matrix")
         else:
             for s in "stiffness viscosity".split():
-                self.draw_link(layout, s + "_matrix_6x6_name", s + "_matrix_edit")
+                self.draw_link(layout, s + "_matrix_6x6_name", s + "_matrix_edit", "matrix")
         layout.prop(self, "initial_status")
         for s in "activating deactivating".split():
-            self.draw_link(layout, s+ "_condition_name", s + "_condition_edit")
+            self.draw_link(layout, s+ "_condition_name", s + "_condition_edit", "drive")
     def check(self, context):
         return self.basis != self.dimensions
     def create_entity(self):

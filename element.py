@@ -168,7 +168,7 @@ class ForceBase(Base):
     def draw(self, context):
         layout = self.layout
         layout.prop(self, "orientation")
-        self.draw_link(layout, "drive_name", "drive_edit")
+        self.draw_link(layout, "drive_name", "drive_edit", "drive")
 
 class StructuralForceOperator(ForceBase):
     bl_label = "Structural force"
@@ -325,7 +325,7 @@ class AxialRotationOperator(Base):
         self.test_for_new_objects()
     def draw(self, context):
         layout = self.layout
-        self.draw_link(layout, "drive_name", "drive_edit")
+        self.draw_link(layout, "drive_name", "drive_edit", "drive")
     def create_entity(self):
         return AxialRotation(self.name)
 
@@ -373,7 +373,7 @@ class ConstitutiveBase(Base):
         self.test_for_new_objects()
     def draw(self, context):
         layout = self.layout
-        self.draw_link(layout, "constitutive_name", "constitutive_edit")
+        self.draw_link(layout, "constitutive_name", "constitutive_edit", "constitutive")
 
 class DeformableDisplacementJointOperator(ConstitutiveBase):
     bl_label = "Deformable displacement joint"
@@ -456,7 +456,7 @@ class DistanceOperator(Base):
         layout = self.layout
         layout.prop(self, "from_nodes")
         if not self.from_nodes:
-            self.draw_link(layout, "drive_name", "drive_edit")
+            self.draw_link(layout, "drive_name", "drive_edit", "drive")
     def check(self, context):
         return self.basis != self.from_nodes
     def create_entity(self):
@@ -576,7 +576,7 @@ class RevoluteHingeOperator(Base):
             row.prop(self, "enable_preload")
             if self.enable_preload:
                 row.prop(self, "preload")
-            self.draw_link(layout, "friction_name", "friction_edit")
+            self.draw_link(layout, "friction_name", "friction_edit", "friction")
     def check(self, context):
         return self.basis != (self.enable_theta, self.enable_friction, self.enable_preload)
     def create_entity(self):
@@ -742,7 +742,7 @@ class TotalJointOperator(Base):
             for c in "xyz":
                 row = layout.row()
                 row.prop(self, predicate + c)
-                self.draw_link(row, predicate + c + "_drive_name", predicate + c + "_drive_edit")
+                self.draw_link(row, predicate + c + "_drive_name", predicate + c + "_drive_edit", "drive")
     def create_entity(self):
         return TotalJoint(self.name)
 
@@ -779,7 +779,7 @@ class ViscousBodyOperator(Base):
         self.test_for_new_objects()
     def draw(self, context):
         layout = self.layout
-        self.draw_link(layout, "constitutive_name", "constitutive_edit")
+        self.draw_link(layout, "constitutive_name", "constitutive_edit", "constitutive")
     def create_entity(self):
         return ViscousBody(self.name)
 
@@ -822,7 +822,7 @@ class BodyOperator(Base):
     def draw(self, context):
         layout = self.layout
         layout.prop(self, "mass")
-        self.draw_link(layout, "matrix_name", "matrix_edit")
+        self.draw_link(layout, "matrix_name", "matrix_edit", "matrix")
     def create_entity(self):
         return Body(self.name)
 
@@ -978,8 +978,8 @@ class GravityOperator(Base):
         self.entity.increment_links()
     def draw(self, context):
         layout = self.layout
-        self.draw_link(layout, "matrix_name", "matrix_edit")
-        self.draw_link(layout, "drive_name", "drive_edit")
+        self.draw_link(layout, "matrix_name", "matrix_edit", "matrix")
+        self.draw_link(layout, "drive_name", "drive_edit", "drive")
     def create_entity(self):
         return Gravity(self.name)
 
@@ -1016,7 +1016,7 @@ class DrivenOperator(Base):
         self.entity.increment_links()
     def draw(self, context):
         layout = self.layout
-        self.draw_link(layout, "drive_name", "drive_edit")
+        self.draw_link(layout, "drive_name", "drive_edit", "drive")
         self.draw_link(layout, "element_name", "element_edit")
     def create_entity(self):
         return Driven(self.name)

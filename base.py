@@ -344,10 +344,12 @@ class Operator:
         if edit:
             exec("bpy.ops." + root_dot + "e_" + "_".join(definition.type.lower().split()) + "('INVOKE_DEFAULT')")
         self.entity.links.append(definition)
-    def draw_link(self, layout, link_name, link_edit):
+    def draw_link(self, layout, link_name, link_edit, link_module=None):
         row = layout.row()
         row.prop(self, link_name)
         row.prop(self, link_edit, toggle=True)
+        if link_module:
+            row.menu(root_dot + "_".join(["add", link_module]), icon='ZOOMIN', text="")
     def draw_panel_pre(self, context, layout):
         pass
     def draw_panel_post(self, context, layout):
@@ -558,7 +560,7 @@ class UI(list):
             return segments
         klass.types_dict = OrderedDict()
         klass.types_dict.update(segments_maker(entity_tree[0], entity_tree[1]))
-        enum_types = [("All", "All", "All types", 'NONE', 0)] + [(key, key, ", ".join(value), ('RIGHTARROW_THIN' if ", " in value else 'NONE'), i+1) for i, (key, value) in enumerate(klass.types_dict.items())]
+        enum_types = [("All", "All", "All types", 'NONE', 0)] + [(key, key, ", ".join(value), ('RIGHTARROW_THIN' if 1 < len(value) else 'NONE'), i+1) for i, (key, value) in enumerate(klass.types_dict.items())]
         klass.types_dict["All"] = None
         class ListItem(bpy.types.PropertyGroup, klass):
             def update(self, context):
