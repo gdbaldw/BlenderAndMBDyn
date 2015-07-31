@@ -376,7 +376,6 @@ class TreeMenu(list):
                     name, N = item if isinstance(item, tuple) else (item, None)
                     if leaf:
                         layout.operator(root_dot + "c_" + "_".join(name.lower().split()), icon='OUTLINER_OB_MESH' if N == len(SelectedObjects(context)) + 1 else 'NONE')
-                        #layout.operator(root_dot + "c_" + "_".join(name.lower().split()))
                     else:
                         layout.menu(root_dot + "_".join(name.lower().split()))
         self.append(Menu)
@@ -542,6 +541,25 @@ class UI(list):
         klass.entity_list = entity_list
         self.make_list = klass.make_list
         self.delete_list = klass.delete_list
+        def segments_maker(base, branch):
+            segments = OrderedDict()
+            def get_string(item):
+                return item if isinstance(item, str) else item[0]
+            for i in range(len(branch)):
+                if isinstance(branch[i], list):
+                    assert isinstance(branch[i-1], (str, tuple))
+                    if not [item for item in branch[i] if isinstance(item, list)]:
+                        segments[get_string(branch[i-1])] = [get_string(item) for item in branch[i]]
+                    segments.update(segments_maker(branch[i-1], branch[i]))
+                elif len(branch) <= i+1 or not isinstance(branch[i+1], list) :
+                    assert isinstance(branch[i], (str, tuple))
+                    item = get_string(branch[i])
+                    segments[item] = [item]
+            return segments
+        klass.types_dict = OrderedDict()
+        klass.types_dict.update(segments_maker(entity_tree[0], entity_tree[1]))
+        enum_types = [("All", "All", "All types", 'NONE', 0)] + [(key, key, ", ".join(value), ('RIGHTARROW_THIN' if ", " in value else 'NONE'), i+1) for i, (key, value) in enumerate(klass.types_dict.items())]
+        klass.types_dict["All"] = None
         class ListItem(bpy.types.PropertyGroup, klass):
             def update(self, context):
                 index, uilist = self.get_uilist(context)
@@ -561,19 +579,22 @@ class UI(list):
                     uilist[index].name = name
                 self.entity_list[index].name = name
             name = bpy.props.StringProperty(update=update)
-        class List(bpy.types.UIList):
+        class List(bpy.types.UIList, klass):
             bl_idname = module_name
-            types = bpy.props.EnumProperty(items=[("All", "All", ""), ], name="", description="Show only items of this type", default="All")
+            types = bpy.props.EnumProperty(items=enum_types, name="", description="Show only items of this type")
+            test = enum_types
             use_filter_consumed = bpy.props.BoolProperty(name="", description="Show consumed items", default=False)
             filter_name = bpy.props.StringProperty(name="", description="Only show items containing this string")
             def draw_item(self, context, layout, data, item, icon, active_data, active_property, index, flt_flag):
                 layout.prop(item, "name", text="", emboss=False)
             def filter_items(self, context, data, prop):
+                filter_types = self.types_dict[self.types]
                 uilist = getattr(data, prop)
                 entity_list.flags = [True]*len(uilist)
                 for i, entity in enumerate(entity_list):
                     if ((not self.use_filter_consumed and hasattr(entity, "consumer"))
-                        or self.filter_name not in entity.name):
+                        or self.filter_name not in entity.name
+                        or (filter_types and entity.type not in filter_types)):
                         entity_list.flags[i] = False
                 order = [i for i in range(len(uilist))]
                 if self.use_filter_sort_alpha:
