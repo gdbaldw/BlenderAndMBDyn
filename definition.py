@@ -29,6 +29,7 @@ if "bpy" in locals():
     imp.reload(Entity)
 else:
     from .base import bpy, BPY, root_dot, database, Operator, Entity, Bundle, enum_drive, enum_meter_drive, enum_method
+    from .base import update_drive
     from .common import FORMAT, method_types, nonlinear_solver_types
 
 problem_types = ["General data"] + method_types + nonlinear_solver_types + ["Eigenanalysis", "Abort after", "Linear solver", "Dummy steps", "Output data", "Real time"]
@@ -59,6 +60,9 @@ class Base(Operator):
     bl_label = "Definitions"
     bl_options = {'DEFAULT_CLOSED'}
     @classmethod
+    def poll(cls, context):
+        return True
+    @classmethod
     def make_list(self, ListItem):
         bpy.types.Scene.definition_uilist = bpy.props.CollectionProperty(type = ListItem)
         bpy.types.Scene.definition_index = bpy.props.IntProperty(default=-1)
@@ -71,8 +75,6 @@ class Base(Operator):
         return context.scene.definition_index, context.scene.definition_uilist
     def set_index(self, context, value):
         context.scene.definition_index = value
-    def prereqs(self, context):
-        pass
 
 for t in types:
     class Tester(Base):
@@ -80,10 +82,6 @@ for t in types:
         @classmethod
         def poll(cls, context):
             return False
-        def assign(self, context):
-            self.entity = database.definition[context.scene.definition_index]
-        def store(self, context):
-            self.entity = database.definition[self.index]
         def create_entity(self):
             return Entity(self.name)
     klasses[t] = Tester
@@ -132,8 +130,8 @@ class GeneralProblemOperator(Base):
     factor_min_iterations = bpy.props.IntProperty(name="Min iterations", default=0, min=0)
     set_factor_max_iterations = bpy.props.BoolProperty(name="Set max iterations")
     factor_max_iterations = bpy.props.IntProperty(name="Max iterations", min=0)
-    time_step_pattern_name = bpy.props.EnumProperty(items=enum_drive, name="Time step pattern")
-    time_step_pattern_edit = bpy.props.BoolProperty(name="")
+    time_step_pattern_name = bpy.props.EnumProperty(items=enum_drive, name="Time step pattern",
+        update=lambda self, context: update_drive(self, context, self.time_step_pattern_name))
     min_time_step = bpy.props.FloatProperty(name="Min time step", default=0.0, min=0.0, precision=6)
     unlimited = bpy.props.BoolProperty(name="Unlimited")
     max_time_step = bpy.props.FloatProperty(name="Max time step", default=0.0, min=0.0, precision=6)
@@ -172,14 +170,7 @@ class GeneralProblemOperator(Base):
     derivatives_tolerance = bpy.props.FloatProperty(name="Derivatives tolerance", default=2.0, min=0.0, precision=6)
     derivatives_max_iterations = bpy.props.IntProperty(name="Derivatives max iterations", default=1, min=0)
     derivatives_coefficient = bpy.props.FloatProperty(name="Derivatives coefficient", default=1e-3, min=0.0, precision=6)
-    @classmethod
-    def poll(self, context):
-        return True
-    def prereqs(self, context):
-        self.drive_exists(context)
     def assign(self, context):
-        self.drive_exists(context)
-        self.entity = database.definition[context.scene.definition_index]
         self.strategy = self.entity.strategy
         self.reducion_factor = self.entity.reducion_factor
         self.steps_before_reduction = self.entity.steps_before_reduction
@@ -215,7 +206,6 @@ class GeneralProblemOperator(Base):
         if self.strategy == "change":
             self.time_step_pattern_name = self.entity.links[0].name
     def store(self, context):
-        self.entity = database.definition[self.index]
         self.entity.strategy = self.strategy
         self.entity.reducion_factor = self.reducion_factor
         self.entity.steps_before_reduction = self.steps_before_reduction
@@ -250,7 +240,7 @@ class GeneralProblemOperator(Base):
         self.entity.derivatives_coefficient = self.derivatives_coefficient
         self.entity.unlink_all()
         if self.strategy == "change":
-            self.link_drive(context, self.time_step_pattern_name, self.time_step_pattern_edit)
+            self.link_drive(context, self.time_step_pattern_name)
         self.entity.increment_links()
     def draw(self, context):
         self.basis = (self.strategy, self.set_factor_max_iterations, self.unlimited, self.set_residual_tolerance, self.set_residual_test, self.set_solution_tolerance, self.set_solution_test, self.set_threads, self.set_assembly_solver)
@@ -267,7 +257,7 @@ class GeneralProblemOperator(Base):
             if self.set_factor_max_iterations:
                 row.prop(self, "factor_max_iterations")
         elif self.strategy == "change":
-            self.draw_link(layout, "time_step_pattern_name", "time_step_pattern_edit", "drive")
+            layout.prop(self, "time_step_pattern_name")
         if self.strategy != "no change":
             layout.prop(self, "min_time_step")
             row = layout.row()
@@ -321,13 +311,6 @@ class CrankNicolson(Entity):
 
 class CrankNicolsonOperator(Base):
     bl_label = "Crank Nicolson"
-    @classmethod
-    def poll(self, context):
-        return True
-    def assign(self, context):
-        self.entity = database.definition[context.scene.definition_index]
-    def store(self, context):
-        self.entity = database.definition[self.index]
     def create_entity(self):
         return CrankNicolson(self.name)
 
@@ -338,38 +321,31 @@ class MS(Entity):
         f.write(("\t" if tab else "") + "method: ms, " + ", ".join([link.string() for link in self.links]) + ";\n")
 
 class MSHopeOperator(Base):
-    differential_radius_drive_name = bpy.props.EnumProperty(items=enum_drive, name="Differential radius drive")
-    differential_radius_drive_edit = bpy.props.BoolProperty(name="")
+    differential_radius_drive_name = bpy.props.EnumProperty(items=enum_drive, name="Differential radius drive",
+        update=lambda self, context: update_drive(self, context, self.differential_radius_drive_name))
     set_algebraic_radius = bpy.props.BoolProperty(name="Set algebraic radius")
-    algebraic_radius_drive_name = bpy.props.EnumProperty(items=enum_drive, name="Algebraic radius drive")
-    algebraic_radius_drive_edit = bpy.props.BoolProperty(name="")
-    @classmethod
-    def poll(self, context):
-        return True
-    def prereqs(self, context):
-        self.drive_exists(context)
+    algebraic_radius_drive_name = bpy.props.EnumProperty(items=enum_drive, name="Algebraic radius drive",
+        update=lambda self, context: update_drive(self, context, self.algebraic_radius_drive_name))
     def assign(self, context):
-        self.entity = database.definition[context.scene.definition_index]
         self.set_algebraic_radius = self.entity.set_algebraic_radius
         self.differential_radius_drive_name = self.entity.links[0].name
         if self.set_algebraic_radius:
             self.algebraic_radius_drive_name = self.entity.links[1].name
     def store(self, context):
-        self.entity = database.definition[self.index]
         self.entity.set_algebraic_radius = self.set_algebraic_radius
         self.entity.unlink_all()
-        self.link_drive(context, self.differential_radius_drive_name, self.differential_radius_drive_edit)
+        self.link_drive(context, self.differential_radius_drive_name)
         if self.set_algebraic_radius:
-            self.link_drive(context, self.algebraic_radius_drive_name, self.algebraic_radius_drive_edit)
+            self.link_drive(context, self.algebraic_radius_drive_name)
         self.entity.increment_links()
     def draw(self, context):
         self.basis = self.set_algebraic_radius
         layout = self.layout
-        self.draw_link(layout, "differential_radius_drive_name", "differential_radius_drive_edit", "drive")
+        layout.prop(self, "differential_radius_drive_name")
         row = layout.row()
         row.prop(self, "set_algebraic_radius")
         if self.set_algebraic_radius:
-            self.draw_link(row, "algebraic_radius_drive_name", "algebraic_radius_drive_edit", "drive")
+            row.prop(self, "algebraic_radius_drive_name")
     def check(self, context):
         return self.basis != self.set_algebraic_radius
 
@@ -398,22 +374,15 @@ class ThirdOrder(Entity):
 class ThirdOrderOperator(Base):
     bl_label = "Third order"
     ad_hoc = bpy.props.BoolProperty(name="Ad hoc")
-    differential_radius_drive_name = bpy.props.EnumProperty(items=enum_drive, name="Differential radius drive")
-    differential_radius_drive_edit = bpy.props.BoolProperty(name="")
-    @classmethod
-    def poll(self, context):
-        return True
-    def prereqs(self, context):
-        self.drive_exists(context)
+    differential_radius_drive_name = bpy.props.EnumProperty(items=enum_drive, name="Differential radius drive",
+        update=lambda self, context: update_drive(self, context, self.differential_radius_drive_name))
     def assign(self, context):
-        self.entity = database.definition[context.scene.definition_index]
         self.ad_hoc = self.entity.ad_hoc
         self.differential_radius_drive_name = self.entity.links[0].name
     def store(self, context):
-        self.entity = database.definition[self.index]
         self.entity.ad_hoc = self.ad_hoc
         self.entity.unlink_all()
-        self.link_drive(context, self.differential_radius_drive_name, self.differential_radius_drive_edit)
+        self.link_drive(context, self.differential_radius_drive_name)
         self.entity.increment_links()
     def draw(self, context):
         self.basis = self.ad_hoc
@@ -421,7 +390,7 @@ class ThirdOrderOperator(Base):
         row = layout.row()
         row.prop(self, "ad_hoc")
         if not self.ad_hoc:
-            self.draw_link(row, "differential_radius_drive_name", "differential_radius_drive_edit", "drive")
+            row.prop(self, "differential_radius_drive_name")
     def check(self, context):
         return self.basis != self.ad_hoc
     def create_entity(self):
@@ -437,15 +406,10 @@ class BDFOperator(Base):
     bl_label = "bdf"
     set_order = bpy.props.BoolProperty(name="Set order")
     order = bpy.props.IntProperty(name="Order", default=1, min=1, max=2)
-    @classmethod
-    def poll(self, context):
-        return True
     def assign(self, context):
-        self.entity = database.definition[context.scene.definition_index]
         self.set_order = self.entity.set_order
         self.order = self.entity.order
     def store(self, context):
-        self.entity = database.definition[self.index]
         self.entity.set_order = self.set_order
         self.entity.order = self.order
     def draw(self, context):
@@ -468,13 +432,6 @@ class ImplicitEuler(Entity):
 
 class ImplicitEulerOperator(Base):
     bl_label = "Implicit Euler"
-    @classmethod
-    def poll(self, context):
-        return True
-    def assign(self, context):
-        self.entity = database.definition[context.scene.definition_index]
-    def store(self, context):
-        self.entity = database.definition[self.index]
     def create_entity(self):
         return ImplicitEuler(self.name)
 
@@ -498,17 +455,12 @@ class NewtonRaphstonOperator(Base):
     iterations = bpy.props.IntProperty(name="Iterations", default=0, min=0)
     keep_jacobian_matrix = bpy.props.BoolProperty(name="Keep jacobian matrix")
     honor_element_requests = bpy.props.BoolProperty(name="Honor element requests")
-    @classmethod
-    def poll(self, context):
-        return True
     def assign(self, context):
-        self.entity = database.definition[context.scene.definition_index]
         self.true_or_modified = self.entity.true_or_modified
         self.iterations = self.entity.iterations
         self.keep_jacobian_matrix = self.entity.keep_jacobian_matrix
         self.honor_element_requests = self.entity.honor_element_requests
     def store(self, context):
-        self.entity = database.definition[self.index]
         self.entity.true_or_modified = self.true_or_modified
         self.entity.iterations = self.iterations
         self.entity.keep_jacobian_matrix = self.keep_jacobian_matrix
@@ -597,11 +549,7 @@ class LineSearchOperator(Base):
     print_convergence_info = bpy.props.BoolProperty(name="Print convergence info")
     verbose = bpy.props.BoolProperty(name="Verbose")
     abort_at_lambda_min = bpy.props.BoolProperty(name="Abort at lambda min")
-    @classmethod
-    def poll(self, context):
-        return True
     def assign(self, context):
-        self.entity = database.definition[context.scene.definition_index]
         self.true_or_modified = self.entity.true_or_modified
         self.iterations = self.entity.iterations
         self.keep_jacobian_matrix = self.entity.keep_jacobian_matrix
@@ -633,7 +581,6 @@ class LineSearchOperator(Base):
         self.verbose = self.entity.verbose
         self.abort_at_lambda_min = self.entity.abort_at_lambda_min
     def store(self, context):
-        self.entity = database.definition[self.index]
         self.entity.true_or_modified = self.true_or_modified
         self.entity.iterations = self.iterations
         self.entity.keep_jacobian_matrix = self.keep_jacobian_matrix
@@ -757,11 +704,7 @@ class MatrixFreeOperator(Base):
     set_preconditioner_steps = bpy.props.BoolProperty(name="Set preconditioner steps")
     preconditioner_steps = bpy.props.IntProperty(name="Preconditioner", default=0, min=0)
     honor_element_requests = bpy.props.BoolProperty(name="Honor element requests")
-    @classmethod
-    def poll(self, context):
-        return True
     def assign(self, context):
-        self.entity = database.definition[context.scene.definition_index]
         self.bicgstab_or_gmres = self.entity.bicgstab_or_gmres
         self.set_tolerance = self.entity.set_tolerance
         self.tolerance = self.entity.tolerance
@@ -776,7 +719,6 @@ class MatrixFreeOperator(Base):
         self.preconditioner_steps = self.entity.preconditioner_steps
         self.honor_element_requests = self.entity.honor_element_requests
     def store(self, context):
-        self.entity = database.definition[self.index]
         self.entity.bicgstab_or_gmres = self.bicgstab_or_gmres
         self.entity.set_tolerance = self.set_tolerance
         self.entity.tolerance = self.tolerance
@@ -870,15 +812,11 @@ class EigenanalysisOperator(Base):
     nev = bpy.props.IntProperty(name="Number of eigenvalues", default=1, min=1)
     ncv = bpy.props.IntProperty(name="Number of Arnoldi vectors", default=1, min=1)
     tol = bpy.props.FloatProperty(name="Tolerance", default=0.0, min=0.0, precision=6)
-    @classmethod
-    def poll(self, context):
-        return True
     def prereqs(self, context):
         self.when.clear()
         for i in range(50):
             self.when.add()
     def assign(self, context):
-        self.entity = database.definition[context.scene.definition_index]
         self.num_times = self.entity.num_times
         for i, value in enumerate(self.entity.when):
             self.when[i].value = value
@@ -899,7 +837,6 @@ class EigenanalysisOperator(Base):
         self.ncv = self.entity.ncv
         self.tol = self.entity.tol
     def store(self, context):
-        self.entity = database.definition[self.index]
         self.entity.num_times = self.num_times
         self.entity.when = [t.value for t in self.when[:self.num_times]] if self.when else [0.0]
         self.entity.output_full_matrices = self.output_full_matrices
@@ -969,14 +906,9 @@ class AbortAfterOperator(Base):
         ("derivatives", "derivatives", ""),
         ("dummy steps", "dummy steps", ""),
         ], name="Abort after", default="input")
-    @classmethod
-    def poll(self, context):
-        return True
     def assign(self, context):
-        self.entity = database.definition[context.scene.definition_index]
         self.abort_after = self.entity.abort_after
     def store(self, context):
-        self.entity = database.definition[self.index]
         self.entity.abort_after = self.abort_after
     def create_entity(self):
         return AbortAfter(self.name)
@@ -1047,11 +979,7 @@ class LinearSolverOperator(Base):
         ("max", "max", ""),
         ("sum", "sum", ""),
         ], name="Scale", default="no")
-    @classmethod
-    def poll(self, context):
-        return True
     def assign(self, context):
-        self.entity = database.definition[context.scene.definition_index]
         self.linear_solver = self.entity.linear_solver
         self.set_map_cc_dir = self.entity.set_map_cc_dir
         self.map_cc_dir = self.entity.map_cc_dir
@@ -1071,7 +999,6 @@ class LinearSolverOperator(Base):
         self.set_scale = self.entity.set_scale
         self.scale = self.entity.scale
     def store(self, context):
-        self.entity = database.definition[self.index]
         self.entity.linear_solver = self.linear_solver
         self.entity.set_map_cc_dir = self.set_map_cc_dir
         self.entity.map_cc_dir = self.map_cc_dir
@@ -1159,20 +1086,13 @@ class DummyStepsOperator(Base):
     dummy_steps_ratio = bpy.props.FloatProperty(name="Dummy steps ratio", default=1.0, min=0.0, precision=6)
     dummy_steps_method_name = bpy.props.EnumProperty(items=enum_method, name="Method")
     dummy_steps_method_edit = bpy.props.BoolProperty(name="")
-    @classmethod
-    def poll(self, context):
-        return True
-    def prereqs(self, context):
-        self.method_exists(context)
     def assign(self, context):
-        self.entity = database.definition[context.scene.definition_index]
         self.dummy_steps_tolerance = self.entity.dummy_steps_tolerance
         self.dummy_steps_max_iterations = self.entity.dummy_steps_max_iterations
         self.dummy_steps_number = self.entity.dummy_steps_number
         self.dummy_steps_ratio = self.entity.dummy_steps_ratio
         self.dummy_steps_method_name = self.entity.links[0].name
     def store(self, context):
-        self.entity = database.definition[self.index]
         self.entity.dummy_steps_tolerance = self.dummy_steps_tolerance
         self.entity.dummy_steps_max_iterations = self.dummy_steps_max_iterations
         self.entity.dummy_steps_number = self.dummy_steps_number
@@ -1220,11 +1140,7 @@ class OutputDataOperator(Base):
     bailout = bpy.props.BoolProperty(name="Bailout")
     matrix_condition_number = bpy.props.BoolProperty(name="Matrix condition number")
     solver_condition_number = bpy.props.BoolProperty(name="Solver condition number")
-    @classmethod
-    def poll(self, context):
-        return True
     def assign(self, context):
-        self.entity = database.definition[context.scene.definition_index]
         self.none = self.entity.none
         self.iterations = self.entity.iterations
         self.residual = self.entity.residual
@@ -1236,7 +1152,6 @@ class OutputDataOperator(Base):
         self.matrix_condition_number = self.entity.matrix_condition_number
         self.solver_condition_number = self.entity.solver_condition_number
     def store(self, context):
-        self.entity = database.definition[self.index]
         self.entity.none = self.none
         self.entity.iterations = self.iterations
         self.entity.residual = self.residual
@@ -1304,11 +1219,7 @@ class RealTimeOperator(Base):
     real_time_log = bpy.props.BoolProperty(name="Real time log")
     set_command_name = bpy.props.BoolProperty(name="Set command name")
     command_name = bpy.props.StringProperty(name="Command name")
-    @classmethod
-    def poll(self, context):
-        return True
     def assign(self, context):
-        self.entity = database.definition[context.scene.definition_index]
         self.rtai_posix = self.entity.rtai_posix
         self.mode = self.entity.mode
         self.time_step = self.entity.time_step
@@ -1323,7 +1234,6 @@ class RealTimeOperator(Base):
         self.set_command_name = self.entity.set_command_name
         self.command_name = self.entity.command_name
     def store(self, context):
-        self.entity = database.definition[self.index]
         self.entity.rtai_posix = self.rtai_posix
         self.entity.mode = self.mode
         self.entity.time_step = self.time_step
@@ -1409,11 +1319,7 @@ class AssemblyOperator(Base):
     tolerance = bpy.props.FloatProperty(name="Tolerance", default=0.0, min=0.0, precision=6)
     set_max_iterations = bpy.props.BoolProperty(name="Set max iterations")
     max_iterations = bpy.props.IntProperty(name="Max iterations", default=0, min=0)
-    @classmethod
-    def poll(self, context):
-        return True
     def assign(self, context):
-        self.entity = database.definition[context.scene.definition_index]
         self.skip_initial_joint_assembly = self.entity.skip_initial_joint_assembly
         self.rigid_bodies = self.entity.rigid_bodies
         self.gravity = self.entity.gravity
@@ -1431,7 +1337,6 @@ class AssemblyOperator(Base):
         self.set_max_iterations = self.entity.set_max_iterations
         self.max_iterations = self.entity.max_iterations
     def store(self, context):
-        self.entity = database.definition[self.index]
         self.entity.skip_initial_joint_assembly = self.skip_initial_joint_assembly
         self.entity.rigid_bodies = self.rigid_bodies
         self.entity.gravity = self.gravity
@@ -1515,8 +1420,8 @@ class JobControlOperator(Base):
     set_select_timeout = bpy.props.BoolProperty(name="Set select timeout")
     forever = bpy.props.BoolProperty(name="Forever")
     timeout = bpy.props.FloatProperty(name="Timeout", default=0.0, min=0.0, precision=6)
-    meter_drive_name = bpy.props.EnumProperty(items=enum_meter_drive, name="Meter drive")
-    meter_drive_edit = bpy.props.BoolProperty(name="")
+    meter_drive_name = bpy.props.EnumProperty(items=enum_meter_drive, name="Meter drive",
+        update=lambda self, context: update_drive(self, context, self.meter_drive_name, "Meter drive"))
     output_precision = bpy.props.IntProperty(name="Output precision", default=6, min=1)
     default_orientation = bpy.props.EnumProperty(items=[
         ("euler123", "Euler123", ""),
@@ -1526,13 +1431,7 @@ class JobControlOperator(Base):
         ("orientation matrix", "Orientation matrix", ""),
         ], name="Default orientation", default="orientation matrix")
     static_model = bpy.props.BoolProperty(name="Static model")
-    @classmethod
-    def poll(self, context):
-        return True
-    def prereqs(self, context):
-        self.meter_drive_exists(context)
     def assign(self, context):
-        self.entity = database.definition[context.scene.definition_index]
         self.set_simulation_title = self.entity.set_simulation_title
         self.simulation_title = self.entity.simulation_title
         self.dof_stats = self.entity.dof_stats
@@ -1544,14 +1443,12 @@ class JobControlOperator(Base):
         self.forever = self.entity.forever
         self.timeout = self.entity.timeout
         self.meter_drive_name = self.entity.meter_drive_name
-        self.meter_drive_edit = self.entity.meter_drive_edit
         self.output_precision = self.entity.output_precision
         self.default_orientation = self.entity.default_orientation
         self.output_precision = self.entity.output_precision
         self.meter_drive_name = self.entity.links[0].name
         self.static_model = self.entity.static_model
     def store(self, context):
-        self.entity = database.definition[self.index]
         self.entity.set_simulation_title = self.set_simulation_title
         self.entity.simulation_title = self.simulation_title
         self.entity.dof_stats = self.dof_stats
@@ -1563,13 +1460,12 @@ class JobControlOperator(Base):
         self.entity.forever = self.forever
         self.entity.timeout = self.timeout
         self.entity.meter_drive_name = self.meter_drive_name
-        self.entity.meter_drive_edit = self.meter_drive_edit
         self.entity.output_precision = self.output_precision
         self.entity.default_orientation = self.default_orientation
         self.entity.output_precision = self.output_precision
         self.entity.static_model = self.static_model
         self.entity.unlink_all()
-        self.link_drive(context, self.meter_drive_name, self.meter_drive_edit)
+        self.link_drive(context, self.meter_drive_name)
         self.entity.increment_links()
     def draw(self, context):
         self.basis = (self.set_simulation_title, self.set_select_timeout, self.forever)
@@ -1590,7 +1486,7 @@ class JobControlOperator(Base):
             if not self.forever:
                 row.prop(self, "timeout")
         layout.prop(self, "default_orientation")
-        self.draw_link(layout, "meter_drive_name", "meter_drive_edit", "drive")
+        layout.prop(self, "meter_drive_name")
         layout.prop(self, "output_precision")
         layout.prop(self, "static_model")
     def check(self, context):
@@ -1644,11 +1540,7 @@ class DefaultOutputOperator(Base):
     joints = bpy.props.BoolProperty(name="Joints", default=True)
     rigid_bodies = bpy.props.BoolProperty(name="Rigid bodies", default=True)
     induced_velocity_elements = bpy.props.BoolProperty(name="Induced velocity elements", default=True)
-    @classmethod
-    def poll(self, context):
-        return True
     def assign(self, context):
-        self.entity = database.definition[context.scene.definition_index]
         self.none = self.entity.none
         self.reference_frames = self.entity.reference_frames
         self.abstract_nodes = self.entity.abstract_nodes
@@ -1668,7 +1560,6 @@ class DefaultOutputOperator(Base):
         self.rigid_bodies = self.entity.rigid_bodies
         self.induced_velocity_elements = self.entity.induced_velocity_elements
     def store(self, context):
-        self.entity = database.definition[self.index]
         self.entity.none = self.none
         self.entity.reference_frames = self.reference_frames
         self.entity.abstract_nodes = self.abstract_nodes
@@ -1742,11 +1633,7 @@ class DefaultAerodynamicOutputOperator(Base):
     angular_velocity = bpy.props.BoolProperty(name="Angular velocity")
     force = bpy.props.BoolProperty(name="Force")
     moment = bpy.props.BoolProperty(name="Moment")
-    @classmethod
-    def poll(self, context):
-        return True
     def assign(self, context):
-        self.entity = database.definition[context.scene.definition_index]
         self.position = self.entity.position
         self.orientation = self.entity.orientation
         self.orientation_description = self.entity.orientation_description
@@ -1755,7 +1642,6 @@ class DefaultAerodynamicOutputOperator(Base):
         self.force = self.entity.force
         self.moment = self.entity.moment
     def store(self, context):
-        self.entity = database.definition[self.index]
         self.entity.position = self.position
         self.entity.orientation = self.orientation
         self.entity.orientation_description = self.orientation_description
@@ -1817,11 +1703,7 @@ class DefaultBeamOutputOperator(Base):
     angular_strain = bpy.props.BoolProperty(name="Angular strain")
     linear_strain_rate = bpy.props.BoolProperty(name="Linear strain rate")
     angular_strain_rate = bpy.props.BoolProperty(name="Angular strain rate")
-    @classmethod
-    def poll(self, context):
-        return True
     def assign(self, context):
-        self.entity = database.definition[context.scene.definition_index]
         self.position = self.entity.position
         self.orientation = self.entity.orientation
         self.orientation_description = self.entity.orientation_description
@@ -1832,7 +1714,6 @@ class DefaultBeamOutputOperator(Base):
         self.linear_strain_rate = self.entity.linear_strain_rate
         self.angular_strain_rate = self.entity.angular_strain_rate
     def store(self, context):
-        self.entity = database.definition[self.index]
         self.entity.position = self.position
         self.entity.orientation = self.orientation
         self.entity.orientation_description = self.orientation_description

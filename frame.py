@@ -32,6 +32,7 @@ if "bpy" in locals():
     imp.reload(subsurf)
 else:
     from .base import bpy, root_dot, database, Operator, Entity, Bundle, enum_matrix_3x1, SelectedObjects
+    from .base import update_matrix
     from .common import RhombicPyramid
     import bmesh
     from copy import copy
@@ -45,6 +46,9 @@ klasses = dict()
 class Base(Operator):
     bl_label = "Frames"
     bl_options = {'DEFAULT_CLOSED'}
+    @classmethod
+    def poll(cls, context):
+        return True
     @classmethod
     def make_list(self, ListItem):
         bpy.types.Scene.frame_uilist = bpy.props.CollectionProperty(type = ListItem)
@@ -66,8 +70,6 @@ class Base(Operator):
         return context.scene.frame_index, context.scene.frame_uilist
     def set_index(self, context, value):
         context.scene.frame_index = value
-    def prereqs(self, context):
-        pass
 
 for t in types:
     class Tester(Base):
@@ -75,10 +77,6 @@ for t in types:
         @classmethod
         def poll(cls, context):
             return False
-        def assign(self, context):
-            self.entity = database.frame[context.scene.frame_index]
-        def store(self, context):
-            self.entity = database.frame[self.index]
         def create_entity(self):
             return Entity(self.name)
     klasses[t] = Tester
@@ -89,10 +87,10 @@ class Frame(Entity):
 
 class FrameOperator(Base):
     bl_label = "Reference frame"
-    linear_velocity_name = bpy.props.EnumProperty(items=enum_matrix_3x1, name="Linear velocity vector")
-    linear_velocity_edit = bpy.props.BoolProperty(name="")
-    angular_velocity_name = bpy.props.EnumProperty(items=enum_matrix_3x1, name="Angular velocity vector")
-    angular_velocity_edit = bpy.props.BoolProperty(name="")
+    linear_velocity_name = bpy.props.EnumProperty(items=enum_matrix_3x1, name="Linear velocity vector",
+        update=lambda self, context: update_matrix(self, context, self.linear_velocity_name, "3x1"))
+    angular_velocity_name = bpy.props.EnumProperty(items=enum_matrix_3x1, name="Angular velocity vector",
+        update=lambda self, context: update_matrix(self, context, self.angular_velocity_name, "3x1"))
     @classmethod
     def poll(self, context):
         frames = copy(database.frame)
@@ -112,23 +110,19 @@ class FrameOperator(Base):
                     head = objects[0]
                     frame_objects.remove(objects)
         return head not in selected[1:]
-    def prereqs(self, context):
-        self.matrix_exists(context, "3x1")
     def assign(self, context):
-        self.entity = database.frame[context.scene.frame_index]
         self.linear_velocity_name = self.entity.links[0].name
         self.angular_velocity_name = self.entity.links[1].name
     def store(self, context):
-        self.entity = database.frame[self.index]
         self.entity.objects = SelectedObjects(context)
         self.entity.unlink_all()
-        self.link_matrix(context, self.linear_velocity_name, self.linear_velocity_edit)
-        self.link_matrix(context, self.angular_velocity_name, self.angular_velocity_edit)
+        self.link_matrix(context, self.linear_velocity_name)
+        self.link_matrix(context, self.angular_velocity_name)
         self.entity.increment_links()
     def draw(self, context):
         layout = self.layout
-        self.draw_link(layout, "linear_velocity_name", "linear_velocity_edit", "matrix")
-        self.draw_link(layout, "angular_velocity_name", "angular_velocity_edit", "matrix")
+        layout.prop(self, "linear_velocity_name")
+        layout.prop(self, "angular_velocity_name")
     def create_entity(self):
         return Frame(self.name)
 

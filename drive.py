@@ -29,6 +29,7 @@ if "bpy" in locals():
     imp.reload(Entity)
 else:
     from .base import bpy, root_dot, database, Operator, Entity, Bundle, BPY, enum_drive, enum_element, SelectedObjects
+    from .base import update_drive, update_element
     from .common import FORMAT
 
 types = [
@@ -70,6 +71,9 @@ class Base(Operator):
     bl_label = "Drives"
     bl_options = {'DEFAULT_CLOSED'}
     @classmethod
+    def poll(cls, context):
+        return True
+    @classmethod
     def make_list(self, ListItem):
         bpy.types.Scene.drive_uilist = bpy.props.CollectionProperty(type = ListItem)
         bpy.types.Scene.drive_index = bpy.props.IntProperty(default=-1)
@@ -82,24 +86,18 @@ class Base(Operator):
         return context.scene.drive_index, context.scene.drive_uilist
     def set_index(self, context, value):
         context.scene.drive_index = value
-    def prereqs(self, context):
-        pass
 
 klasses = dict()
 
 for t in types:
-    class DefaultOperator(Base):
+    class Tester(Base):
         bl_label = t
         @classmethod
         def poll(cls, context):
             return False
-        def assign(self, context):
-            self.entity = database.drive[context.scene.drive_index]
-        def store(self, context):
-            self.entity = database.drive[self.index]
         def create_entity(self):
             return Entity(self.name)
-    klasses[t] = DefaultOperator
+    klasses[t] = Tester
 
 class NullDrive(Entity):
     def string(self, indent=False):
@@ -107,16 +105,7 @@ class NullDrive(Entity):
         ret += "null"
         return ret
 
-class DriveOperator(Base):
-    @classmethod
-    def poll(cls, context):
-        return True
-    def assign(self, context):
-        self.entity = database.drive[context.scene.drive_index]
-    def store(self, context):
-        self.entity = database.drive[self.index]
-
-class NullDriveOperator(DriveOperator):
+class NullDriveOperator(Base):
     bl_label = "Null drive"
     def create_entity(self):
         return NullDrive(self.name)
@@ -129,7 +118,7 @@ class DirectDrive(Entity):
         ret += "direct"
         return ret
 
-class DirectDriveOperator(DriveOperator):
+class DirectDriveOperator(Base):
     bl_label = "Direct drive"
     def create_entity(self):
         return DirectDrive(self.name)
@@ -142,7 +131,7 @@ class UnitDrive(Entity):
         ret += "unit"
         return ret
 
-class UnitDriveOperator(DriveOperator):
+class UnitDriveOperator(Base):
     bl_label = "Unit drive"
     def create_entity(self):
         return UnitDrive(self.name)
@@ -158,14 +147,9 @@ class ConstantDrive(Entity):
 class ConstantDriveOperator(Base):
     bl_label = "Constant drive"
     constant = bpy.props.FloatProperty(name="Constant", description="", min=-9.9e10, max=9.9e10, precision=6, default=0.0)
-    @classmethod
-    def poll(cls, context):
-        return True
     def assign(self, context):
-        self.entity = database.drive[context.scene.drive_index]
         self.constant = self.entity.constant
     def store(self, context):
-        self.entity = database.drive[self.index]
         self.entity.constant = self.constant
     def create_entity(self):
         return ConstantDrive(self.name)
@@ -178,7 +162,7 @@ class TimeDrive(Entity):
         ret += "time"
         return ret
 
-class TimeDriveOperator(DriveOperator):
+class TimeDriveOperator(Base):
     bl_label = "Time drive"
     def create_entity(self):
         return TimeDrive(self.name)
@@ -197,15 +181,10 @@ class LinearDriveOperator(Base):
     bl_label = "Linear drive"
     constant = bpy.props.FloatProperty(name="Constant", description="", min=-9.9e10, max=9.9e10, precision=6, default=0.0)
     linear = bpy.props.FloatProperty(name="Linear", description="", min=-9.9e10, max=9.9e10, precision=6, default=0.0)
-    @classmethod
-    def poll(cls, context):
-        return True
     def assign(self, context):
-        self.entity = database.drive[context.scene.drive_index]
         self.constant = self.entity.constant
         self.linear = self.entity.linear
     def store(self, context):
-        self.entity = database.drive[self.index]
         self.entity.constant = self.constant
         self.entity.linear = self.linear
     def draw(self, context):
@@ -230,16 +209,11 @@ class ParabolicDriveOperator(Base):
     constant = bpy.props.FloatProperty(name="Constant", description="", min=-9.9e10, max=9.9e10, precision=6, default=0.0)
     linear = bpy.props.FloatProperty(name="Linear", description="", min=-9.9e10, max=9.9e10, precision=6, default=0.0)
     parabolic = bpy.props.FloatProperty(name="Parabolic", description="", min=-9.9e10, max=9.9e10, precision=6, default=0.0)
-    @classmethod
-    def poll(cls, context):
-        return True
     def assign(self, context):
-        self.entity = database.drive[context.scene.drive_index]
         self.constant = self.entity.constant
         self.linear = self.entity.linear
         self.parabolic = self.entity.parabolic
     def store(self, context):
-        self.entity = database.drive[self.index]
         self.entity.constant = self.constant
         self.entity.linear = self.linear
         self.entity.parabolic = self.parabolic
@@ -267,17 +241,12 @@ class CubicDriveOperator(Base):
     linear = bpy.props.FloatProperty(name="Linear", description="", min=-9.9e10, max=9.9e10, precision=6, default=0.0)
     parabolic = bpy.props.FloatProperty(name="Parabolic", description="", min=-9.9e10, max=9.9e10, precision=6, default=0.0)
     cubic = bpy.props.FloatProperty(name="Cubic", description="", min=-9.9e10, max=9.9e10, precision=6, default=0.0)
-    @classmethod
-    def poll(cls, context):
-        return True
     def assign(self, context):
-        self.entity = database.drive[context.scene.drive_index]
         self.constant = self.entity.constant
         self.linear = self.entity.linear
         self.parabolic = self.entity.parabolic
         self.cubic = self.entity.cubic
     def store(self, context):
-        self.entity = database.drive[self.index]
         self.entity.constant = self.constant
         self.entity.linear = self.linear
         self.entity.parabolic = self.parabolic
@@ -306,16 +275,11 @@ class StepDriveOperator(Base):
     initial_time = bpy.props.FloatProperty(name="Initial time", description="", min=0.0, max=9.9e10, precision=6, default=0.0)
     step_value = bpy.props.FloatProperty(name="Step value", description="", min=-9.9e10, max=9.9e10, precision=6, default=0.0)
     initial_value = bpy.props.FloatProperty(name="Initial value", description="", min=-9.9e10, max=9.9e10, precision=6, default=0.0)
-    @classmethod
-    def poll(cls, context):
-        return True
     def assign(self, context):
-        self.entity = database.drive[context.scene.drive_index]
         self.initial_time = self.entity.initial_time
         self.step_value = self.entity.step_value
         self.initial_value = self.entity.initial_value
     def store(self, context):
-        self.entity = database.drive[self.index]
         self.entity.initial_time = self.initial_time
         self.entity.step_value = self.step_value
         self.entity.initial_value = self.initial_value
@@ -343,17 +307,12 @@ class DoubleStepDriveOperator(Base):
     final_time = bpy.props.FloatProperty(name="Final time", description="", min=0.0, max=9.9e10, precision=6, default=0.0)
     step_value = bpy.props.FloatProperty(name="Step value", description="", min=-9.9e10, max=9.9e10, precision=6, default=0.0)
     initial_value = bpy.props.FloatProperty(name="Initial value", description="", min=-9.9e10, max=9.9e10, precision=6, default=0.0)
-    @classmethod
-    def poll(cls, context):
-        return True
     def assign(self, context):
-        self.entity = database.drive[context.scene.drive_index]
         self.initial_time = self.entity.initial_time
         self.final_time = self.entity.final_time
         self.step_value = self.entity.step_value
         self.initial_value = self.entity.initial_value
     def store(self, context):
-        self.entity = database.drive[self.index]
         self.entity.initial_time = self.initial_time
         self.entity.final_time = self.final_time
         self.entity.step_value = self.step_value
@@ -389,18 +348,13 @@ class RampDriveOperator(Base):
     forever = bpy.props.BoolProperty(name="Forever", description="", default=False)
     final_time = bpy.props.FloatProperty(name="Final time", description="", min=0.0, max=9.9e10, precision=6, default=0.0)
     initial_value = bpy.props.FloatProperty(name="Initial value", description="", min=-9.9e10, max=9.9e10, precision=6, default=0.0)
-    @classmethod
-    def poll(cls, context):
-        return True
     def assign(self, context):
-        self.entity = database.drive[context.scene.drive_index]
         self.slope = self.entity.slope
         self.initial_time = self.entity.initial_time
         self.forever = self.entity.forever
         self.final_time = self.entity.final_time
         self.initial_value = self.entity.initial_value
     def store(self, context):
-        self.entity = database.drive[self.index]
         self.entity.slope = self.slope
         self.entity.initial_time = self.initial_time
         self.entity.forever = self.forever
@@ -435,9 +389,6 @@ class PiecewiseLinearDriveOperator(Base):
     N = bpy.props.IntProperty(name="Number of points", min=2, max=50, description="")
     T = bpy.props.CollectionProperty(name="Times", type = BPY.Floats)
     X = bpy.props.CollectionProperty(name="Values", type = BPY.Floats)
-    @classmethod
-    def poll(cls, context):
-        return True
     def prereqs(self, context):
         self.N = 2
         self.T.clear()
@@ -446,14 +397,12 @@ class PiecewiseLinearDriveOperator(Base):
             self.T.add()
             self.X.add()
     def assign(self, context):
-        self.entity = database.drive[context.scene.drive_index]
         self.N = self.entity.N
         for i, value in enumerate(self.entity.T):
             self.T[i].value = value
         for i, value in enumerate(self.entity.X):
             self.X[i].value = value
     def store(self, context):
-        self.entity = database.drive[self.index]
         self.entity.N = self.N
         self.entity.T = [t.value for t in self.T]
         self.entity.X = [x.value for x in self.X]
@@ -495,11 +444,7 @@ class PeriodicDriveOperator(Base):
     cycles = bpy.props.IntProperty(name="Cycles", description="Number of full cycles", default=1)
     initial_value = bpy.props.FloatProperty(name="Initial value", description="", min=-9.9e10, max=9.9e10, precision=6, default=0.0)
     duration = bpy.props.EnumProperty(items=[("cycles", "N-cycles", ""), ("half", "Half cycle", ""), ("one", "Full cycle", ""), ("forever", "Infinite cycle", "")], default="cycles")
-    @classmethod
-    def poll(cls, context):
-        return True
     def assign(self, context):
-        self.entity = database.drive[context.scene.drive_index]
         self.initial_time = self.entity.initial_time
         self.omega = self.entity.omega
         self.amplitude = self.entity.amplitude
@@ -507,7 +452,6 @@ class PeriodicDriveOperator(Base):
         self.initial_value = self.entity.initial_value
         self.duration = self.entity.duration
     def store(self, context):
-        self.entity = database.drive[self.index]
         self.entity.initial_time = self.initial_time
         self.entity.omega = self.omega
         self.entity.amplitude = self.amplitude
@@ -570,17 +514,12 @@ class TanhDriveOperator(Base):
     amplitude = bpy.props.FloatProperty(name="Amplitude", description="", min=-9.9e10, max=9.9e10, precision=6, default=0.0)
     slope = bpy.props.FloatProperty(name="Slope", description="", min=-9.9e10, max=9.9e10, precision=6, default=0.0)
     initial_value = bpy.props.FloatProperty(name="Initial value", description="", min=-9.9e10, max=9.9e10, precision=6, default=0.0)
-    @classmethod
-    def poll(cls, context):
-        return True
     def assign(self, context):
-        self.entity = database.drive[context.scene.drive_index]
         self.initial_time = self.entity.initial_time
         self.amplitude = self.entity.amplitude
         self.slope = self.entity.slope
         self.initial_value = self.entity.initial_value
     def store(self, context):
-        self.entity = database.drive[self.index]
         self.entity.initial_time = self.initial_time
         self.entity.amplitude = self.amplitude
         self.entity.slope = self.slope
@@ -623,9 +562,6 @@ class FourierSeriesDriveOperator(Base):
     initial_value = bpy.props.FloatProperty(name="Initial value", description="", min=-9.9e10, max=9.9e10, precision=6, default=0.0)
     A = bpy.props.CollectionProperty(name="A values", type = BPY.Floats)
     B = bpy.props.CollectionProperty(name="B values", type = BPY.Floats)
-    @classmethod
-    def poll(cls, context):
-        return True
     def prereqs(self, context):
         self.A.clear()
         self.B.clear()
@@ -633,7 +569,6 @@ class FourierSeriesDriveOperator(Base):
             self.A.add()
             self.B.add()
     def assign(self, context):
-        self.entity = database.drive[context.scene.drive_index]
         self.initial_time = self.entity.initial_time
         self.omega = self.entity.omega
         self.N = self.entity.N
@@ -645,7 +580,6 @@ class FourierSeriesDriveOperator(Base):
         for i, value in enumerate(self.entity.B):
             self.B[i].value = value
     def store(self, context):
-        self.entity = database.drive[self.index]
         self.entity.initial_time = self.initial_time
         self.entity.omega = self.omega
         self.entity.N = self.N
@@ -699,19 +633,15 @@ class FrequencySweepDrive(Entity):
 class FrequencySweepDriveOperator(Base):
     bl_label = "Frequency sweep drive"
     initial_time = bpy.props.FloatProperty(name="Initial time", description="", min=0.0, max=9.9e10, precision=6, default=0.0)
-    angular_velocity_drive_name = bpy.props.EnumProperty(items=enum_drive, name="Angular velocity drive")
-    angular_velocity_edit = bpy.props.BoolProperty(name="")
-    amplitude_drive_name = bpy.props.EnumProperty(items=enum_drive, name="Amplitude drive")
-    amplitude_drive_edit = bpy.props.BoolProperty(name="")
+    angular_velocity_drive_name = bpy.props.EnumProperty(items=enum_drive, name="Angular velocity drive",
+        update=lambda self, context: update_drive(self, context, self.angular_velocity_drive_name))
+    amplitude_drive_name = bpy.props.EnumProperty(items=enum_drive, name="Amplitude drive",
+        update=lambda self, context: update_drive(self, context, self.amplitude_drive_name))
     initial_value = bpy.props.FloatProperty(name="Initial value", description="", min=-9.9e10, max=9.9e10, precision=6, default=0.0)
     forever = bpy.props.BoolProperty(name="Forever", description="", default=False)
     final_time = bpy.props.FloatProperty(name="Final time", description="", min=0.0, max=9.9e10, precision=6, default=0.0)
     final_value = bpy.props.FloatProperty(name="Final value", description="", min=-9.9e10, max=9.9e10, precision=6, default=0.0)
-    @classmethod
-    def poll(cls, context):
-        return True
     def assign(self, context):
-        self.entity = database.drive[context.scene.drive_index]
         self.angular_velocity_drive_name = self.entity.links[0].name
         self.amplitude_drive_name = self.entity.links[0].name
         self.initial_time = self.entity.initial_time
@@ -720,23 +650,22 @@ class FrequencySweepDriveOperator(Base):
         self.final_time = self.entity.final_time
         self.final_value = self.entity.final_value
     def store(self, context):
-        self.entity = database.drive[self.index]
         self.entity.initial_time = self.initial_time
         self.entity.initial_value = self.initial_value
         self.entity.forever = self.forever
         self.entity.final_time = self.final_time
         self.entity.final_value = self.final_value
         self.entity.unlink_all()
-        self.link_drive(context, self.angular_velocity_drive_name, self.angular_velocity_drive_edit)
-        self.link_drive(context, self.amplitude_drive_name, self.amplitude_drive_edit)
+        self.link_drive(context, self.angular_velocity_drive_name)
+        self.link_drive(context, self.amplitude_drive_name)
         self.entity.increment_links()
     def draw(self, context):
         self.basis = self.forever
         layout = self.layout
         layout.prop(self, "initial_time")
         layout.prop(self, "initial_value")
-        self.draw_link(layout, "angular_velocity_drive_name", "angular_velocity_drive_edit", "drive")
-        self.draw_link(layout, "amplitude_drive_name", "amplitude_drive_edit", "drive")
+        layout.prop(self, "angular_velocity_drive_name")
+        layout.prop(self, "amplitude_drive_name")
         layout.prop(self, "forever")
         if not self.forever:
             layout.prop(self, "final_time")
@@ -762,17 +691,12 @@ class ExponentialDriveOperator(Base):
     time_constant = bpy.props.FloatProperty(name="Time constant", description="", min=-9.9e10, max=9.9e10, precision=6, default=0.0)
     initial_time = bpy.props.FloatProperty(name="Initial time", description="", min=-9.9e10, max=9.9e10, precision=6, default=0.0)
     initial_value = bpy.props.FloatProperty(name="Initial value", description="", min=-9.9e10, max=9.9e10, precision=6, default=0.0)
-    @classmethod
-    def poll(cls, context):
-        return True
     def assign(self, context):
-        self.entity = database.drive[context.scene.drive_index]
         self.amplitude = self.entity.amplitude
         self.time_constant = self.entity.time_constant
         self.initial_time = self.entity.initial_time
         self.initial_value = self.entity.initial_value
     def store(self, context):
-        self.entity = database.drive[self.index]
         self.entity.amplitude = self.amplitude
         self.entity.time_constant = self.time_constant
         self.entity.initial_time = self.initial_time
@@ -815,11 +739,7 @@ class RandomDriveOperator(Base):
     steps = bpy.props.FloatProperty(name="Steps", description="", min=-9.9e10, max=9.9e10, precision=6, default=0.0)
     seed_type = bpy.props.EnumProperty(items=[("time_seed", "Time seed", ""), ("specified_seed", "Specified seed", "")], name="Seed type", default="specified_seed")
     specified_seed = bpy.props.FloatProperty(name="Specified seed", description="", min=0.0, max=9.9e10, precision=6, default=0.0)
-    @classmethod
-    def poll(cls, context):
-        return True
     def assign(self, context):
-        self.entity = database.drive[context.scene.drive_index]
         self.amplitude = self.entity.amplitude
         self.mean = self.entity.mean
         self.initial_time = self.entity.initial_time
@@ -829,7 +749,6 @@ class RandomDriveOperator(Base):
         self.seed_type = self.entity.seed_type
         self.specified_seed = self.entity.specified_seed
     def store(self, context):
-        self.entity = database.drive[self.index]
         self.entity.amplitude = self.amplitude
         self.entity.mean = self.mean
         self.entity.initial_time = self.initial_time
@@ -875,17 +794,12 @@ class MeterDriveOperator(Base):
     forever = bpy.props.BoolProperty(name="Forever", description="", default=True)
     final_time = bpy.props.FloatProperty(name="Final time", description="", min=0.0, max=9.9e10, precision=6)
     steps = bpy.props.IntProperty(name="Steps", description="", min=1, default=1)
-    @classmethod
-    def poll(cls, context):
-        return True
     def assign(self, context):
-        self.entity = database.drive[context.scene.drive_index]
         self.initial_time = self.entity.initial_time
         self.forever = self.entity.forever
         self.final_time = self.entity.final_time
         self.steps = self.entity.steps
     def store(self, context):
-        self.entity = database.drive[self.index]
         self.entity.initial_time = self.initial_time
         self.entity.forever = self.forever
         self.entity.final_time = self.final_time
@@ -914,14 +828,9 @@ class StringDrive(Entity):
 class StringDriveOperator(Base):
     bl_label = "String drive"
     expression_string = bpy.props.StringProperty(name="Expression string", maxlen=100, default="")
-    @classmethod
-    def poll(cls, context):
-        return True
     def assign(self, context):
-        self.entity = database.drive[context.scene.drive_index]
         self.expression_string = self.entity.expression_string
     def store(self, context):
-        self.entity = database.drive[self.index]
         self.entity.expression_string = self.expression_string
     def create_entity(self):
         return StringDrive(self.name)
@@ -938,29 +847,22 @@ class MultDrive(Entity):
 
 class MultDriveOperator(Base):
     bl_label = "Mult drive"
-    drive_1_name = bpy.props.EnumProperty(items=enum_drive, name="Drive 1")
-    drive_1_edit = bpy.props.BoolProperty(name="")
-    drive_2_name = bpy.props.EnumProperty(items=enum_drive, name="Drive 2")
-    drive_2_edit = bpy.props.BoolProperty(name="")
-    @classmethod
-    def poll(cls, context):
-        return True
-    def prereqs(self, context):
-        self.drive_exists(context)
+    drive_1_name = bpy.props.EnumProperty(items=enum_drive, name="Drive 1",
+        update=lambda self, context: update_drive(self, context, self.drive_1_name))
+    drive_2_name = bpy.props.EnumProperty(items=enum_drive, name="Drive 2",
+        update=lambda self, context: update_drive(self, context, self.drive_2_name))
     def assign(self, context):
-        self.entity = database.drive[context.scene.drive_index]
         self.drive_1_name = self.entity.links[0].name
         self.drive_2_name = self.entity.links[0].name
     def store(self, context):
-        self.entity = database.drive[self.index]
         self.entity.unlink_all()
-        self.link_drive(context, self.drive_1_name, self.drive_1_edit)
-        self.link_drive(context, self.drive_2_name, self.drive_2_edit)
+        self.link_drive(context, self.drive_1_name)
+        self.link_drive(context, self.drive_2_name)
         self.entity.increment_links()
     def draw(self, context):
         layout = self.layout
-        self.draw_link(layout, "drive_1_name", "drive_1_edit", "drive")
-        self.draw_link(layout, "drive_2_name", "drive_2_edit", "drive")
+        layout.prop(self, "drive_1_name")
+        layout.prop(self, "drive_2_name")
     def create_entity(self):
         return MultDrive(self.name)
 
@@ -992,29 +894,25 @@ class NodeDriveOperator(Base):
     bl_label = "Node drive"
     symbolic_name = bpy.props.StringProperty(name="Symbolic name", maxlen=100,
         description="Private data of the structural node", default="")
-    drive_name = bpy.props.EnumProperty(items=enum_drive, name="Drive")
-    drive_edit = bpy.props.BoolProperty(name="")
+    drive_name = bpy.props.EnumProperty(items=enum_drive, name="Drive",
+        update=lambda self, context: update_drive(self, context, self.drive_name))
     @classmethod
     def poll(cls, context):
         obs = SelectedObjects(context)
         return cls.bl_idname.startswith(root_dot + "e_") or len(obs) == 1
-    def prereqs(self, context):
-        self.drive_exists(context)
     def assign(self, context):
-        self.entity = database.drive[context.scene.drive_index]
         self.symbolic_name = self.entity.symbolic_name
         self.drive_name = self.entity.links[0].name
     def store(self, context):
-        self.entity = database.drive[self.index]
         self.entity.objects = SelectedObjects(context)
         self.entity.symbolic_name = self.symbolic_name
         self.entity.unlink_all()
-        self.link_drive(context, self.drive_name, self.drive_edit)
+        self.link_drive(context, self.drive_name)
         self.entity.increment_links()
     def draw(self, context):
         layout = self.layout
         layout.prop(self, "symbolic_name")
-        self.draw_link(layout, "drive_name", "drive_edit", "drive")
+        layout.prop(self, "drive_name")
     def create_entity(self):
         return NodeDrive(self.name)
 
@@ -1031,35 +929,27 @@ class ElementDrive(Entity):
 
 class ElementDriveOperator(Base):
     bl_label = "Structural node drive"
-    element_name = bpy.props.EnumProperty(items=enum_element, name="Element")
-    element_edit = bpy.props.BoolProperty(name="")
+    element_name = bpy.props.EnumProperty(items=enum_element, name="Element",
+        update=lambda self, context: update_element(self, context, self.element_name))
     symbolic_name = bpy.props.StringProperty(name="Symbolic name", maxlen=100,
         description="Private data of the structural node", default="")
-    drive_name = bpy.props.EnumProperty(items=enum_drive, name="Drive")
-    drive_edit = bpy.props.BoolProperty(name="")
-    @classmethod
-    def poll(cls, context):
-        return True
-    def prereqs(self, context):
-        self.element_exists(context)
-        self.drive_exists(context)
+    drive_name = bpy.props.EnumProperty(items=enum_drive, name="Drive",
+        update=lambda self, context: update_drive(self, context, self.drive_name))
     def assign(self, context):
-        self.entity = database.drive[context.scene.drive_index]
         self.symbolic_name = self.entity.symbolic_name
         self.element_name = self.entity.links[0].name
         self.drive_name = self.entity.links[1].name
     def store(self, context):
-        self.entity = database.drive[self.index]
         self.symbolic_name = self.symbolic_name
         self.entity.unlink_all()
-        self.link_drive(context, self.element_name, self.element_edit)
-        self.link_drive(context, self.drive_name, self.drive_edit)
+        self.link_drive(context, self.element_name)
+        self.link_drive(context, self.drive_name)
         self.entity.increment_links()
     def draw(self, context):
         layout = self.layout
-        self.draw_link(layout, "element_name", "element_edit")
+        layout.prop(slef, "element_name")
         layout.prop(self, "symbolic_name")
-        self.draw_link(layout, "drive_name", "drive_edit", "drive")
+        layout.prop(self, "drive_name")
     def create_entity(self):
         return ElementDrive(self.name)
 
@@ -1075,29 +965,22 @@ class DriveDrive(Entity):
 
 class DriveDriveOperator(Base):
     bl_label = "Drive drive"
-    drive_1_name = bpy.props.EnumProperty(items=enum_drive, name="Drive 1")
-    drive_1_edit = bpy.props.BoolProperty(name="")
-    drive_2_name = bpy.props.EnumProperty(items=enum_drive, name="Drive 2")
-    drive_2_edit = bpy.props.BoolProperty(name="")
-    @classmethod
-    def poll(cls, context):
-        return True
-    def prereqs(self, context):
-        self.drive_exists(context)
+    drive_1_name = bpy.props.EnumProperty(items=enum_drive, name="Drive 1",
+        update=lambda self, context: update_drive(self, context, self.drive_1_name))
+    drive_2_name = bpy.props.EnumProperty(items=enum_drive, name="Drive 2",
+        update=lambda self, context: update_drive(self, context, self.drive_2_name))
     def assign(self, context):
-        self.entity = database.drive[context.scene.drive_index]
         self.drive_1_name = self.entity.links[0].name
         self.drive_2_name = self.entity.links[0].name
     def store(self, context):
-        self.entity = database.drive[self.index]
         self.entity.unlink_all()
-        self.link_drive(context, self.drive_1_name, self.drive_1_edit)
-        self.link_drive(context, self.drive_2_name, self.drive_2_edit)
+        self.link_drive(context, self.drive_1_name)
+        self.link_drive(context, self.drive_2_name)
         self.entity.increment_links()
     def draw(self, context):
         layout = self.layout
-        self.draw_link(layout, "drive_1_name", "drive_1_edit", "drive")
-        self.draw_link(layout, "drive_2_name", "drive_2_edit", "drive")
+        layout.prop(self, "drive_1_name")
+        layout.prop(self, "drive_2_name")
     def create_entity(self):
         return DriveDrive(self.name)
 
@@ -1115,34 +998,29 @@ class ArrayDriveOperator(Base):
     bl_label = "Array drive"
     N = bpy.props.IntProperty(min=2, max=20)
     drive_names = bpy.props.CollectionProperty(name="Drive Names", type = BPY.DriveNames)
-    @classmethod
-    def poll(cls, context):
-        return True
     def prereqs(self, context):
+        self.drive_names.clear()
         self.N = 2
-        self.drive_exists(context)
         for i in range(20):
             self.drive_names.add()
     def assign(self, context):
-        self.entity = database.drive[context.scene.drive_index]
         self.N = self.entity.N
         for i, link in enumerate(self.entity.links):
+            self.drive_names[i].enable_popups = False
             self.drive_names[i].value = link.name
+            self.drive_names[i].enable_popups = True
     def store(self, context):
-        self.entity = database.drive[self.index]
         self.entity.N = self.N
         self.entity.unlink_all()
         for d in self.drive_names[:self.N]:
-            self.link_drive(context, d.value, d.edit)
+            self.link_drive(context, d.value)
         self.entity.increment_links()
     def draw(self, context):
         self.basis = self.N
         layout = self.layout
         layout.prop(self, "N")
         for i in range(self.N):
-            row = layout.row()
-            row.prop(self.drive_names[i], "value", text="")
-            row.prop(self.drive_names[i], "edit", toggle=True)
+            layout.prop(self.drive_names[i], "value", text="")
     def check(self, context):
         return self.basis != self.N
     def create_entity(self):

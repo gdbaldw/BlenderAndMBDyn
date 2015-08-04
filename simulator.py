@@ -29,6 +29,7 @@ if "bpy" in locals():
     imp.reload(Entity)
 else:
     from .base import bpy, BPY, root_dot, database, Operator, Entity, Bundle, enum_general_data, enum_method, enum_nonlinear_solver, enum_eigenanalysis, enum_abort_after, enum_linear_solver, enum_dummy_steps, enum_output_data, enum_real_time, enum_assembly, enum_job_control, enum_default_output, enum_default_aerodynamic_output, enum_default_beam_output
+    from .base import update_definition
     from .common import FORMAT
     from bpy_extras.io_utils import ExportHelper
     from mathutils import Matrix
@@ -45,6 +46,9 @@ klasses = dict()
 
 class Base(Operator):
     bl_label = "Simulators"
+    @classmethod
+    def poll(cls, context):
+        return True
     @classmethod
     def make_list(self, ListItem):
         bpy.types.Scene.simulator_uilist = bpy.props.CollectionProperty(type = ListItem)
@@ -77,10 +81,6 @@ for t in types:
         @classmethod
         def poll(cls, context):
             return False
-        def assign(self, context):
-            self.entity = database.simulator[context.scene.simulator_index]
-        def store(self, context):
-            self.entity = database.simulator[self.index]
         def create_entity(self):
             return Entity(self.name)
     klasses[t] = Tester
@@ -110,74 +110,87 @@ class InitialValue(Entity):
             f.write("end: control data;\n")
             database.write(f)
 
+"""
+method_types = [
+    "Crank Nicolson",
+    "ms",
+    "Hope",
+    "Third order",
+    "bdf",
+    "Implicit Euler"]
+
+nonlinear_solver_types = [
+    "Newton Raphston",
+    "Line search",
+    "Matrix free"]
+
+problem_types = ["General data"] + method_types + nonlinear_solver_types + ["Eigenanalysis", "Abort after", "Linear solver", "Dummy steps", "Output data", "Real time"]
+
+control_types = ["Assembly", "Job control", "Default output", "Default aerodynamic output", "Default beam output", "Default scale", "Rigid body kinematics"]
+
+problem_tree = ["Problem",
+    ["General data",
+    "Method", method_types,
+    "Nonlinear solver", nonlinear_solver_types,
+    "Eigenanalysis",
+    "Abort after",
+    "Linear solver",
+    "Dummy steps",
+    "Output data",
+     "Real time"
+    ]]
+
+control_tree = ["Control", control_types]
+"""
+
 class InitialValueOperator(Base):
     bl_label = "Initial value"
     executable_path = bpy.props.StringProperty(name="MBDyn path", description="Path to the MBDyn executable")
     initial_time = bpy.props.FloatProperty(name="Initial time", description="When to start simulation (s)", default=0.0, min=0.0, precision=6)
     forever = bpy.props.BoolProperty(name="Forever")
     final_time = bpy.props.FloatProperty(name="Final time", description="When to end simulation (s)", default=10.0, min=0.0, precision=6)
-    general_data_name = bpy.props.EnumProperty(items=enum_general_data, name="General data")
-    general_data_edit = bpy.props.BoolProperty(name="")
+    general_data_name = bpy.props.EnumProperty(items=enum_general_data, name="General data",
+        update=lambda self, context: update_definition(self, context, self.general_data_name, "General data"))
     set_method = bpy.props.BoolProperty(name="Set method")
-    method_name = bpy.props.EnumProperty(items=enum_method, name="Method")
-    method_edit = bpy.props.BoolProperty(name="")
+    method_name = bpy.props.EnumProperty(items=enum_method, name="Method",
+        update=lambda self, context: update_definition(self, context, self.method_name, "Method"))
     set_nonlinear_solver = bpy.props.BoolProperty(name="Set nonlinear solver")
-    nonlinear_solver_name = bpy.props.EnumProperty(items=enum_nonlinear_solver, name="Nonlinear solver")
-    nonlinear_solver_edit = bpy.props.BoolProperty(name="")
+    nonlinear_solver_name = bpy.props.EnumProperty(items=enum_nonlinear_solver, name="Nonlinear solver",
+        update=lambda self, context: update_definition(self, context, self.nonlinear_solver_name, "Nonlinear solver"))
     set_eigenanalysis = bpy.props.BoolProperty(name="Set eigenanalysis")
-    eigenanalysis_name = bpy.props.EnumProperty(items=enum_eigenanalysis, name="Eigenanalysis")
-    eigenanalysis_edit = bpy.props.BoolProperty(name="")
+    eigenanalysis_name = bpy.props.EnumProperty(items=enum_eigenanalysis, name="Eigenanalysis",
+        update=lambda self, context: update_definition(self, context, self.eigenanalysis_name, "Eigenanalysis"))
     set_abort_after = bpy.props.BoolProperty(name="Set abort after")
-    abort_after_name = bpy.props.EnumProperty(items=enum_abort_after, name="Abort after")
-    abort_after_edit = bpy.props.BoolProperty(name="")
+    abort_after_name = bpy.props.EnumProperty(items=enum_abort_after, name="Abort after",
+        update=lambda self, context: update_definition(self, context, self.abort_after_name, "Abort after"))
     set_linear_solver = bpy.props.BoolProperty(name="Set linear solver")
-    linear_solver_name = bpy.props.EnumProperty(items=enum_linear_solver, name="Linear solver")
-    linear_solver_edit = bpy.props.BoolProperty(name="")
+    linear_solver_name = bpy.props.EnumProperty(items=enum_linear_solver, name="Linear solver",
+        update=lambda self, context: update_definition(self, context, self.linear_solver_name, "Linear solver"))
     set_dummy_steps = bpy.props.BoolProperty(name="Set dummy steps")
-    dummy_steps_name = bpy.props.EnumProperty(items=enum_dummy_steps, name="Dummy steps")
-    dummy_steps_edit = bpy.props.BoolProperty(name="")
-    output_data_name = bpy.props.EnumProperty(items=enum_output_data, name="Output data")
-    output_data_edit = bpy.props.BoolProperty(name="")
+    dummy_steps_name = bpy.props.EnumProperty(items=enum_dummy_steps, name="Dummy steps",
+        update=lambda self, context: update_definition(self, context, self.dummy_steps_name, "Dummy steps"))
+    output_data_name = bpy.props.EnumProperty(items=enum_output_data, name="Output data",
+        update=lambda self, context: update_definition(self, context, self.output_data_name, "Output data"))
     set_real_time = bpy.props.BoolProperty(name="Set real time")
-    real_time_name = bpy.props.EnumProperty(items=enum_real_time, name="Real time")
-    real_time_edit = bpy.props.BoolProperty(name="")
+    real_time_name = bpy.props.EnumProperty(items=enum_real_time, name="Real time",
+        update=lambda self, context: update_definition(self, context, self.real_time_name, "Real time"))
     set_assembly = bpy.props.BoolProperty(name="Set assembly")
-    assembly_name = bpy.props.EnumProperty(items=enum_assembly, name="Assembly")
-    assembly_edit = bpy.props.BoolProperty(name="")
-    job_control_name = bpy.props.EnumProperty(items=enum_job_control, name="Job control")
-    job_control_edit = bpy.props.BoolProperty(name="")
+    assembly_name = bpy.props.EnumProperty(items=enum_assembly, name="Assembly",
+        update=lambda self, context: update_definition(self, context, self.assembly_name, "Assembly"))
+    job_control_name = bpy.props.EnumProperty(items=enum_job_control, name="Job control",
+        update=lambda self, context: update_definition(self, context, self.job_control_name, "Job control"))
     set_default_output = bpy.props.BoolProperty(name="Set default output", default=True)
-    default_output_name = bpy.props.EnumProperty(items=enum_default_output, name="Default output")
-    default_output_edit = bpy.props.BoolProperty(name="")
+    default_output_name = bpy.props.EnumProperty(items=enum_default_output, name="Default output",
+        update=lambda self, context: update_definition(self, context, self.default_output_name, "Default output"))
     set_default_aerodynamic_output = bpy.props.BoolProperty(name="Set default aerodynamic output")
-    default_aerodynamic_output_name = bpy.props.EnumProperty(items=enum_default_aerodynamic_output, name="Default aerodynamic output")
-    default_aerodynamic_output_edit = bpy.props.BoolProperty(name="")
+    default_aerodynamic_output_name = bpy.props.EnumProperty(items=enum_default_aerodynamic_output, name="Default aerodynamic output",
+        update=lambda self, context: update_definition(self, context, self.default_aerodynamic_output_name, "Default aerodynamic output"))
     set_default_beam_output = bpy.props.BoolProperty(name="Set beam default output")
-    default_beam_output_name = bpy.props.EnumProperty(items=enum_default_beam_output, name="Default beam output")
-    default_beam_output_edit = bpy.props.BoolProperty(name="")
-    @classmethod
-    def poll(self, context):
-        return True
+    default_beam_output_name = bpy.props.EnumProperty(items=enum_default_beam_output, name="Default beam output",
+        update=lambda self, context: update_definition(self, context, self.default_beam_output_name, "Default beam output"))
     def prereqs(self, context):
-        self.drive_exists(context)
-        self.meter_drive_exists(context)
-        self.general_data_exists(context)
-        self.method_exists(context)
-        self.nonlinear_solver_exists(context)
-        self.eigenanalysis_exists(context)
-        self.abort_after_exists(context)
-        self.linear_solver_exists(context)
-        self.dummy_steps_exists(context)
-        self.output_data_exists(context)
-        self.real_time_exists(context)
-        self.assembly_exists(context)
-        self.job_control_exists(context)
-        self.default_output_exists(context)
-        self.default_aerodynamic_output_exists(context)
-        self.default_beam_output_exists(context)
         self.executable_path = BPY.executable_path
     def assign(self, context):
-        self.entity = database.simulator[context.scene.simulator_index]
         self.executable_path = BPY.executable_path
         self.initial_time = self.entity.initial_time
         self.forever = self.entity.forever
@@ -220,7 +233,6 @@ class InitialValueOperator(Base):
         if self.set_default_beam_output:
             self.default_beam_output_name = next(link).name
     def store(self, context):
-        self.entity = database.simulator[self.index]
         BPY.executable_path = self.executable_path
         self.entity.executable_path = self.executable_path
         self.entity.initial_time = self.initial_time
@@ -238,31 +250,31 @@ class InitialValueOperator(Base):
         self.entity.set_default_aerodynamic_output = self.set_default_aerodynamic_output
         self.entity.set_default_beam_output = self.set_default_beam_output
         self.entity.unlink_all()
-        self.link_definition(context, self.general_data_name, self.general_data_edit)
+        self.link_definition(context, self.general_data_name)
         if self.set_method:
-            self.link_definition(context, self.method_name, self.method_edit)
+            self.link_definition(context, self.method_name)
         if self.set_nonlinear_solver:
-            self.link_definition(context, self.nonlinear_solver_name, self.nonlinear_solver_edit)
+            self.link_definition(context, self.nonlinear_solver_name)
         if self.set_eigenanalysis:
-            self.link_definition(context, self.eigenanalysis_name, self.eigenanalysis_edit)
+            self.link_definition(context, self.eigenanalysis_name)
         if self.set_abort_after:
-            self.link_definition(context, self.abort_after_name, self.abort_after_edit)
+            self.link_definition(context, self.abort_after_name)
         if self.set_linear_solver:
-            self.link_definition(context, self.linear_solver_name, self.linear_solver_edit)
+            self.link_definition(context, self.linear_solver_name)
         if self.set_dummy_steps:
-            self.link_definition(context, self.dummy_steps_name, self.dummy_steps_edit)
-        self.link_definition(context, self.output_data_name, self.output_data_edit)
+            self.link_definition(context, self.dummy_steps_name)
+        self.link_definition(context, self.output_data_name)
         if self.set_real_time:
-            self.link_definition(context, self.real_time_name, self.real_time_edit)
+            self.link_definition(context, self.real_time_name)
         if self.set_assembly:
-            self.link_definition(context, self.assembly_name, self.assembly_edit)
-        self.link_definition(context, self.job_control_name, self.job_control_edit)
+            self.link_definition(context, self.assembly_name)
+        self.link_definition(context, self.job_control_name)
         if self.set_default_output:
-            self.link_definition(context, self.default_output_name, self.default_output_edit)
+            self.link_definition(context, self.default_output_name)
         if self.set_default_aerodynamic_output:
-            self.link_definition(context, self.default_aerodynamic_output_name, self.default_aerodynamic_output_edit)
+            self.link_definition(context, self.default_aerodynamic_output_name)
         if self.set_default_beam_output:
-            self.link_definition(context, self.default_beam_output_name, self.default_beam_output_edit)
+            self.link_definition(context, self.default_beam_output_name)
         self.entity.increment_links()
         exec("bpy.ops." + root_dot + "save('INVOKE_DEFAULT')")
     def draw(self, context):
@@ -274,53 +286,53 @@ class InitialValueOperator(Base):
         row.prop(self, "forever")
         if not self.forever:
             row.prop(self, "final_time")
-        self.draw_link(layout, "general_data_name", "general_data_edit", "definition")
+        layout.prop(self, "general_data_name")
         row = layout.row()
         row.prop(self, "set_method")
         if self.set_method:
-            self.draw_link(row, "method_name", "method_edit", "definition")
+            row.prop(self, "method_name")
         row = layout.row()
         row.prop(self, "set_nonlinear_solver")
         if self.set_nonlinear_solver:
-            self.draw_link(row, "nonlinear_solver_name", "nonlinear_solver_edit", "definition")
+            row.prop(self, "nonlinear_solver_name")
         row = layout.row()
         row.prop(self, "set_eigenanalysis")
         if self.set_eigenanalysis:
-            self.draw_link(row, "eigenanalysis_name", "eigenanalysis_edit", "definition")
+            row.prop(self, "eigenanalysis_name")
         row = layout.row()
         row.prop(self, "set_abort_after")
         if self.set_abort_after:
-            self.draw_link(row, "abort_after_name", "abort_after_edit", "definition")
+            row.prop(self, "abort_after_name")
         row = layout.row()
         row.prop(self, "set_linear_solver")
         if self.set_linear_solver:
-            self.draw_link(row, "linear_solver_name", "linear_solver_edit", "definition")
+            row.prop(self, "linear_solver_name")
         row = layout.row()
         row.prop(self, "set_dummy_steps")
         if self.set_dummy_steps:
-            self.draw_link(row, "dummy_steps_name", "dummy_steps_edit", "definition")
-        self.draw_link(layout, "output_data_name", "output_data_edit", "definition")
+            row.prop(self, "dummy_steps_name")
+        layout.prop(self, "output_data_name")
         row = layout.row()
         row.prop(self, "set_real_time")
         if self.set_real_time:
-            self.draw_link(row, "real_time_name", "real_time_edit", "definition")
+            row.prop(self, "real_time_name")
         row = layout.row()
         row.prop(self, "set_assembly")
         if self.set_assembly:
-            self.draw_link(row, "assembly_name", "assembly_edit", "definition")
-        self.draw_link(layout, "job_control_name", "job_control_edit", "definition")
+            row.prop(self, "assembly_name")
+        layout.prop(self, "job_control_name")
         row = layout.row()
         row.prop(self, "set_default_output")
         if self.set_default_output:
-            self.draw_link(row, "default_output_name", "default_output_edit", "definition")
+            row.prop(self, "default_output_name")
         row = layout.row()
         row.prop(self, "set_default_aerodynamic_output")
         if self.set_default_aerodynamic_output:
-            self.draw_link(row, "default_aerodynamic_output_name", "default_aerodynamic_output_edit", "definition")
+            row.prop(self, "default_aerodynamic_output_name")
         row = layout.row()
         row.prop(self, "set_default_beam_output")
         if self.set_default_beam_output:
-            self.draw_link(row, "default_beam_output_name", "default_beam_output_edit", "definition")
+            row.prop(self, "default_beam_output_name")
     def check(self, context):
         return self.basis != (self.forever, self.set_method, self.set_nonlinear_solver, self.set_eigenanalysis, self.set_abort_after, self.set_linear_solver, self.set_dummy_steps, self.set_real_time, self.set_assembly, self.set_default_output, self.set_default_aerodynamic_output, self.set_default_beam_output)
     def create_entity(self):

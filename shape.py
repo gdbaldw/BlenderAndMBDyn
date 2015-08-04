@@ -46,6 +46,9 @@ class Base(Operator):
     bl_label = "Shapes"
     bl_options = {'DEFAULT_CLOSED'}
     @classmethod
+    def poll(cls, context):
+        return True
+    @classmethod
     def make_list(self, ListItem):
         bpy.types.Scene.shape_uilist = bpy.props.CollectionProperty(type = ListItem)
         bpy.types.Scene.shape_index = bpy.props.IntProperty(default=-1)
@@ -67,10 +70,6 @@ for t in types:
         @classmethod
         def poll(cls, context):
             return False
-        def assign(self, context):
-            self.entity = database.shape[context.scene.shape_index]
-        def store(self, context):
-            self.entity = database.shape[self.index]
         def create_entity(self):
             return Entity(self.name)
     klasses[t] = Tester
@@ -82,14 +81,9 @@ class ConstShape(Entity):
 class ConstShapeOperator(Base):
     bl_label = "Const shape"
     constant = bpy.props.FloatProperty(name="Constant", description="", min=-9.9e10, max=9.9e10, precision=6, default=1.0)
-    @classmethod
-    def poll(cls, context):
-        return True
     def assign(self, context):
-        self.entity = database.shape[context.scene.shape_index]
         self.constant = self.entity.constant
     def store(self, context):
-        self.entity = database.shape[self.index]
         self.entity.constant = self.constant
     def create_entity(self):
         return ConstShape(self.name)
@@ -107,9 +101,6 @@ class PiecewiseShapeOperator(Base):
     N = bpy.props.IntProperty(name="Number of points", min=2, max=50, description="")
     X = bpy.props.CollectionProperty(name="Abscissas", type = BPY.Floats)
     Y = bpy.props.CollectionProperty(name="Values", type = BPY.Floats)
-    @classmethod
-    def poll(cls, context):
-        return True
     def prereqs(self, context):
         self.N = 2
         self.X.clear()
@@ -118,14 +109,12 @@ class PiecewiseShapeOperator(Base):
             self.X.add()
             self.Y.add()
     def assign(self, context):
-        self.entity = database.shape[context.scene.shape_index]
         self.N = self.entity.N
         for i, value in enumerate(self.entity.X):
             self.X[i].value = value
         for i, value in enumerate(self.entity.Y):
             self.Y[i].value = value
     def store(self, context):
-        self.entity = database.shape[self.index]
         self.entity.N = self.N
         self.entity.X = [x.value for x in self.X]
         self.entity.Y = [y.value for y in self.Y]
@@ -158,15 +147,10 @@ class LinearShapeOperator(Base):
     bl_label = "Linear shape"
     y1 = bpy.props.FloatProperty(name="y(x=-1)", description="", min=-9.9e10, max=9.9e10, precision=6, default=0.0)
     y2 = bpy.props.FloatProperty(name="y(x=1)", description="", min=-9.9e10, max=9.9e10, precision=6, default=0.0)
-    @classmethod
-    def poll(cls, context):
-        return True
     def assign(self, context):
-        self.entity = database.shape[context.scene.shape_index]
         self.y1 = self.entity.y1
         self.y2 = self.entity.y2
     def store(self, context):
-        self.entity = database.shape[self.index]
         self.entity.y1 = self.y1
         self.entity.y2 = self.y2
     def draw(self, context):
@@ -201,16 +185,11 @@ class ParabolicShapeOperator(Base):
     y1 = bpy.props.FloatProperty(name="y(x=-1)", description="", min=-9.9e10, max=9.9e10, precision=6, default=0.0)
     y2 = bpy.props.FloatProperty(name="y(x=0)", description="", min=-9.9e10, max=9.9e10, precision=6, default=0.0)
     y3 = bpy.props.FloatProperty(name="y(x=1)", description="", min=-9.9e10, max=9.9e10, precision=6, default=0.0)
-    @classmethod
-    def poll(cls, context):
-        return True
     def assign(self, context):
-        self.entity = database.shape[context.scene.shape_index]
         self.y1 = self.entity.y1
         self.y2 = self.entity.y2
         self.y3 = self.entity.y3
     def store(self, context):
-        self.entity = database.shape[self.index]
         self.entity.y1 = self.y1
         self.entity.y2 = self.y2
         self.entity.y3 = self.y3

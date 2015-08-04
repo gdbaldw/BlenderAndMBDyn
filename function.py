@@ -29,6 +29,7 @@ if "bpy" in locals():
     imp.reload(Entity)
 else:
     from .base import bpy, database, Operator, Entity, Bundle, BPY, enum_function
+    from .base import update_function
     from .common import FORMAT
 
 types = [
@@ -53,6 +54,9 @@ class Base(Operator):
     bl_label = "Functions"
     bl_options = {'DEFAULT_CLOSED'}
     @classmethod
+    def poll(cls, context):
+        return True
+    @classmethod
     def make_list(self, ListItem):
         bpy.types.Scene.function_uilist = bpy.props.CollectionProperty(type = ListItem)
         bpy.types.Scene.function_index = bpy.props.IntProperty(default=-1)
@@ -65,8 +69,6 @@ class Base(Operator):
         return context.scene.function_index, context.scene.function_uilist
     def set_index(self, context, value):
         context.scene.function_index = value
-    def prereqs(self, context):
-        pass
 
 for t in types:
     class Tester(Base):
@@ -74,10 +76,6 @@ for t in types:
         @classmethod
         def poll(cls, context):
             return False
-        def assign(self, context):
-            self.entity = database.function[context.scene.function_index]
-        def store(self, context):
-            self.entity = database.function[self.index]
         def create_entity(self):
             return Entity(self.name)
     klasses[t] = Tester
@@ -90,15 +88,10 @@ class Const(Entity):
 
 class ConstOperator(Base):
     bl_label = "Const"
-    constant = bpy.props.FloatProperty(name="Constant", description="", min=-9.9e10, max=9.9e10, precision=6, default=1.0)
-    @classmethod
-    def poll(cls, context):
-        return True
+    constant = bpy.props.FloatProperty(name="Constant", description="", min=-9.9e10, max=9.9e10, precision=6, default=0.0)
     def assign(self, context):
-        self.entity = database.function[context.scene.function_index]
         self.constant = self.entity.constant
     def store(self, context):
-        self.entity = database.function[self.index]
         self.entity.constant = self.constant
     def create_entity(self):
         return Const(self.name)
@@ -122,18 +115,13 @@ class ExpLogBase(Base):
     default_coefficient = bpy.props.BoolProperty(name="Default coefficient (1)", default=True)
     coefficient = bpy.props.FloatProperty(name="Coefficient", description="", min=-9.9e10, max=9.9e10, precision=6, default=1.0)
     multiplier = bpy.props.FloatProperty(name="Multiplier", description="", min=-9.9e10, max=9.9e10, precision=6, default=1.0)
-    @classmethod
-    def poll(cls, context):
-        return True
     def assign(self, context):
-        self.entity = database.function[context.scene.function_index]
         self.default_base = self.entity.default_base
         self.base = self.entity.base
         self.default_coefficient = self.entity.default_coefficient
         self.coefficient = self.entity.coefficient
         self.multiplier = self.entity.multiplier
     def store(self, context):
-        self.entity = database.function[self.index]
         self.entity.default_base = self.default_base
         self.entity.base = self.base
         self.entity.default_coefficient = self.default_coefficient
@@ -188,14 +176,9 @@ class Pow(Entity):
 class PowOperator(Base):
     bl_label = "Pow"
     power = bpy.props.FloatProperty(name="Power", description="", min=-9.9e10, max=9.9e10, precision=6, default=1.0)
-    @classmethod
-    def poll(cls, context):
-        return True
     def assign(self, context):
-        self.entity = database.function[context.scene.function_index]
         self.power = self.entity.power
     def store(self, context):
-        self.entity = database.function[self.index]
         self.entity.power = self.power
     def create_entity(self):
         return Pow(self.name)
@@ -216,17 +199,12 @@ class LinearOperator(Base):
     x2 = bpy.props.FloatProperty(name="x2", description="", min=-9.9e10, max=9.9e10, precision=6, default=0.0)
     y1 = bpy.props.FloatProperty(name="y1", description="", min=-9.9e10, max=9.9e10, precision=6, default=0.0)
     y2 = bpy.props.FloatProperty(name="y2", description="", min=-9.9e10, max=9.9e10, precision=6, default=0.0)
-    @classmethod
-    def poll(cls, context):
-        return True
     def assign(self, context):
-        self.entity = database.function[context.scene.function_index]
         self.x1 = self.entity.x1
         self.x2 = self.entity.x2
         self.y1 = self.entity.y1
         self.y2 = self.entity.y2
     def store(self, context):
-        self.entity = database.function[self.index]
         self.entity.x1 = self.x1
         self.entity.x2 = self.x2
         self.entity.y1 = self.y1
@@ -258,9 +236,6 @@ class MultipleBase(Base):
     N = bpy.props.IntProperty(name="Number of points", min=2, max=50, description="", default=2)
     X = bpy.props.CollectionProperty(name="X", type = BPY.Floats)
     Y = bpy.props.CollectionProperty(name="Y", type = BPY.Floats)
-    @classmethod
-    def poll(cls, context):
-        return True
     def prereqs(self, context):
         self.X.clear()
         self.Y.clear()
@@ -268,7 +243,6 @@ class MultipleBase(Base):
             self.X.add()
             self.Y.add()
     def assign(self, context):
-        self.entity = database.function[context.scene.function_index]
         self.extrapolate = self.entity.extrapolate
         self.N = self.entity.N
         for i, value in enumerate(self.entity.X):
@@ -276,7 +250,6 @@ class MultipleBase(Base):
         for i, value in enumerate(self.entity.Y):
             self.Y[i].value = value
     def store(self, context):
-        self.entity = database.function[self.index]
         self.entity.extrapolate = self.extrapolate
         self.entity.N = self.N
         self.entity.X = [x.value for x in self.X]
@@ -344,15 +317,11 @@ class ChebychevOperator(Base):
     extrapolate = bpy.props.BoolProperty(name="Extrapolate", default=True)
     N = bpy.props.IntProperty(name="Number of points", min=2, max=50, description="", default=2)
     C = bpy.props.CollectionProperty(name="Coefficients", type = BPY.Floats)
-    @classmethod
-    def poll(cls, context):
-        return True
     def prereqs(self, context):
         self.C.clear()
         for i in range(50):
             self.C.add()
     def assign(self, context):
-        self.entity = database.function[context.scene.function_index]
         self.lower_bound = self.entity.lower_bound
         self.upper_bound = self.entity.upper_bound
         self.extrapolate = self.entity.extrapolate
@@ -360,7 +329,6 @@ class ChebychevOperator(Base):
         for i, value in enumerate(self.entity.C):
             self.C[i].value = value
     def store(self, context):
-        self.entity = database.function[self.index]
         self.entity.lower_bound = self.lower_bound
         self.entity.upper_bound = self.upper_bound
         self.entity.extrapolate = self.extrapolate
@@ -391,29 +359,22 @@ class Sum(Entity):
         text.write(",\n\t\"" + self.links[0].name + "\", \"" + self.links[1].name + "\";\n")
 
 class BinaryOperator(Base):
-    f1_name = bpy.props.EnumProperty(items=enum_function, name="f1")
-    f1_edit = bpy.props.BoolProperty(name="")
-    f2_name = bpy.props.EnumProperty(items=enum_function, name="f2")
-    f2_edit = bpy.props.BoolProperty(name="")
-    @classmethod
-    def poll(cls, context):
-        return True
-    def prereqs(self, context):
-        self.function_exists(context)
+    f1_name = bpy.props.EnumProperty(items=enum_function, name="f1",
+        update=lambda self, context: update_function(self, context, self.f1_name))
+    f2_name = bpy.props.EnumProperty(items=enum_function, name="f2",
+        update=lambda self, context: update_function(self, context, self.f2_name))
     def assign(self, context):
-        self.entity = database.function[context.scene.function_index]
         self.f1_name = self.entity.links[0].name
         self.f2_name = self.entity.links[1].name
     def store(self, context):
-        self.entity = database.function[self.index]
         self.entity.unlink_all()
-        self.link_function(context, self.f1_name, self.f1_edit)
-        self.link_function(context, self.f2_name, self.f2_edit)
+        self.link_function(context, self.f1_name)
+        self.link_function(context, self.f2_name)
         self.entity.increment_links()
     def draw(self, context):
         layout = self.layout
-        self.draw_link(layout, "f1_name", "f1_edit", "function")
-        self.draw_link(layout, "f2_name", "f2_edit", "function")
+        layout.prop(self, "f1_name")
+        layout.prop(self, "f2_name")
 
 class SumOperator(BinaryOperator):
     bl_label = "Sum"

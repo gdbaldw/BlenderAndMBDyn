@@ -39,13 +39,77 @@ category = "MBDyn"
 root_dot = "_".join(category.lower().split()) + "."
 database = Database()
 
+def update_constitutive(self, context, name):
+    if self.enable_popups:
+        if name == "New":
+            bpy.ops.wm.call_menu(name=root_dot+"add_constitutive")
+        else:
+            entity = database.constitutive.get_by_name(name)
+            context.scene.constitutive_index = database.constitutive.index(entity)
+            exec("bpy.ops." + root_dot + "e_" + "_".join(entity.type.lower().split()) + "('INVOKE_DEFAULT')")
+def update_definition(self, context, name, menu_item):
+    if self.enable_popups:
+        if name == "New":
+            if menu_item in ["Method", "Nonlinear solver"]:
+                bpy.ops.wm.call_menu(name=root_dot + "_".join(menu_item.lower().split()))
+            else:
+                exec("bpy.ops." + root_dot + "c_" + "_".join(menu_item.lower().split()) + "('INVOKE_DEFAULT')")
+                #bpy.ops.wm.call_menu(name=root_dot+"add_definition")
+        else:
+            entity = database.definition.get_by_name(name)
+            context.scene.definition_index = database.definition.index(entity)
+            exec("bpy.ops." + root_dot + "e_" + "_".join(entity.type.lower().split()) + "('INVOKE_DEFAULT')")
+def update_drive(self, context, name, menu_item=None):
+    if self.enable_popups:
+        if name == "New":
+            if menu_item:
+                exec("bpy.ops." + root_dot + "c_" + "_".join(menu_item.lower().split()) + "('INVOKE_DEFAULT')")
+            else:
+                bpy.ops.wm.call_menu(name=root_dot+"add_drive")
+        else:
+            entity = database.drive.get_by_name(name)
+            context.scene.drive_index = database.drive.index(entity)
+            exec("bpy.ops." + root_dot + "e_" + "_".join(entity.type.lower().split()) + "('INVOKE_DEFAULT')")
+def update_element(self, context, name):
+    if self.enable_popups:
+        if name == "New":
+            bpy.ops.wm.call_menu(name=root_dot+"add_element")
+        else:
+            entity = database.element.get_by_name(name)
+            context.scene.element_index = database.element.index(entity)
+            exec("bpy.ops." + root_dot + "e_" + "_".join(entity.type.lower().split()) + "('INVOKE_DEFAULT')")
+def update_friction(self, context, name):
+    if self.enable_popups:
+        if name == "New":
+            bpy.ops.wm.call_menu(name=root_dot+"add_friction")
+        else:
+            entity = database.friction.get_by_name(name)
+            context.scene.friction_index = database.friction.index(entity)
+            exec("bpy.ops." + root_dot + "e_" + "_".join(entity.type.lower().split()) + "('INVOKE_DEFAULT')")
+def update_function(self, context, name):
+    if self.enable_popups:
+        if name == "New":
+            bpy.ops.wm.call_menu(name=root_dot+"add_function")
+        else:
+            entity = database.function.get_by_name(name)
+            context.scene.function_index = database.function.index(entity)
+            exec("bpy.ops." + root_dot + "e_" + "_".join(entity.type.lower().split()) + "('INVOKE_DEFAULT')")
+def update_matrix(self, context, name, menu_item):
+    if self.enable_popups:
+        if name == "New":
+            exec("bpy.ops." + root_dot + "c_" + "_".join(menu_item.lower().split()) + "('INVOKE_DEFAULT')")
+        else:
+            entity = database.matrix.get_by_name(name)
+            context.scene.matrix_index = database.matrix.index(entity)
+            exec("bpy.ops." + root_dot + "e_" + "_".join(entity.type.lower().split()) + "('INVOKE_DEFAULT')")
+
 def enum_scenes(self, context):
     return [(s.name, s.name, "") for s in bpy.data.scenes]
 def enum_objects(self, context):
     return [(o.name, o.name, "") for o in context.scene.objects if o.type == 'MESH']
 def enum_matrix(self, context, matrix_type):
     return [(m.name, m.name, "") for i, m in enumerate(context.scene.matrix_uilist)
-        if database.matrix[i].type == matrix_type]
+        if database.matrix[i].type == matrix_type] + [("New", "New", "")]
 def enum_matrix_3x1(self, context):
     return enum_matrix(self, context, "3x1")
 def enum_matrix_6x1(self, context):
@@ -57,8 +121,8 @@ def enum_matrix_6x6(self, context):
 def enum_matrix_6xN(self, context):
     return enum_matrix(self, context, "6xN")
 def enum_constitutive(self, context, dimension):
-    return [(c.name, c.name, "") for i, c in enumerate(context.scene.constitutive_uilist)
-        if dimension in database.constitutive[i].dimensions]
+    return  [(c.name, c.name, "") for i, c in enumerate(context.scene.constitutive_uilist)
+        if dimension in database.constitutive[i].dimensions] + [("New", "New", "")]
 def enum_constitutive_1D(self, context):
     return enum_constitutive(self, context, "1D")
 def enum_constitutive_3D(self, context):
@@ -66,43 +130,43 @@ def enum_constitutive_3D(self, context):
 def enum_constitutive_6D(self, context):
     return enum_constitutive(self, context, "6D")
 def enum_drive(self, context):
-    return [(d.name, d.name, "") for d in context.scene.drive_uilist]
+    return [(d.name, d.name, "") for d in context.scene.drive_uilist] + [("New", "New", "")]
 def enum_meter_drive(self, context):
-    return [(d.name, d.name, "") for i, d in enumerate(context.scene.drive_uilist) if database.drive[i].type == "Meter drive"]
+    return [(d.name, d.name, "") for i, d in enumerate(context.scene.drive_uilist) if database.drive[i].type == "Meter drive"] + [("New", "New", "")]
 def enum_element(self, context):
-    return [(e.name, e.name, "") for e in context.scene.element_uilist]
+    return [(e.name, e.name, "") for e in context.scene.element_uilist] + [("New", "New", "")]
 def enum_function(self, context):
-    return [(f.name, f.name, "") for f in context.scene.function_uilist]
+    return [(f.name, f.name, "") for f in context.scene.function_uilist] + [("New", "New", "")]
 def enum_friction(self, context):
-    return [(f.name, f.name, "") for f in context.scene.friction_uilist]
+    return [(f.name, f.name, "") for f in context.scene.friction_uilist] + [("New", "New", "")]
 def enum_general_data(self, context):
-    return [(d.name, d.name, "") for i, d in enumerate(context.scene.definition_uilist) if database.definition[i].type == "General data"]
+    return [(d.name, d.name, "") for i, d in enumerate(context.scene.definition_uilist) if database.definition[i].type == "General data"] + [("New", "New", "")]
 def enum_method(self, context):
-    return [(d.name, d.name, "") for i, d in enumerate(context.scene.definition_uilist) if database.definition[i].type in method_types]
+    return [(d.name, d.name, "") for i, d in enumerate(context.scene.definition_uilist) if database.definition[i].type in method_types] + [("New", "New", "")]
 def enum_nonlinear_solver(self, context):
-    return [(d.name, d.name, "") for i, d in enumerate(context.scene.definition_uilist) if database.definition[i].type in nonlinear_solver_types]
+    return [(d.name, d.name, "") for i, d in enumerate(context.scene.definition_uilist) if database.definition[i].type in nonlinear_solver_types] + [("New", "New", "")]
 def enum_eigenanalysis(self, context):
-    return [(d.name, d.name, "") for i, d in enumerate(context.scene.definition_uilist) if database.definition[i].type == "Eigenanalysis"]
+    return [(d.name, d.name, "") for i, d in enumerate(context.scene.definition_uilist) if database.definition[i].type == "Eigenanalysis"] + [("New", "New", "")]
 def enum_abort_after(self, context):
-    return [(d.name, d.name, "") for i, d in enumerate(context.scene.definition_uilist) if database.definition[i].type == "Abort after"]
+    return [(d.name, d.name, "") for i, d in enumerate(context.scene.definition_uilist) if database.definition[i].type == "Abort after"] + [("New", "New", "")]
 def enum_linear_solver(self, context):
-    return [(d.name, d.name, "") for i, d in enumerate(context.scene.definition_uilist) if database.definition[i].type == "Linear solver"]
+    return [(d.name, d.name, "") for i, d in enumerate(context.scene.definition_uilist) if database.definition[i].type == "Linear solver"] + [("New", "New", "")]
 def enum_dummy_steps(self, context):
-    return [(d.name, d.name, "") for i, d in enumerate(context.scene.definition_uilist) if database.definition[i].type == "Dummy steps"]
+    return [(d.name, d.name, "") for i, d in enumerate(context.scene.definition_uilist) if database.definition[i].type == "Dummy steps"] + [("New", "New", "")]
 def enum_output_data(self, context):
-    return [(d.name, d.name, "") for i, d in enumerate(context.scene.definition_uilist) if database.definition[i].type == "Output data"]
+    return [(d.name, d.name, "") for i, d in enumerate(context.scene.definition_uilist) if database.definition[i].type == "Output data"] + [("New", "New", "")]
 def enum_real_time(self, context):
-    return [(d.name, d.name, "") for i, d in enumerate(context.scene.definition_uilist) if database.definition[i].type == "Real time"]
+    return [(d.name, d.name, "") for i, d in enumerate(context.scene.definition_uilist) if database.definition[i].type == "Real time"] + [("New", "New", "")]
 def enum_assembly(self, context):
-    return [(d.name, d.name, "") for i, d in enumerate(context.scene.definition_uilist) if database.definition[i].type == "Assembly"]
+    return [(d.name, d.name, "") for i, d in enumerate(context.scene.definition_uilist) if database.definition[i].type == "Assembly"] + [("New", "New", "")]
 def enum_job_control(self, context):
-    return [(d.name, d.name, "") for i, d in enumerate(context.scene.definition_uilist) if database.definition[i].type == "Job control"]
+    return [(d.name, d.name, "") for i, d in enumerate(context.scene.definition_uilist) if database.definition[i].type == "Job control"] + [("New", "New", "")]
 def enum_default_output(self, context):
-    return [(d.name, d.name, "") for i, d in enumerate(context.scene.definition_uilist) if database.definition[i].type == "Default output"]
+    return [(d.name, d.name, "") for i, d in enumerate(context.scene.definition_uilist) if database.definition[i].type == "Default output"] + [("New", "New", "")]
 def enum_default_aerodynamic_output(self, context):
-    return [(d.name, d.name, "") for i, d in enumerate(context.scene.definition_uilist) if database.definition[i].type == "Default aerodynamic output"]
+    return [(d.name, d.name, "") for i, d in enumerate(context.scene.definition_uilist) if database.definition[i].type == "Default aerodynamic output"] + [("New", "New", "")]
 def enum_default_beam_output(self, context):
-    return [(d.name, d.name, "") for i, d in enumerate(context.scene.definition_uilist) if database.definition[i].type == "Default beam output"]
+    return [(d.name, d.name, "") for i, d in enumerate(context.scene.definition_uilist) if database.definition[i].type == "Default beam output"] + [("New", "New", "")]
 
 @bpy.app.handlers.persistent
 def load_post(*args, **kwargs):
@@ -126,11 +190,13 @@ class BPY:
         value = bpy.props.StringProperty(name="")
         select = bpy.props.BoolProperty(name="")
     class DriveNames(bpy.types.PropertyGroup):
-        value = bpy.props.EnumProperty(items=enum_drive, name="Drive")
-        edit = bpy.props.BoolProperty(name="")
+        value = bpy.props.EnumProperty(items=enum_drive, name="Drive",
+            update=lambda self, context: update_drive(self, context, self.value))
+        enable_popups = bpy.props.BoolProperty(default=True, options={'HIDDEN'})
     class FunctionNames(bpy.types.PropertyGroup):
-        value = bpy.props.EnumProperty(items=enum_function, name="Function")
-        edit = bpy.props.BoolProperty(name="")
+        value = bpy.props.EnumProperty(items=enum_function, name="Function",
+            update=lambda self, context: update_function(self, context, self.value))
+        enable_popups = bpy.props.BoolProperty(default=True, options={'HIDDEN'})
     class ObjectNames(bpy.types.PropertyGroup):
         value = bpy.props.EnumProperty(items=enum_objects, name="Object")
     klasses = [Floats, Names, DriveNames, FunctionNames, ObjectNames]
@@ -229,130 +295,50 @@ class SelectedObjects(list):
             self.clear()
 
 class Operator:
-    def matrix_exists(self, context, matrix_type):
-        if not enum_matrix(self, context, matrix_type):
-            exec("bpy.ops." + root_dot + "c_" + matrix_type + "()")
-    def constitutive_exists(self, context, dimension):
-        if not enum_constitutive(self, context, dimension):
-            if dimension == "1D":
-                exec("bpy.ops." + root_dot + "c_linear_elastic(dimensions = \"1D\")")
-            else:
-                exec("bpy.ops." + root_dot + "c_linear_elastic(dimensions = \"3D, 6D\")")
-    def drive_exists(self, context):
-        if not enum_drive(self, context):
-            exec("bpy.ops." + root_dot + "c_unit_drive()")
-    def meter_drive_exists(self, context):
-        if not enum_meter_drive(self, context):
-            exec("bpy.ops." + root_dot + "c_meter_drive()")
-    def element_exists(self, context):
-        if not enum_element(self, context):
-            exec("bpy.ops." + root_dot + "c_gravity()")
-    def function_exists(self, context):
-        if not enum_function(self, context):
-            exec("bpy.ops." + root_dot + "c_const()")
-    def friction_exists(self, context):
-        if not enum_friction(self, context):
-            exec("bpy.ops." + root_dot + "c_modlugre()")
-    def general_data_exists(self, context):
-        if not enum_general_data(self, context):
-            exec("bpy.ops." + root_dot + "c_general_data()")
-    def method_exists(self, context):
-        if not enum_method(self, context):
-            exec("bpy.ops." + root_dot + "c_crank_nicolson()")
-    def nonlinear_solver_exists(self, context):
-        if not enum_nonlinear_solver(self, context):
-            exec("bpy.ops." + root_dot + "c_newton_raphston()")
-    def eigenanalysis_exists(self, context):
-        if not enum_eigenanalysis(self, context):
-            exec("bpy.ops." + root_dot + "c_eigenanalysis()")
-    def abort_after_exists(self, context):
-        if not enum_abort_after(self, context):
-            exec("bpy.ops." + root_dot + "c_abort_after()")
-    def linear_solver_exists(self, context):
-        if not enum_linear_solver(self, context):
-            exec("bpy.ops." + root_dot + "c_linear_solver()")
-    def dummy_steps_exists(self, context):
-        if not enum_dummy_steps(self, context):
-            exec("bpy.ops." + root_dot + "c_dummy_steps()")
-    def output_data_exists(self, context):
-        if not enum_output_data(self, context):
-            exec("bpy.ops." + root_dot + "c_output_data()")
-    def real_time_exists(self, context):
-        if not enum_real_time(self, context):
-            exec("bpy.ops." + root_dot + "c_real_time()")
-    def assembly_exists(self, context):
-        if not enum_assembly(self, context):
-            exec("bpy.ops." + root_dot + "c_assembly()")
-    def job_control_exists(self, context):
-        if not enum_job_control(self, context):
-            exec("bpy.ops." + root_dot + "c_job_control()")
-    def default_output_exists(self, context):
-        if not enum_default_output(self, context):
-            exec("bpy.ops." + root_dot + "c_default_output()")
-    def default_aerodynamic_output_exists(self, context):
-        if not enum_default_aerodynamic_output(self, context):
-            exec("bpy.ops." + root_dot + "c_default_aerodynamic_output()")
-    def default_beam_output_exists(self, context):
-        if not enum_default_beam_output(self, context):
-            exec("bpy.ops." + root_dot + "c_default_beam_output()")
-    def link_matrix(self, context, matrix_name, edit=True):
-        context.scene.matrix_index = next(i for i, x in enumerate(context.scene.matrix_uilist)
-            if x.name == matrix_name)
-        matrix = database.matrix[context.scene.matrix_index]
-        if edit:
-            exec("bpy.ops." + root_dot + "e_" + matrix.type + "('INVOKE_DEFAULT')")
-        self.entity.links.append(matrix)
-    def link_constitutive(self, context, constitutive_name, edit=True):
-        context.scene.constitutive_index = next(i for i, x in enumerate(context.scene.constitutive_uilist)
-            if x.name == constitutive_name)
-        constitutive = database.constitutive[context.scene.constitutive_index]
-        if edit:
-            exec("bpy.ops." + root_dot + "e_" + "_".join(constitutive.type.lower().split()) + "('INVOKE_DEFAULT')")
-        self.entity.links.append(constitutive)
-    def link_drive(self, context, drive_name, edit=True):
-        context.scene.drive_index = next(i for i, x in enumerate(context.scene.drive_uilist)
-            if x.name == drive_name)
-        drive = database.drive[context.scene.drive_index]
-        if edit:
-            exec("bpy.ops." + root_dot + "e_" + "_".join(drive.type.lower().split()) + "('INVOKE_DEFAULT')")
-        self.entity.links.append(drive)
-    def link_element(self, context, element_name, edit=True):
+    def link_element(self, context, element_name):
         context.scene.element_index = next(i for i, x in enumerate(context.scene.element_uilist)
             if x.name == element_name)
         element = database.element[context.scene.element_index]
-        if edit:
-            exec("bpy.ops." + root_dot + "e_" + "_".join(element.type.lower().split()) + "('INVOKE_DEFAULT')")
         self.entity.links.append(element)
-    def link_function(self, context, function_name, edit=True):
+    def link_matrix(self, context, matrix_name):
+        context.scene.matrix_index = next(i for i, x in enumerate(context.scene.matrix_uilist)
+            if x.name == matrix_name)
+        matrix = database.matrix[context.scene.matrix_index]
+        self.entity.links.append(matrix)
+    def link_constitutive(self, context, constitutive_name):
+        context.scene.constitutive_index = next(i for i, x in enumerate(context.scene.constitutive_uilist)
+            if x.name == constitutive_name)
+        constitutive = database.constitutive[context.scene.constitutive_index]
+        self.entity.links.append(constitutive)
+    def link_drive(self, context, drive_name):
+        context.scene.drive_index = next(i for i, x in enumerate(context.scene.drive_uilist)
+            if x.name == drive_name)
+        drive = database.drive[context.scene.drive_index]
+        self.entity.links.append(drive)
+    def link_function(self, context, function_name):
         context.scene.function_index = next(i for i, x in enumerate(context.scene.function_uilist)
             if x.name == function_name)
         function = database.function[context.scene.function_index]
-        if edit:
-            exec("bpy.ops." + root_dot + "e_" + "_".join(function.type.lower().split()) + "('INVOKE_DEFAULT')")
         self.entity.links.append(function)
-    def link_friction(self, context, friction_name, edit=True):
+    def link_friction(self, context, friction_name):
         context.scene.friction_index = next(i for i, x in enumerate(context.scene.friction_uilist)
             if x.name == friction_name)
         friction = database.friction[context.scene.friction_index]
-        if edit:
-            exec("bpy.ops." + root_dot + "e_" + "_".join(friction.type.lower().split()) + "('INVOKE_DEFAULT')")
         self.entity.links.append(friction)
-    def link_definition(self, context, definition_name, edit=True):
+    def link_definition(self, context, definition_name):
         context.scene.definition_index = next(i for i, x in enumerate(context.scene.definition_uilist)
             if x.name == definition_name)
         definition = database.definition[context.scene.definition_index]
-        if edit:
-            exec("bpy.ops." + root_dot + "e_" + "_".join(definition.type.lower().split()) + "('INVOKE_DEFAULT')")
         self.entity.links.append(definition)
-    def draw_link(self, layout, link_name, link_edit, link_module=None):
-        row = layout.row()
-        row.prop(self, link_name)
-        row.prop(self, link_edit, toggle=True)
-        if link_module:
-            row.menu(root_dot + "_".join(["add", link_module]), icon='ZOOMIN', text="")
     def draw_panel_pre(self, context, layout):
         pass
     def draw_panel_post(self, context, layout):
+        pass
+    def prereqs(self, context):
+        pass
+    def assign(self, context):
+        pass
+    def store(self, context):
         pass
 
 class TreeMenu(list):
@@ -397,29 +383,40 @@ class Operators(list):
             class Create(bpy.types.Operator, klass):
                 bl_idname = root_dot + "c_" + "_".join(name.lower().split())
                 bl_options = {'REGISTER', 'INTERNAL'}
+                enable_popups = bpy.props.BoolProperty(default=True, options={'HIDDEN'})
                 def invoke(self, context, event):
                     self.prereqs(context)
+                    self.entity = self.create_entity()
                     return context.window_manager.invoke_props_dialog(self)
                 def execute(self, context):
+                    try:
+                        self.store(context)
+                    except StopIteration as e:
+                        self.entity.unlink_all()
+                        self.report({'ERROR'}, "Incomplete (click on each 'New' selector)")
+                        return {'CANCELLED'}
                     index, uilist = self.get_uilist(context)
-                    self.index = len(uilist)
+                    index = len(uilist)
                     uilist.add()
-                    self.set_index(context, self.index)
-                    self.entity_list.append(self.create_entity())
+                    self.set_index(context, index)
+                    self.entity_list.append(self.entity)
                     self.entity_list[-1].entity_list = self.entity_list
-                    uilist[self.index].name = self.name
-                    self.store(context)
+                    uilist[index].name = self.name
                     context.scene.dirty_simulator = True
-                    self.set_index(context, self.index)
+                    self.set_index(context, index)
                     return {'FINISHED'}
             class Edit(bpy.types.Operator, klass):
                 bl_label = " ".join(["Edit:", name, "instance"])
                 bl_idname = root_dot + "e_" + "_".join(name.lower().split())
                 bl_options = {'REGISTER', 'INTERNAL'}
+                enable_popups = bpy.props.BoolProperty(default=False, options={'HIDDEN'})
                 def invoke(self, context, event):
+                    self.enable_popups = False
                     self.prereqs(context)
                     self.index, uilist = self.get_uilist(context)
+                    self.entity = self.entity_list[self.index]
                     self.assign(context)
+                    self.enable_popups = True
                     return context.window_manager.invoke_props_dialog(self)
                 def execute(self, context):
                     self.store(context)
@@ -565,7 +562,7 @@ class UI(list):
         class ListItem(bpy.types.PropertyGroup, klass):
             def update(self, context):
                 index, uilist = self.get_uilist(context)
-                names = [e.name for i, e in enumerate(self.entity_list) if i != index]
+                names = [e.name for i, e in enumerate(self.entity_list) if i != index] + ["New"]
                 name = uilist[index].name
                 if name in names:
                     if ".001" <= name[-4:] and name[-4:] <= ".999":

@@ -39,6 +39,9 @@ class Base(Operator):
     bl_label = "Matrices"
     bl_options = {'DEFAULT_CLOSED'}
     @classmethod
+    def poll(cls, context):
+        return True
+    @classmethod
     def make_list(self, ListItem):
         bpy.types.Scene.matrix_uilist = bpy.props.CollectionProperty(type = ListItem)
         bpy.types.Scene.matrix_index = bpy.props.IntProperty(default=-1)
@@ -51,18 +54,12 @@ class Base(Operator):
         return context.scene.matrix_index, context.scene.matrix_uilist
     def set_index(self, context, value):
         context.scene.matrix_index = value
-    def prereqs(self, context):
-        pass
 
 klasses = dict()
 
 for t in types:
     class DefaultOperator(Base):
         bl_label = t
-        def assign(self, context):
-            self.entity = database.matrix[context.scene.matrix_index]
-        def store(self, context):
-            self.entity = database.matrix[self.index]
         def create_entity(self):
             return Entity(self.name)
     klasses[t] = DefaultOperator
@@ -78,14 +75,12 @@ class MatrixBase(Base):
         for i in range(self.N):
             self.floats.add()
     def assign(self, context):
-        self.entity = database.matrix[self.index]
         self.subtype = self.entity.subtype
         for i, value in enumerate(self.entity.floats):
             self.floats[i].value = value
         self.scale = self.entity.scale
         self.factor = self.entity.factor
     def store(self, context):
-        self.entity = database.matrix[self.index]
         self.entity.subtype = self.subtype
         self.entity.floats = [f.value for f in self.floats] if self.floats else self.N*[0.0]
         self.entity.scale = self.scale

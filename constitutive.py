@@ -29,6 +29,7 @@ if "bpy" in locals():
     imp.reload(Entity)
 else:
     from .base import bpy, root_dot, database, Operator, Entity, Bundle, BPY, enum_drive, enum_function, enum_matrix_3x1, enum_matrix_6x1, enum_matrix_3x3, enum_matrix_6x6, enum_matrix_6xN
+    from .base import update_drive, update_function, update_matrix
     from .common import FORMAT
 
 types = [
@@ -75,6 +76,9 @@ class Base(Operator):
     bl_label = "Constitutives"
     bl_options = {'DEFAULT_CLOSED'}
     @classmethod
+    def poll(cls, context):
+        return True
+    @classmethod
     def make_list(self, ListItem):
         bpy.types.Scene.constitutive_uilist = bpy.props.CollectionProperty(type = ListItem)
         bpy.types.Scene.constitutive_index = bpy.props.IntProperty(default=-1)
@@ -87,8 +91,6 @@ class Base(Operator):
         return context.scene.constitutive_index, context.scene.constitutive_uilist
     def set_index(self, context, value):
         context.scene.constitutive_index = value
-    def prereqs(self, context):
-        pass
     def draw_dimensions(self, layout):
         if self.bl_idname.endswith("c_" + "_".join(self.name.lower().split())):
             layout.prop(self, "dimensions")
@@ -101,10 +103,6 @@ for t in types:
         @classmethod
         def poll(cls, context):
             return False
-        def assign(self, context):
-            self.entity = database.constitutive[context.scene.constitutive_index]
-        def store(self, context):
-            self.entity = database.constitutive[self.index]
         def create_entity(self):
             return Entity(self.name)
     klasses[t] = Tester
@@ -120,15 +118,10 @@ class LinearElasticOperator(Base):
     bl_label = "Linear elastic"
     dimensions = bpy.props.EnumProperty(items=[("1D", "1D", ""), ("3D, 6D", "3D, 6D", "")], name="Dimension(s)")
     stiffness = bpy.props.FloatProperty(name="Stiffness", description="", min=0.000001, max=9.9e10, precision=6, default=1.0)
-    @classmethod
-    def poll(cls, context):
-        return True
     def assign(self, context):
-        self.entity = database.constitutive[context.scene.constitutive_index]
         self.stiffness = self.entity.stiffness
         self.dimensions = self.entity.dimensions
     def store(self, context):
-        self.entity = database.constitutive[self.index]
         self.entity.stiffness = self.stiffness
         self.entity.dimensions = self.dimensions
     def draw(self, context):
@@ -151,17 +144,11 @@ class LinearElasticGenericOperator(Base):
     bl_label = "Linear elastic generic"
     dimensions = bpy.props.EnumProperty(items=[("1D", "1D", ""), ("3D", "3D", ""), ("6D", "6D", "")], name="Dimension(s)")
     stiffness = bpy.props.FloatProperty(name="Stiffness", description="", min=0.000001, max=9.9e10, precision=6, default=1.0)
-    stiffness_matrix_3x3_name = bpy.props.EnumProperty(items=enum_matrix_3x3, name="Stiffness")
-    stiffness_matrix_6x6_name = bpy.props.EnumProperty(items=enum_matrix_6x6, name="Stiffness")
-    stiffness_matrix_edit = bpy.props.BoolProperty(name="", description="Edit the stiffness matrix")
-    @classmethod
-    def poll(cls, context):
-        return True
-    def prereqs(self, context):
-        self.matrix_exists(context, "3x3")
-        self.matrix_exists(context, "6x6")
+    stiffness_matrix_3x3_name = bpy.props.EnumProperty(items=enum_matrix_3x3, name="Stiffness",
+        update=lambda self, context: update_matrix(self, context, self.stiffness_matrix_3x3_name, "3x3"))
+    stiffness_matrix_6x6_name = bpy.props.EnumProperty(items=enum_matrix_6x6, name="Stiffness",
+        update=lambda self, context: update_matrix(self, context, self.stiffness_matrix_6x6_name, "6x6"))
     def assign(self, context):
-        self.entity = database.constitutive[context.scene.constitutive_index]
         self.dimensions = self.entity.dimensions
         if self.dimensions == "1D":
             self.stiffness = self.entity.stiffness
@@ -170,16 +157,15 @@ class LinearElasticGenericOperator(Base):
         else:
             self.stiffness_matrix_6x6_name = self.entity.links[0].name
     def store(self, context):
-        self.entity = database.constitutive[self.index]
         self.entity.dimensions = self.dimensions
         if self.dimensions == "1D":
             self.entity.stiffness = self.stiffness
         else:
             self.entity.unlink_all()
             if self.dimensions == "3D":
-                self.link_matrix(context, self.stiffness_matrix_3x3_name, self.stiffness_matrix_edit)
+                self.link_matrix(context, self.stiffness_matrix_3x3_name)
             else:
-                self.link_matrix(context, self.stiffness_matrix_6x6_name, self.stiffness_matrix_edit)
+                self.link_matrix(context, self.stiffness_matrix_6x6_name)
             self.entity.increment_links()
     def draw(self, context):
         self.basis = self.dimensions
@@ -188,9 +174,9 @@ class LinearElasticGenericOperator(Base):
         if self.dimensions == "1D":
             layout.prop(self, "stiffness")
         elif self.dimensions == "3D":
-            self.draw_link(layout, "stiffness_matrix_3x3_name", "stiffness_matrix_edit", "matrix")
+            layout.prop(self, "stiffness_matrix_3x3_name")
         else:
-            self.draw_link(layout, "stiffness_matrix_6x6_name", "stiffness_matrix_edit", "matrix")
+            layout.prop(self, "stiffness_matrix_6x6_name")
     def check(self, context):
         return self.basis != self.dimensions
     def create_entity(self):
@@ -206,31 +192,24 @@ class LinearElasticGenericAxialTorsionCouplingOperator(Base):
     bl_label = "Linear elastic generic axial torsion coupling"
     dimensions = bpy.props.EnumProperty(items=[("6D", "6D", "")], name="Dimension(s)")
     coupling_coefficient = bpy.props.FloatProperty(name="Coupling coefficient", description="", min=0.000001, max=9.9e10, precision=6, default=1.0)
-    stiffness_matrix_6x1_name = bpy.props.EnumProperty(items=enum_matrix_6x1, name="Stiffness")
-    stiffness_matrix_edit = bpy.props.BoolProperty(name="", description="Edit the stiffness matrix")
-    @classmethod
-    def poll(cls, context):
-        return True
-    def prereqs(self, context):
-        self.matrix_exists(context, "6x1")
+    stiffness_matrix_6x1_name = bpy.props.EnumProperty(items=enum_matrix_6x1, name="Stiffness",
+        update=lambda self, context: update_matrix(self, context, self.stiffness_matrix_6x1_name, "6x1"))
     def assign(self, context):
-        self.entity = database.constitutive[context.scene.constitutive_index]
         self.dimensions = self.entity.dimensions
         self.coupling_coefficient = self.entity.coupling_coefficient
         self.stiffness_matrix_6x1_name = self.entity.links[0].name
     def store(self, context):
-        self.entity = database.constitutive[self.index]
         self.entity.dimensions = self.dimensions
         self.entity.coupling_coefficient = self.coupling_coefficient
         self.entity.unlink_all()
-        self.link_matrix(context, self.stiffness_matrix_6x1_name, self.stiffness_matrix_edit)
+        self.link_matrix(context, self.stiffness_matrix_6x1_name)
         self.entity.increment_links()
     def draw(self, context):
         self.basis = self.dimensions
         layout = self.layout
         self.draw_dimensions(layout)
         layout.prop(self, "coupling_coefficient")
-        self.draw_link(layout, "stiffness_matrix_6x1_name", "stiffness_matrix_edit", "matrix")
+        layout.prop(self, "stiffness_matrix_6x1_name")
     def create_entity(self):
         return LinearElasticGenericAxialTorsionCoupling(self.name)
 
@@ -253,19 +232,13 @@ class CubicElasticGenericOperator(Base):
     stiffness_1 = bpy.props.FloatProperty(name="Stiffness 1", description="", min=0.000001, max=9.9e10, precision=6, default=1.0)
     stiffness_2 = bpy.props.FloatProperty(name="Stiffness 2", description="", min=0.000001, max=9.9e10, precision=6, default=1.0)
     stiffness_3 = bpy.props.FloatProperty(name="Stiffness 3", description="", min=0.000001, max=9.9e10, precision=6, default=1.0)
-    stiffness_matrix_3x1_1_name = bpy.props.EnumProperty(items=enum_matrix_3x1, name="Stiffness 1")
-    stiffness_matrix_3x1_1_edit = bpy.props.BoolProperty(name="")
-    stiffness_matrix_3x1_2_name = bpy.props.EnumProperty(items=enum_matrix_3x1, name="Stiffness 2")
-    stiffness_matrix_3x1_2_edit = bpy.props.BoolProperty(name="")
-    stiffness_matrix_3x1_3_name = bpy.props.EnumProperty(items=enum_matrix_3x1, name="Stiffness 3")
-    stiffness_matrix_3x1_3_edit = bpy.props.BoolProperty(name="")
-    @classmethod
-    def poll(cls, context):
-        return True
-    def prereqs(self, context):
-        self.matrix_exists(context, "3x1")
+    stiffness_matrix_3x1_1_name = bpy.props.EnumProperty(items=enum_matrix_3x1, name="Stiffness 1",
+        update=lambda self, context: update_matrix(self, context, self.stiffness_matrix_3x1_1_name, "3x1"))
+    stiffness_matrix_3x1_2_name = bpy.props.EnumProperty(items=enum_matrix_3x1, name="Stiffness 2",
+        update=lambda self, context: update_matrix(self, context, self.stiffness_matrix_3x1_2_name, "3x1"))
+    stiffness_matrix_3x1_3_name = bpy.props.EnumProperty(items=enum_matrix_3x1, name="Stiffness 3",
+        update=lambda self, context: update_matrix(self, context, self.stiffness_matrix_3x1_3_name, "3x1"))
     def assign(self, context):
-        self.entity = database.constitutive[context.scene.constitutive_index]
         self.dimensions = self.entity.dimensions
         if self.dimensions == "1D":
             self.stiffness_1 = self.entity.stiffness_1
@@ -276,7 +249,6 @@ class CubicElasticGenericOperator(Base):
             self.stiffness_matrix_3x1_2_name = self.entity.links[1].name
             self.stiffness_matrix_3x1_3_name = self.entity.links[2].name
     def store(self, context):
-        self.entity = database.constitutive[self.index]
         self.entity.dimensions = self.dimensions
         if self.dimensions == "1D":
             self.entity.stiffness_1 = self.stiffness_1
@@ -284,21 +256,20 @@ class CubicElasticGenericOperator(Base):
             self.entity.stiffness_3 = self.stiffness_3
         else:
             self.entity.unlink_all()
-            self.link_matrix(context, self.stiffness_matrix_3x1_1_name, self.stiffness_matrix_3x1_1_edit)
-            self.link_matrix(context, self.stiffness_matrix_3x1_2_name, self.stiffness_matrix_3x1_2_edit)
-            self.link_matrix(context, self.stiffness_matrix_3x1_3_name, self.stiffness_matrix_3x1_3_edit)
+            self.link_matrix(context, self.stiffness_matrix_3x1_1_name)
+            self.link_matrix(context, self.stiffness_matrix_3x1_2_name)
+            self.link_matrix(context, self.stiffness_matrix_3x1_3_name)
             self.entity.increment_links()
     def draw(self, context):
         self.basis = self.dimensions
         layout = self.layout
         self.draw_dimensions(layout)
         if self.dimensions == "1D":
-            layout.prop(self, "stiffness_1")
-            layout.prop(self, "stiffness_2")
-            layout.prop(self, "stiffness_3")
+            for c in "123":
+                layout.prop(self, "stiffness_" + c)
         else:
             for c in "123":
-                self.draw_link(layout, "stiffness_matrix_3x1_" + c + "_name", "stiffness_matrix_3x1_" + c + "_edit", "matrix")
+                layout.prop(self, "stiffness_matrix_3x1_" + c + "_name")
     def check(self, context):
         return self.basis != self.dimensions
     def create_entity(self):
@@ -315,16 +286,11 @@ class InverseSquareElasticOperator(Base):
     dimensions = bpy.props.EnumProperty(items=[("1D", "1D", ""), ], name="Dimension(s)")
     stiffness = bpy.props.FloatProperty(name="Stiffness", description="", min=0.000001, max=9.9e10, precision=6, default=1.0)
     ref_length = bpy.props.FloatProperty(name="Reference length", description="", min=0.000001, max=9.9e10, precision=6, default=1.0)
-    @classmethod
-    def poll(cls, context):
-        return True
     def assign(self, context):
-        self.entity = database.constitutive[context.scene.constitutive_index]
         self.stiffness = self.entity.stiffness
         self.ref_length = self.entity.ref_length
         self.dimensions = self.entity.dimensions
     def store(self, context):
-        self.entity = database.constitutive[self.index]
         self.entity.stiffness = self.stiffness
         self.entity.ref_length = self.ref_length
         self.entity.dimensions = self.dimensions
@@ -346,15 +312,10 @@ class LogElasticOperator(Base):
     bl_label = "Log elastic"
     dimensions = bpy.props.EnumProperty(items=[("1D", "1D", ""), ], name="Dimension(s)")
     stiffness = bpy.props.FloatProperty(name="Stiffness", description="", min=0.000001, max=9.9e10, precision=6, default=1.0)
-    @classmethod
-    def poll(cls, context):
-        return True
     def assign(self, context):
-        self.entity = database.constitutive[context.scene.constitutive_index]
         self.stiffness = self.entity.stiffness
         self.dimensions = self.entity.dimensions
     def store(self, context):
-        self.entity = database.constitutive[self.index]
         self.entity.stiffness = self.stiffness
         self.entity.dimensions = self.dimensions
     def draw(self, context):
@@ -382,23 +343,16 @@ class LinearElasticBistopOperator(Base):
     bl_label = "Linear elastic bistop"
     dimensions = bpy.props.EnumProperty(items=[("1D", "1D", ""), ("3D", "3D", ""), ("6D", "6D", "")], name="Dimension(s)")
     stiffness = bpy.props.FloatProperty(name="Stiffness", description="", min=0.000001, max=9.9e10, precision=6, default=1.0)
-    stiffness_matrix_3x3_name = bpy.props.EnumProperty(items=enum_matrix_3x3, name="Stiffness")
-    stiffness_matrix_6x6_name = bpy.props.EnumProperty(items=enum_matrix_6x6, name="Stiffness")
-    stiffness_matrix_edit = bpy.props.BoolProperty(name="", description="Edit the stiffness matrix")
+    stiffness_matrix_3x3_name = bpy.props.EnumProperty(items=enum_matrix_3x3, name="Stiffness",
+        update=lambda self, context: update_matrix(self, context, self.stiffness_matrix_3x3_name, "3x3"))
+    stiffness_matrix_6x6_name = bpy.props.EnumProperty(items=enum_matrix_6x6, name="Stiffness",
+        update=lambda self, context: update_matrix(self, context, self.stiffness_matrix_6x6_name, "6x6"))
     initial_status = bpy.props.EnumProperty(items=[("active", "Active", ""), ("inactive", "Inactive", "")], name="Initial status")
-    activating_condition_name = bpy.props.EnumProperty(items=enum_drive, name="Activating condition")
-    activating_condition_edit = bpy.props.BoolProperty(name="")
-    deactivating_condition_name = bpy.props.EnumProperty(items=enum_drive, name="Deactivating condition")
-    deactivating_condition_edit = bpy.props.BoolProperty(name="")
-    @classmethod
-    def poll(cls, context):
-        return True
-    def prereqs(self, context):
-        self.matrix_exists(context, "3x3")
-        self.matrix_exists(context, "6x6")
-        self.drive_exists(context)
+    activating_condition_name = bpy.props.EnumProperty(items=enum_drive, name="Activating condition",
+        update=lambda self, context: update_drive(self, context, self.activating_condition_name))
+    deactivating_condition_name = bpy.props.EnumProperty(items=enum_drive, name="Deactivating condition",
+        update=lambda self, context: update_drive(self, context, self.deactivating_condition_name))
     def assign(self, context):
-        self.entity = database.constitutive[context.scene.constitutive_index]
         self.dimensions = self.entity.dimensions
         self.initial_status = self.entity.initial_status
         self.activating_condition_name = self.entity.links[0].name
@@ -410,19 +364,18 @@ class LinearElasticBistopOperator(Base):
         else:
             self.stiffness_matrix_6x6_name = self.entity.links[2].name
     def store(self, context):
-        self.entity = database.constitutive[self.index]
         self.entity.dimensions = self.dimensions
         self.entity.initial_status = self.initial_status
         self.entity.unlink_all()
-        self.link_drive(context, self.activating_condition_name, self.activating_condition_edit)
-        self.link_drive(context, self.deactivating_condition_name, self.deactivating_condition_edit)
+        self.link_drive(context, self.activating_condition_name)
+        self.link_drive(context, self.deactivating_condition_name)
         if self.dimensions == "1D":
             self.entity.stiffness = self.stiffness
         else:
             if self.dimensions == "3D":
-                self.link_matrix(context, self.stiffness_matrix_3x3_name, self.stiffness_matrix_edit)
+                self.link_matrix(context, self.stiffness_matrix_3x3_name)
             else:
-                self.link_matrix(context, self.stiffness_matrix_6x6_name, self.stiffness_matrix_edit)
+                self.link_matrix(context, self.stiffness_matrix_6x6_name)
         self.entity.increment_links()
     def draw(self, context):
         self.basis = self.dimensions
@@ -431,12 +384,12 @@ class LinearElasticBistopOperator(Base):
         if self.dimensions == "1D":
             layout.prop(self, "stiffness")
         elif self.dimensions == "3D":
-            self.draw_link(layout, "stiffness_matrix_3x3_name", "stiffness_matrix_edit", "matrix")
+            layout.prop(self, "stiffness_matrix_3x3_name")
         else:
-            self.draw_link(layout, "stiffness_matrix_6x6_name", "stiffness_matrix_edit", "matrix")
+            layout.prop(self, "stiffness_matrix_6x6_name")
         layout.prop(self, "initial_status")
         for s in "activating deactivating".split():
-            self.draw_link(layout, s + "_condition_name", s + "_condition_edit", "drive")
+            layout.prop(self, s + "_condition_name")
     def check(self, context):
         return self.basis != self.dimensions
     def create_entity(self):
@@ -464,17 +417,11 @@ class DoubleLinearElasticOperator(Base):
     stiffness_2 = bpy.props.FloatProperty(name="Stiffness 2", description="", min=0.000001, max=9.9e10, precision=6, default=1.0)
     upper_strain = bpy.props.FloatProperty(name="Upper strain", description="", min=0.000001, max=9.9e10, precision=6)
     lower_strain = bpy.props.FloatProperty(name="Lower strain", description="", min=0.000001, max=9.9e10, precision=6)
-    stiffness_matrix_3x1_1_name = bpy.props.EnumProperty(items=enum_matrix_3x1, name="Stiffness 1")
-    stiffness_matrix_3x1_1_edit = bpy.props.BoolProperty(name="")
-    stiffness_matrix_3x1_2_name = bpy.props.EnumProperty(items=enum_matrix_3x1, name="Stiffness 2")
-    stiffness_matrix_3x1_2_edit = bpy.props.BoolProperty(name="")
-    @classmethod
-    def poll(cls, context):
-        return True
-    def prereqs(self, context):
-        self.matrix_exists(context, "3x1")
+    stiffness_matrix_3x1_1_name = bpy.props.EnumProperty(items=enum_matrix_3x1, name="Stiffness 1",
+        update=lambda self, context: update_matrix(self, context, self.stiffness_matrix_3x1_1_name, "3x1"))
+    stiffness_matrix_3x1_2_name = bpy.props.EnumProperty(items=enum_matrix_3x1, name="Stiffness 2",
+        update=lambda self, context: update_matrix(self, context, self.stiffness_matrix_3x1_2_name, "3x1"))
     def assign(self, context):
-        self.entity = database.constitutive[context.scene.constitutive_index]
         self.dimensions = self.entity.dimensions
         self.upper_strain = self.entity.upper_strain
         self.lower_strain = self.entity.lower_strain
@@ -485,7 +432,6 @@ class DoubleLinearElasticOperator(Base):
             self.stiffness_matrix_3x1_1_name = self.entity.links[0].name
             self.stiffness_matrix_3x1_2_name = self.entity.links[1].name
     def store(self, context):
-        self.entity = database.constitutive[self.index]
         self.entity.dimensions = self.dimensions
         self.entity.upper_strain = self.upper_strain
         self.entity.lower_strain = self.lower_strain
@@ -494,19 +440,19 @@ class DoubleLinearElasticOperator(Base):
             self.entity.stiffness_2 = self.stiffness_2
         else:
             self.entity.unlink_all()
-            self.link_matrix(context, self.stiffness_matrix_3x1_1_name, self.stiffness_matrix_3x1_1_edit)
-            self.link_matrix(context, self.stiffness_matrix_3x1_2_name, self.stiffness_matrix_3x1_2_edit)
+            self.link_matrix(context, self.stiffness_matrix_3x1_1_name)
+            self.link_matrix(context, self.stiffness_matrix_3x1_2_name)
             self.entity.increment_links()
     def draw(self, context):
         self.basis = self.dimensions
         layout = self.layout
         self.draw_dimensions(layout)
         if self.dimensions == "1D":
-            layout.prop(self, "stiffness_1")
-            layout.prop(self, "stiffness_2")
+            for c in "12":
+                layout.prop(self, "stiffness_" + c)
         else:
             for c in "12":
-                self.draw_link(layout, "stiffness_matrix_3x1_" + c + "_name", "stiffness_matrix_3x1_" + c + "_edit", "matrix")
+                layout.prop(self, "stiffness_matrix_3x1_" + c + "_name")
         layout.prop(self, "upper_strain")
         layout.prop(self, "lower_strain")
     def check(self, context):
@@ -532,20 +478,14 @@ class IsotropicHardeningElasticOperator(Base):
     bl_label = "Isotropic hardening elastic"
     dimensions = bpy.props.EnumProperty(items=[("1D", "1D", ""), ("3D", "3D", ""), ("6D", "6D", "")], name="Dimension(s)")
     stiffness = bpy.props.FloatProperty(name="Stiffness", description="", min=0.000001, max=9.9e10, precision=6, default=1.0)
-    stiffness_matrix_3x3_name = bpy.props.EnumProperty(items=enum_matrix_3x3, name="Stiffness")
-    stiffness_matrix_6x6_name = bpy.props.EnumProperty(items=enum_matrix_6x6, name="Stiffness")
-    stiffness_matrix_edit = bpy.props.BoolProperty(name="", description="Edit the stiffness matrix")
+    stiffness_matrix_3x3_name = bpy.props.EnumProperty(items=enum_matrix_3x3, name="Stiffness",
+        update=lambda self, context: update_matrix(self, context, self.stiffness_matrix_3x3_name, "3x3"))
+    stiffness_matrix_6x6_name = bpy.props.EnumProperty(items=enum_matrix_6x6, name="Stiffness",
+        update=lambda self, context: update_matrix(self, context, self.stiffness_matrix_6x6_name, "3x3"))
     reference_strain = bpy.props.FloatProperty(name="Reference strain", description="", min=0.000001, max=9.9e10, precision=6, default=1.0)
     use_linear_stiffness = bpy.props.BoolProperty("Use linear stiffness", default=False)
     linear_stiffness = bpy.props.FloatProperty(name="Reference strain", description="", min=0.000001, max=9.9e10, precision=6, default=1.0)
-    @classmethod
-    def poll(cls, context):
-        return True
-    def prereqs(self, context):
-        self.matrix_exists(context, "3x3")
-        self.matrix_exists(context, "6x6")
     def assign(self, context):
-        self.entity = database.constitutive[context.scene.constitutive_index]
         self.dimensions = self.entity.dimensions
         self.reference_strain = self.entity.reference_strain
         self.use_linear_stiffness = self.entity.use_linear_stiffness
@@ -557,7 +497,6 @@ class IsotropicHardeningElasticOperator(Base):
         else:
             self.stiffness_matrix_6x6_name = self.entity.links[0].name
     def store(self, context):
-        self.entity = database.constitutive[self.index]
         self.entity.dimensions = self.dimensions
         self.entity.reference_strain = self.reference_strain
         self.entity.use_linear_stiffness = self.use_linear_stiffness
@@ -567,9 +506,9 @@ class IsotropicHardeningElasticOperator(Base):
         else:
             self.entity.unlink_all()
             if self.dimensions == "3D":
-                self.link_matrix(context, self.stiffness_matrix_3x3_name, self.stiffness_matrix_edit)
+                self.link_matrix(context, self.stiffness_matrix_3x3_name)
             else:
-                self.link_matrix(context, self.stiffness_matrix_6x6_name, self.stiffness_matrix_edit)
+                self.link_matrix(context, self.stiffness_matrix_6x6_name)
             self.entity.increment_links()
     def draw(self, context):
         self.basis = (self.dimensions, self.use_linear_stiffness)
@@ -578,9 +517,9 @@ class IsotropicHardeningElasticOperator(Base):
         if self.dimensions == "1D":
             layout.prop(self, "stiffness")
         elif self.dimensions == "3D":
-            self.draw_link(layout, "stiffness_matrix_3x3_name", "stiffness_matrix_edit", "matrix")
+            layout.prop(self, "stiffness_matrix_3x3_name")
         else:
-            self.draw_link(layout, "stiffness_matrix_6x6_name", "stiffness_matrix_edit", "matrix")
+            layout.prop(self, "stiffness_matrix_6x6_name")
         layout.prop(self, "reference_strain")
         layout.prop(self, "use_linear_stiffness")
         if self.use_linear_stiffness:
@@ -602,27 +541,20 @@ class ScalarFunctionElasticIsotropic(Entity):
 class ScalarFunctionElasticIsotropicOperator(Base):
     bl_label = "Scalar function elastic isotropic"
     dimensions = bpy.props.EnumProperty(items=[("1D", "1D", ""), ("3D, 6D", "3D, 6D", "")], name="Dimension(s)")
-    function_name = bpy.props.EnumProperty(items=enum_function, name="Function")
-    function_edit = bpy.props.BoolProperty(name="")
-    @classmethod
-    def poll(cls, context):
-        return True
-    def prereqs(self, context):
-        self.function_exists(context)
+    function_name = bpy.props.EnumProperty(items=enum_function, name="Function",
+        update=lambda self, context: update_function(self, context, self.function_name))
     def assign(self, context):
-        self.entity = database.constitutive[context.scene.constitutive_index]
         self.dimensions = self.entity.dimensions
         self.function_name = self.entity.links[0].name
     def store(self, context):
-        self.entity = database.constitutive[self.index]
         self.entity.dimensions = self.dimensions
         self.entity.unlink_all()
-        self.link_function(context, self.function_name, self.function_edit)
+        self.link_function(context, self.function_name)
         self.entity.increment_links()
     def draw(self, context):
         layout = self.layout
         self.draw_dimensions(layout)
-        self.draw_link(layout, "function_name", "function_edit", "function")
+        layout.prop(self, "function_name")
     def create_entity(self):
         return ScalarFunctionElasticIsotropic(self.name)
 
@@ -645,27 +577,23 @@ class ScalarFunctionElasticOrthotropicOperator(Base):
     dimensions = bpy.props.EnumProperty(items=[("1D", "1D", ""), ("3D", "3D", ""), ("6D", "6D", "")], name="Dimension(s)")
     is_null = bpy.props.BoolVectorProperty(size=6, name="Null")
     function_names = bpy.props.CollectionProperty(type=BPY.FunctionNames, name="Functions")
-    @classmethod
-    def poll(cls, context):
-        return True
     def prereqs(self, context):
-        self.function_exists(context)
         self.function_names.clear()
         for i in range(6):
             self.function_names.add()
     def assign(self, context):
-        self.entity = database.constitutive[context.scene.constitutive_index]
         self.dimensions = self.entity.dimensions
         self.is_null = self.entity.is_null
         for i, link in enumerate(self.entity.links):
+            self.function_names[i].enable_popups = False
             self.function_names[i].value = link.name
+            self.function_names[i].enable_popups = True
     def store(self, context):
-        self.entity = database.constitutive[self.index]
         self.entity.dimensions = self.dimensions
         self.entity.is_null = [v for v in self.is_null]
         self.entity.unlink_all()
         for f in self.function_names[:int(self.dimensions[0])]:
-            self.link_function(context, f.value, f.edit)
+            self.link_function(context, f.value)
         self.entity.increment_links()
     def draw(self, context):
         self.basis = (self.dimensions, [v for v in self.is_null])
@@ -676,7 +604,6 @@ class ScalarFunctionElasticOrthotropicOperator(Base):
             row.prop(self, "is_null", index=i)
             if not self.is_null[i]:
                 row.prop(self.function_names[i], "value", text="")
-                row.prop(self.function_names[i], "edit", toggle=True)
     def check(self, context):
         return self.basis[0] != self.dimensions or [True for i, v in enumerate(self.basis[1]) if v != self.is_null[i]]
     def create_entity(self):
@@ -695,15 +622,10 @@ class LinearViscousOperator(Base):
     bl_label = "Linear viscous"
     dimensions = bpy.props.EnumProperty(items=[("1D", "1D", ""), ("3D, 6D", "3D, 6D", "")], name="Dimension(s)")
     viscosity = bpy.props.FloatProperty(name="Viscosity", description="", min=0.000001, max=9.9e10, precision=6, default=1.0)
-    @classmethod
-    def poll(cls, context):
-        return True
     def assign(self, context):
-        self.entity = database.constitutive[context.scene.constitutive_index]
         self.viscosity = self.entity.viscosity
         self.dimensions = self.entity.dimensions
     def store(self, context):
-        self.entity = database.constitutive[self.index]
         self.entity.viscosity = self.viscosity
         self.entity.dimensions = self.dimensions
     def draw(self, context):
@@ -726,17 +648,11 @@ class LinearViscousGenericOperator(Base):
     bl_label = "Linear viscous generic"
     dimensions = bpy.props.EnumProperty(items=[("1D", "1D", ""), ("3D", "3D", ""), ("6D", "6D", "")], name="Dimension(s)")
     viscosity = bpy.props.FloatProperty(name="Viscosity", description="", min=0.000001, max=9.9e10, precision=6, default=1.0)
-    viscosity_matrix_3x3_name = bpy.props.EnumProperty(items=enum_matrix_3x3, name="Viscosity")
-    viscosity_matrix_6x6_name = bpy.props.EnumProperty(items=enum_matrix_6x6, name="Viscosity")
-    viscosity_matrix_edit = bpy.props.BoolProperty(name="")
-    @classmethod
-    def poll(cls, context):
-        return True
-    def prereqs(self, context):
-        self.matrix_exists(context, "3x3")
-        self.matrix_exists(context, "6x6")
+    viscosity_matrix_3x3_name = bpy.props.EnumProperty(items=enum_matrix_3x3, name="Viscosity",
+        update=lambda self, context: update_matrix(self, context, self.viscosity_matrix_3x3_name, "3x3"))
+    viscosity_matrix_6x6_name = bpy.props.EnumProperty(items=enum_matrix_6x6, name="Viscosity",
+        update=lambda self, context: update_matrix(self, context, self.viscosity_matrix_6x6_name, "6x6"))
     def assign(self, context):
-        self.entity = database.constitutive[context.scene.constitutive_index]
         self.dimensions = self.entity.dimensions
         if self.dimensions == "1D":
             self.viscosity = self.entity.viscosity
@@ -745,16 +661,15 @@ class LinearViscousGenericOperator(Base):
         else:
             self.viscosity_matrix_6x6_name = self.entity.links[0].name
     def store(self, context):
-        self.entity = database.constitutive[self.index]
         self.entity.dimensions = self.dimensions
         if self.dimensions == "1D":
             self.entity.viscosity = self.viscosity
         else:
             self.entity.unlink_all()
             if self.dimensions == "3D":
-                self.link_matrix(context, self.viscosity_matrix_3x3_name, self.viscosity_matrix_edit)
+                self.link_matrix(context, self.viscosity_matrix_3x3_name)
             else:
-                self.link_matrix(context, self.viscosity_matrix_6x6_name, self.viscosity_matrix_edit)
+                self.link_matrix(context, self.viscosity_matrix_6x6_name)
             self.entity.increment_links()
     def draw(self, context):
         self.basis = self.dimensions
@@ -763,9 +678,9 @@ class LinearViscousGenericOperator(Base):
         if self.dimensions == "1D":
             layout.prop(self, "viscosity")
         elif self.dimensions == "3D":
-            self.draw_link(layout, "viscosity_matrix_3x3_name", "viscosity_matrix_edit", "matrix")
+            layout.prop(self, "viscosity_matrix_3x3_name")
         else:
-            self.draw_link(layout, "viscosity_matrix_6x6_name", "viscosity_matrix_edit", "matrix")
+            layout.prop(self, "viscosity_matrix_6x6_name")
     def check(self, context):
         return self.basis != self.dimensions
     def create_entity(self):
@@ -793,18 +708,13 @@ class LinearViscoelasticOperator(Base):
     proportional = bpy.props.BoolProperty(name="Proportional", default=False)
     factor = bpy.props.FloatProperty(name="Factor", description="", min=0.000001, max=9.9e10, precision=6, default=1.0)
     viscosity = bpy.props.FloatProperty(name="Viscosity", description="", min=0.000001, max=9.9e10, precision=6, default=1.0)
-    @classmethod
-    def poll(cls, context):
-        return True
     def assign(self, context):
-        self.entity = database.constitutive[context.scene.constitutive_index]
         self.dimensions = self.entity.dimensions
         self.stiffness = self.entity.stiffness
         self.proportional = self.entity.proportional
         self.factor = self.entity.factor
         self.viscosity = self.entity.viscosity
     def store(self, context):
-        self.entity = database.constitutive[self.index]
         self.entity.dimensions = self.dimensions
         self.entity.stiffness = self.stiffness
         self.entity.proportional = self.proportional
@@ -848,23 +758,18 @@ class LinearViscoelasticGenericOperator(Base):
     bl_label = "Linear viscoelastic generic"
     dimensions = bpy.props.EnumProperty(items=[("1D", "1D", ""), ("3D", "3D", ""), ("6D", "6D", "")], name="Dimension(s)")
     stiffness = bpy.props.FloatProperty(name="Stiffness", description="", min=0.000001, max=9.9e10, precision=6, default=1.0)
-    stiffness_matrix_3x3_name = bpy.props.EnumProperty(items=enum_matrix_3x3, name="Stiffness")
-    stiffness_matrix_6x6_name = bpy.props.EnumProperty(items=enum_matrix_6x6, name="Stiffness")
-    stiffness_matrix_edit = bpy.props.BoolProperty(name="", description="Edit the stiffness matrix")
+    stiffness_matrix_3x3_name = bpy.props.EnumProperty(items=enum_matrix_3x3, name="Stiffness",
+        update=lambda self, context: update_matrix(self, context, self.stiffness_matrix_3x3_name, "3x3"))
+    stiffness_matrix_6x6_name = bpy.props.EnumProperty(items=enum_matrix_6x6, name="Stiffness",
+        update=lambda self, context: update_matrix(self, context, self.stiffness_matrix_6x6_name, "3x3"))
     proportional = bpy.props.BoolProperty(name="Proportional", default=False)
     factor = bpy.props.FloatProperty(name="Factor", description="", min=0.000001, max=9.9e10, precision=6, default=1.0)
     viscosity = bpy.props.FloatProperty(name="Viscosity", description="", min=0.000001, max=9.9e10, precision=6, default=1.0)
-    viscosity_matrix_3x3_name = bpy.props.EnumProperty(items=enum_matrix_3x3, name="Viscosity")
-    viscosity_matrix_6x6_name = bpy.props.EnumProperty(items=enum_matrix_6x6, name="Viscosity")
-    viscosity_matrix_edit = bpy.props.BoolProperty(name="")
-    @classmethod
-    def poll(cls, context):
-        return True
-    def prereqs(self, context):
-        self.matrix_exists(context, "3x3")
-        self.matrix_exists(context, "6x6")
+    viscosity_matrix_3x3_name = bpy.props.EnumProperty(items=enum_matrix_3x3, name="Viscosity",
+        update=lambda self, context: update_matrix(self, context, self.viscosity_matrix_3x3_name, "6x6"))
+    viscosity_matrix_6x6_name = bpy.props.EnumProperty(items=enum_matrix_6x6, name="Viscosity",
+        update=lambda self, context: update_matrix(self, context, self.viscosity_matrix_6x6_name, "6x6"))
     def assign(self, context):
-        self.entity = database.constitutive[context.scene.constitutive_index]
         self.dimensions = self.entity.dimensions
         self.proportional = self.entity.proportional
         self.factor = self.entity.factor
@@ -881,7 +786,6 @@ class LinearViscoelasticGenericOperator(Base):
             if not self.proportional:
                 self.viscosity_matrix_6x6_name = self.entity.links[1].name
     def store(self, context):
-        self.entity = database.constitutive[self.index]
         self.entity.dimensions = self.dimensions
         self.entity.proportional = self.proportional
         self.entity.factor = self.factor
@@ -892,13 +796,13 @@ class LinearViscoelasticGenericOperator(Base):
         else:
             self.entity.unlink_all()
             if self.dimensions == "3D":
-                self.link_matrix(context, self.stiffness_matrix_3x3_name, self.stiffness_matrix_edit)
+                self.link_matrix(context, self.stiffness_matrix_3x3_name)
                 if not self.proportional:
-                    self.link_matrix(context, self.viscosity_matrix_3x3_name, self.viscosity_matrix_edit)
+                    self.link_matrix(context, self.viscosity_matrix_3x3_name)
             else:
-                self.link_matrix(context, self.stiffness_matrix_6x6_name, self.stiffness_matrix_edit)
+                self.link_matrix(context, self.stiffness_matrix_6x6_name)
                 if not self.proportional:
-                    self.link_matrix(context, self.viscosity_matrix_6x6_name, self.viscosity_matrix_edit)
+                    self.link_matrix(context, self.viscosity_matrix_6x6_name)
             self.entity.increment_links()
     def draw(self, context):
         self.basis = (self.dimensions, self.proportional)
@@ -907,9 +811,9 @@ class LinearViscoelasticGenericOperator(Base):
         if self.dimensions == "1D":
             layout.prop(self, "stiffness")
         elif self.dimensions == "3D":
-            self.draw_link(layout, "stiffness_matrix_3x3_name", "stiffness_matrix_edit", "matrix")
+            layout.prop(self, "stiffness_matrix_3x3_name")
         else:
-            self.draw_link(layout, "stiffness_matrix_6x6_name", "stiffness_matrix_edit", "matrix")
+            layout.prop(self, "stiffness_matrix_6x6_name")
         row = layout.row()
         row.prop(self, "proportional")
         if self.proportional:
@@ -918,9 +822,9 @@ class LinearViscoelasticGenericOperator(Base):
             if self.dimensions == "1D":
                 layout.prop(self, "viscosity")
             elif self.dimensions == "3D":
-                self.draw_link(layout, "viscosity_matrix_3x3_name", "viscosity_matrix_edit", "matrix")
+                layout.prop(self, "viscosity_matrix_3x3_name")
             else:
-                self.draw_link(layout, "viscosity_matrix_6x6_name", "viscosity_matrix_edit", "matrix")
+                layout.prop(self, "viscosity_matrix_6x6_name")
     def check(self, context):
         return self.basis != (self.dimensions, self.proportional)
     def create_entity(self):
@@ -949,28 +853,23 @@ class LinearTimeVariantViscoelasticGeneric(Entity):
 class LinearTimeVariantViscoelasticGenericOperator(Base):
     bl_label = "Linear time variant viscoelastic generic"
     dimensions = bpy.props.EnumProperty(items=[("1D", "1D", ""), ("3D", "3D", ""), ("6D", "6D", "")], name="Dimension(s)")
-    stiffness_scale_name = bpy.props.EnumProperty(items=enum_drive, name="Stiffness scale")
-    stiffness_scale_edit = bpy.props.BoolProperty(name="")
-    viscosity_scale_name = bpy.props.EnumProperty(items=enum_drive, name="Viscosity scale")
-    viscosity_scale_edit = bpy.props.BoolProperty(name="")
+    stiffness_scale_name = bpy.props.EnumProperty(items=enum_drive, name="Stiffness scale",
+        update=lambda self, context: update_drive(self, context, self.stiffness_scale_name))
+    viscosity_scale_name = bpy.props.EnumProperty(items=enum_drive, name="Viscosity scale",
+        update=lambda self, context: update_drive(self, context, self.viscosity_scale_name))
     stiffness = bpy.props.FloatProperty(name="Stiffness", description="", min=0.000001, max=9.9e10, precision=6, default=1.0)
-    stiffness_matrix_3x3_name = bpy.props.EnumProperty(items=enum_matrix_3x3, name="Stiffness")
-    stiffness_matrix_6x6_name = bpy.props.EnumProperty(items=enum_matrix_6x6, name="Stiffness")
-    stiffness_matrix_edit = bpy.props.BoolProperty(name="", description="Edit the stiffness matrix")
+    stiffness_matrix_3x3_name = bpy.props.EnumProperty(items=enum_matrix_3x3, name="Stiffness",
+        update=lambda self, context: update_matrix(self, context, self.stiffness_matrix_3x3_name, "3x3"))
+    stiffness_matrix_6x6_name = bpy.props.EnumProperty(items=enum_matrix_6x6, name="Stiffness",
+        update=lambda self, context: update_matrix(self, context, self.stiffness_matrix_6x6_name, "6x6"))
     proportional = bpy.props.BoolProperty(name="Proportional", default=False)
     factor = bpy.props.FloatProperty(name="Factor", description="", min=0.000001, max=9.9e10, precision=6, default=1.0)
     viscosity = bpy.props.FloatProperty(name="Viscosity", description="", min=0.000001, max=9.9e10, precision=6, default=1.0)
-    viscosity_matrix_3x3_name = bpy.props.EnumProperty(items=enum_matrix_3x3, name="Viscosity")
-    viscosity_matrix_6x6_name = bpy.props.EnumProperty(items=enum_matrix_6x6, name="Viscosity")
-    viscosity_matrix_edit = bpy.props.BoolProperty(name="")
-    @classmethod
-    def poll(cls, context):
-        return True
-    def prereqs(self, context):
-        self.matrix_exists(context, "3x3")
-        self.matrix_exists(context, "6x6")
+    viscosity_matrix_3x3_name = bpy.props.EnumProperty(items=enum_matrix_3x3, name="Viscosity",
+        update=lambda self, context: update_matrix(self, context, self.viscosity_matrix_3x3_name, "3x3"))
+    viscosity_matrix_6x6_name = bpy.props.EnumProperty(items=enum_matrix_6x6, name="Viscosity",
+        update=lambda self, context: update_matrix(self, context, viscosity_matrix_6x6_name, "6x6"))
     def assign(self, context):
-        self.entity = database.constitutive[context.scene.constitutive_index]
         self.dimensions = self.entity.dimensions
         self.proportional = self.entity.proportional
         self.factor = self.entity.factor
@@ -989,26 +888,25 @@ class LinearTimeVariantViscoelasticGenericOperator(Base):
             if not self.proportional:
                 self.viscosity_matrix_6x6_name = self.entity.links[3].name
     def store(self, context):
-        self.entity = database.constitutive[self.index]
         self.entity.dimensions = self.dimensions
         self.entity.proportional = self.proportional
         self.entity.factor = self.factor
         self.entity.unlink_all()
-        self.link_drive(context, self.stiffness_scale_name, self.stiffness_scale_edit)
-        self.link_drive(context, self.viscosity_scale_name, self.viscosity_scale_edit)
+        self.link_drive(context, self.stiffness_scale_name)
+        self.link_drive(context, self.viscosity_scale_name)
         if self.dimensions == "1D":
             self.entity.stiffness = self.stiffness
             if not self.proportional:
                 self.entity.viscosity = self.viscosity
         else:
             if self.dimensions == "3D":
-                self.link_matrix(context, self.stiffness_matrix_3x3_name, self.stiffness_matrix_edit)
+                self.link_matrix(context, self.stiffness_matrix_3x3_name)
                 if not self.proportional:
-                    self.link_matrix(context, self.viscosity_matrix_3x3_name, self.viscosity_matrix_edit)
+                    self.link_matrix(context, self.viscosity_matrix_3x3_name)
             else:
-                self.link_matrix(context, self.stiffness_matrix_6x6_name, self.stiffness_matrix_edit)
+                self.link_matrix(context, self.stiffness_matrix_6x6_name)
                 if not self.proportional:
-                    self.link_matrix(context, self.viscosity_matrix_6x6_name, self.viscosity_matrix_edit)
+                    self.link_matrix(context, self.viscosity_matrix_6x6_name)
         self.entity.increment_links()
     def draw(self, context):
         self.basis = (self.dimensions, self.proportional)
@@ -1017,10 +915,10 @@ class LinearTimeVariantViscoelasticGenericOperator(Base):
         if self.dimensions == "1D":
             layout.prop(self, "stiffness")
         elif self.dimensions == "3D":
-            self.draw_link(layout, "stiffness_matrix_3x3_name", "stiffness_matrix_edit", "matrix")
+            layout.prop(self, "stiffness_matrix_3x3_name")
         else:
-            self.draw_link(layout, "stiffness_matrix_6x6_name", "stiffness_matrix_edit", "matrix")
-        self.draw_link(layout, "stiffness_scale_name", "stiffness_scale_edit", "drive")
+            layout.prop(self, "stiffness_matrix_6x6_name")
+        layout.prop(self, "stiffness_scale_name")
         row = layout.row()
         row.prop(self, "proportional")
         if self.proportional:
@@ -1029,10 +927,10 @@ class LinearTimeVariantViscoelasticGenericOperator(Base):
             if self.dimensions == "1D":
                 layout.prop(self, "viscosity")
             elif self.dimensions == "3D":
-                self.draw_link(layout, "viscosity_matrix_3x3_name", "viscosity_matrix_edit", "matrix")
+                layout.prop(self, "viscosity_matrix_3x3_name")
             else:
-                self.draw_link(layout, "viscosity_matrix_6x6_name", "viscosity_matrix_edit", "matrix")
-        self.draw_link(layout, "viscosity_scale_name", "viscosity_scale_edit", "drive")
+                layout.prop(self, "viscosity_matrix_6x6_name")
+        layout.prop(self, "viscosity_scale_name")
     def check(self, context):
         return self.basis != (self.dimensions, self.proportional)
     def create_entity(self):
@@ -1055,19 +953,13 @@ class LinearViscoelasticGenericAxialTorsionCouplingOperator(Base):
     bl_label = "Linear viscoelastic generic axial torsion coupling"
     dimensions = bpy.props.EnumProperty(items=[("6D", "6D", "")], name="Dimension(s)")
     coupling_coefficient = bpy.props.FloatProperty(name="Coupling coefficient", description="", min=0.000001, max=9.9e10, precision=6, default=1.0)
-    stiffness_matrix_6x1_name = bpy.props.EnumProperty(items=enum_matrix_6x1, name="Stiffness")
-    stiffness_matrix_edit = bpy.props.BoolProperty(name="", description="Edit the stiffness matrix")
+    stiffness_matrix_6x1_name = bpy.props.EnumProperty(items=enum_matrix_6x1, name="Stiffness",
+        update=lambda self, context: update_matrix(self, context, self.stiffness_matrix_6x1_name, "6x1"))
     proportional = bpy.props.BoolProperty(name="Proportional", default=False)
     factor = bpy.props.FloatProperty(name="Factor", description="", min=0.000001, max=9.9e10, precision=6, default=1.0)
-    viscosity_matrix_6x1_name = bpy.props.EnumProperty(items=enum_matrix_6x1, name="Viscosity")
-    viscosity_matrix_edit = bpy.props.BoolProperty(name="")
-    @classmethod
-    def poll(cls, context):
-        return True
-    def prereqs(self, context):
-        self.matrix_exists(context, "6x1")
+    viscosity_matrix_6x1_name = bpy.props.EnumProperty(items=enum_matrix_6x1, name="Viscosity",
+        update=lambda self, context: update_matrix(self, context, self.viscosity_matrix_6x1_name, "6x1"))
     def assign(self, context):
-        self.entity = database.constitutive[context.scene.constitutive_index]
         self.dimensions = self.entity.dimensions
         self.coupling_coefficient = self.entity.coupling_coefficient
         self.stiffness_matrix_6x1_name = self.entity.links[0].name
@@ -1076,27 +968,26 @@ class LinearViscoelasticGenericAxialTorsionCouplingOperator(Base):
         if not self.proportional:
             self.stiffness_matrix_6x1_name = self.entity.links[1].name
     def store(self, context):
-        self.entity = database.constitutive[self.index]
         self.entity.dimensions = self.dimensions
         self.entity.coupling_coefficient = self.coupling_coefficient
         self.entity.proportional = self.proportional
         self.entity.unlink_all()
-        self.link_matrix(context, self.stiffness_matrix_6x1_name, self.stiffness_matrix_edit)
+        self.link_matrix(context, self.stiffness_matrix_6x1_name)
         self.entity.factor = self.factor
         if not self.proportional:
-            self.link_matrix(context, self.viscosity_matrix_6x1_name, self.viscosity_matrix_edit)
+            self.link_matrix(context, self.viscosity_matrix_6x1_name)
         self.entity.increment_links()
     def draw(self, context):
         self.basis = self.proportional
         layout = self.layout
         self.draw_dimensions(layout)
-        self.draw_link(layout, "stiffness_matrix_6x1_name", "stiffness_matrix_edit", "matrix")
+        layout.prop(self, "stiffness_matrix_6x1_name")
         row = layout.row()
         row.prop(self, "proportional")
         if self.proportional:
             row.prop(self, "factor")
         else:
-            self.draw_link(layout, "viscosity_matrix_6x1_name", "viscosity_matrix_edit", "matrix")
+            layout.prop(self, "viscosity_matrix_6x1_name")
     def check(self, context):
         return self.basis != self.proportional
     def create_entity(self):
@@ -1123,21 +1014,15 @@ class CubicViscoelasticGenericOperator(Base):
     stiffness_2 = bpy.props.FloatProperty(name="Stiffness 2", description="", min=0.000001, max=9.9e10, precision=6, default=1.0)
     stiffness_3 = bpy.props.FloatProperty(name="Stiffness 3", description="", min=0.000001, max=9.9e10, precision=6, default=1.0)
     viscosity = bpy.props.FloatProperty(name="Viscosity", description="", min=0.000001, max=9.9e10, precision=6, default=1.0)
-    stiffness_matrix_3x1_1_name = bpy.props.EnumProperty(items=enum_matrix_3x1, name="Stiffness 1")
-    stiffness_matrix_3x1_1_edit = bpy.props.BoolProperty(name="")
-    stiffness_matrix_3x1_2_name = bpy.props.EnumProperty(items=enum_matrix_3x1, name="Stiffness 2")
-    stiffness_matrix_3x1_2_edit = bpy.props.BoolProperty(name="")
-    stiffness_matrix_3x1_3_name = bpy.props.EnumProperty(items=enum_matrix_3x1, name="Stiffness 3")
-    stiffness_matrix_3x1_3_edit = bpy.props.BoolProperty(name="")
-    viscosity_matrix_3x1_name = bpy.props.EnumProperty(items=enum_matrix_3x1, name="Viscosity")
-    viscosity_matrix_3x1_edit = bpy.props.BoolProperty(name="")
-    @classmethod
-    def poll(cls, context):
-        return True
-    def prereqs(self, context):
-        self.matrix_exists(context, "3x1")
+    stiffness_matrix_3x1_1_name = bpy.props.EnumProperty(items=enum_matrix_3x1, name="Stiffness 1",
+        update=lambda self, context: update_matrix(self, context, self.stiffness_matrix_3x1_1_name, "3x1"))
+    stiffness_matrix_3x1_2_name = bpy.props.EnumProperty(items=enum_matrix_3x1, name="Stiffness 2",
+        update=lambda self, context: update_matrix(self, context, self.stiffness_matrix_3x1_2_name, "3x1"))
+    stiffness_matrix_3x1_3_name = bpy.props.EnumProperty(items=enum_matrix_3x1, name="Stiffness 3",
+        update=lambda self, context: update_matrix(self, context, self.stiffness_matrix_3x1_3_name, "3x1"))
+    viscosity_matrix_3x1_name = bpy.props.EnumProperty(items=enum_matrix_3x1, name="Viscosity",
+        update=lambda self, context: update_matrix(self, context, self.viscosity_matrix_3x1_name, "3x1"))
     def assign(self, context):
-        self.entity = database.constitutive[context.scene.constitutive_index]
         self.dimensions = self.entity.dimensions
         if self.dimensions == "1D":
             self.stiffness_1 = self.entity.stiffness_1
@@ -1150,7 +1035,6 @@ class CubicViscoelasticGenericOperator(Base):
             self.stiffness_matrix_3x1_3_name = self.entity.links[2].name
             self.viscosity_matrix_3x1_name = self.entity.links[3].name
     def store(self, context):
-        self.entity = database.constitutive[self.index]
         self.entity.dimensions = self.dimensions
         if self.dimensions == "1D":
             self.entity.stiffness_1 = self.stiffness_1
@@ -1159,10 +1043,10 @@ class CubicViscoelasticGenericOperator(Base):
             self.entity.viscosity = self.viscosity
         else:
             self.entity.unlink_all()
-            self.link_matrix(context, self.stiffness_matrix_3x1_1_name, self.stiffness_matrix_3x1_1_edit)
-            self.link_matrix(context, self.stiffness_matrix_3x1_2_name, self.stiffness_matrix_3x1_2_edit)
-            self.link_matrix(context, self.stiffness_matrix_3x1_3_name, self.stiffness_matrix_3x1_3_edit)
-            self.link_matrix(context, self.viscosity_matrix_3x1_name, self.viscosity_matrix_3x1_edit)
+            self.link_matrix(context, self.stiffness_matrix_3x1_1_name)
+            self.link_matrix(context, self.stiffness_matrix_3x1_2_name)
+            self.link_matrix(context, self.stiffness_matrix_3x1_3_name)
+            self.link_matrix(context, self.viscosity_matrix_3x1_name)
             self.entity.increment_links()
     def draw(self, context):
         self.basis = self.dimensions
@@ -1175,8 +1059,8 @@ class CubicViscoelasticGenericOperator(Base):
             layout.prop(self, "viscosity")
         else:
             for c in "123":
-                self.draw_link(layout, "stiffness_matrix_3x1_" + c + "_name", "stiffness_matrix_3x1_" + c + "_edit", "matrix")
-            self.draw_link(layout, "viscosity_matrix_3x1_name", "viscosity_matrix_3x1_edit", "matrix")
+                layout.prop(self, "stiffness_matrix_3x1_" + c + "_name")
+            layout.prop(self, "viscosity_matrix_3x1_name")
     def check(self, context):
         return self.basis != self.dimensions
     def create_entity(self):
@@ -1210,24 +1094,18 @@ class DoubleLinearViscoelasticOperator(Base):
     stiffness_2 = bpy.props.FloatProperty(name="Stiffness 2", description="", min=0.000001, max=9.9e10, precision=6, default=1.0)
     upper_strain = bpy.props.FloatProperty(name="Upper strain", description="", min=0.000001, max=9.9e10, precision=6)
     lower_strain = bpy.props.FloatProperty(name="Lower strain", description="", min=0.000001, max=9.9e10, precision=6)
-    stiffness_matrix_3x1_1_name = bpy.props.EnumProperty(items=enum_matrix_3x1, name="Stiffness 1")
-    stiffness_matrix_3x1_1_edit = bpy.props.BoolProperty(name="")
-    stiffness_matrix_3x1_2_name = bpy.props.EnumProperty(items=enum_matrix_3x1, name="Stiffness 2")
-    stiffness_matrix_3x1_2_edit = bpy.props.BoolProperty(name="")
+    stiffness_matrix_3x1_1_name = bpy.props.EnumProperty(items=enum_matrix_3x1, name="Stiffness 1",
+        update=lambda self, context: update_matrix(self, context, self.stiffness_matrix_3x1_1_name, "3x1"))
+    stiffness_matrix_3x1_2_name = bpy.props.EnumProperty(items=enum_matrix_3x1, name="Stiffness 2",
+        update=lambda self, context: update_matrix(self, context, self.stiffness_matrix_3x1_2_name, "3x1"))
     second_damping = bpy.props.BoolProperty("Second damping", default=False)
     viscosity_1 = bpy.props.FloatProperty(name="Viscosity 1", description="", min=0.000001, max=9.9e10, precision=6, default=1.0)
     viscosity_2 = bpy.props.FloatProperty(name="Viscosity 2", description="", min=0.000001, max=9.9e10, precision=6, default=1.0)
-    viscosity_matrix_3x1_1_name = bpy.props.EnumProperty(items=enum_matrix_3x1, name="Viscosity 1")
-    viscosity_matrix_3x1_1_edit = bpy.props.BoolProperty(name="")
-    viscosity_matrix_3x1_2_name = bpy.props.EnumProperty(items=enum_matrix_3x1, name="Viscosity 2")
-    viscosity_matrix_3x1_2_edit = bpy.props.BoolProperty(name="")
-    @classmethod
-    def poll(cls, context):
-        return True
-    def prereqs(self, context):
-        self.matrix_exists(context, "3x1")
+    viscosity_matrix_3x1_1_name = bpy.props.EnumProperty(items=enum_matrix_3x1, name="Viscosity 1",
+        update=lambda self, context: update_matrix(self, context, self.viscosity_matrix_3x1_1_name, "3x1"))
+    viscosity_matrix_3x1_2_name = bpy.props.EnumProperty(items=enum_matrix_3x1, name="Viscosity 2",
+        update=lambda self, context: update_matrix(self, context, self.viscosity_matrix_3x1_2_name, "3x1"))
     def assign(self, context):
-        self.entity = database.constitutive[context.scene.constitutive_index]
         self.dimensions = self.entity.dimensions
         self.upper_strain = self.entity.upper_strain
         self.lower_strain = self.entity.lower_strain
@@ -1244,7 +1122,6 @@ class DoubleLinearViscoelasticOperator(Base):
             if self.second_damping:
                 self.viscosity_matrix_3x1_2_name = self.entity.links[3].name
     def store(self, context):
-        self.entity = database.constitutive[self.index]
         self.entity.dimensions = self.dimensions
         self.entity.upper_strain = self.upper_strain
         self.entity.lower_strain = self.lower_strain
@@ -1256,11 +1133,11 @@ class DoubleLinearViscoelasticOperator(Base):
             self.entity.viscosity_2 = self.viscosity_2
         else:
             self.entity.unlink_all()
-            self.link_matrix(context, self.stiffness_matrix_3x1_1_name, self.stiffness_matrix_3x1_1_edit)
-            self.link_matrix(context, self.stiffness_matrix_3x1_2_name, self.stiffness_matrix_3x1_2_edit)
-            self.link_matrix(context, self.viscosity_matrix_3x1_1_name, self.viscosity_matrix_3x1_1_edit)
+            self.link_matrix(context, self.stiffness_matrix_3x1_1_name)
+            self.link_matrix(context, self.stiffness_matrix_3x1_2_name)
+            self.link_matrix(context, self.viscosity_matrix_3x1_1_name)
             if self.second_damping:
-                self.link_matrix(context, self.viscosity_matrix_3x1_2_name, self.viscosity_matrix_3x1_2_edit)
+                self.link_matrix(context, self.viscosity_matrix_3x1_2_name)
             self.entity.increment_links()
     def draw(self, context):
         self.basis = (self.dimensions, self.second_damping)
@@ -1276,12 +1153,12 @@ class DoubleLinearViscoelasticOperator(Base):
                 row.prop(self, "viscosity_2")
         else:
             for c in "12":
-                self.draw_link(layout, "stiffness_matrix_3x1_" + c + "_name", "stiffness_matrix_3x1_" + c + "_edit", "matrix")
-            self.draw_link(layout, "viscosity_matrix_3x1_1_name", "viscosity_matrix_3x1_1_edit", "matrix")
+                layout.prop(self, "stiffness_matrix_3x1_" + c + "_name")
+            layout.prop(self, "viscosity_matrix_3x1_1_name")
             row = layout.row()
             row.prop(self, "second_damping")
             if self.second_damping:
-                self.draw_link(row, "viscosity_matrix_3x1_2_name", "viscosity_matrix_3x1_2_edit", "matrix")
+                row.prop(self, "viscosity_matrix_3x1_2_name")
         layout.prop(self, "upper_strain")
         layout.prop(self, "lower_strain")
     def check(self, context):
@@ -1309,11 +1186,7 @@ class TurbulentViscoelasticOperator(Base):
     threshold = bpy.props.FloatProperty(name="Threshold", description="", min=0.000001, max=9.9e10, precision=6, default=1.0)
     use_linear_viscosity = bpy.props.BoolProperty("Use linear viscosity", default=False)
     linear_viscosity = bpy.props.FloatProperty(name="Linear viscosity", description="", min=0.000001, max=9.9e10, precision=6, default=1.0)
-    @classmethod
-    def poll(cls, context):
-        return True
     def assign(self, context):
-        self.entity = database.constitutive[context.scene.constitutive_index]
         self.dimensions = self.entity.dimensions
         self.stiffness = self.entity.stiffness
         self.parabolic_viscosity = self.entity.parabolic_viscosity
@@ -1322,7 +1195,6 @@ class TurbulentViscoelasticOperator(Base):
         self.use_linear_viscosity = self.entity.use_linear_viscosity
         self.linear_viscosity = self.entity.linear_viscosity
     def store(self, context):
-        self.entity = database.constitutive[self.index]
         self.entity.dimensions = self.dimensions
         self.entity.stiffness = self.stiffness
         self.entity.parabolic_viscosity = self.parabolic_viscosity
@@ -1365,27 +1237,21 @@ class LinearViscoelasticBistopOperator(Base):
     bl_label = "Linear viscoelastic bistop"
     dimensions = bpy.props.EnumProperty(items=[("1D", "1D", ""), ("3D", "3D", ""), ("6D", "6D", "")], name="Dimension(s)")
     stiffness = bpy.props.FloatProperty(name="Stiffness", description="", min=0.000001, max=9.9e10, precision=6, default=1.0)
-    stiffness_matrix_3x3_name = bpy.props.EnumProperty(items=enum_matrix_3x3, name="Stiffness")
-    stiffness_matrix_6x6_name = bpy.props.EnumProperty(items=enum_matrix_6x6, name="Stiffness")
-    stiffness_matrix_edit = bpy.props.BoolProperty(name="", description="Edit the stiffness matrix")
+    stiffness_matrix_3x3_name = bpy.props.EnumProperty(items=enum_matrix_3x3, name="Stiffness",
+        update=lambda self, context: update_matrix(self, context, self.stiffness_matrix_3x3_name, "3x3"))
+    stiffness_matrix_6x6_name = bpy.props.EnumProperty(items=enum_matrix_6x6, name="Stiffness",
+        update=lambda self, context: update_matrix(self, context, self.stiffness_matrix_6x6_name, "6x6"))
     viscosity = bpy.props.FloatProperty(name="Viscosity", description="", min=0.000001, max=9.9e10, precision=6, default=1.0)
-    viscosity_matrix_3x3_name = bpy.props.EnumProperty(items=enum_matrix_3x3, name="Viscosity")
-    viscosity_matrix_6x6_name = bpy.props.EnumProperty(items=enum_matrix_6x6, name="Viscosity")
-    viscosity_matrix_edit = bpy.props.BoolProperty(name="")
+    viscosity_matrix_3x3_name = bpy.props.EnumProperty(items=enum_matrix_3x3, name="Viscosity",
+        update=lambda self, context: update_matrix(self, context, self.viscosity_matrix_3x3_name, "3x3"))
+    viscosity_matrix_6x6_name = bpy.props.EnumProperty(items=enum_matrix_6x6, name="Viscosity",
+        update=lambda self, context: update_matrix(self, context, self.viscosity_matrix_6x6_name, "6x6"))
     initial_status = bpy.props.EnumProperty(items=[("active", "Active", ""), ("inactive", "Inactive", "")], name="Initial status")
-    activating_condition_name = bpy.props.EnumProperty(items=enum_drive, name="Activating condition")
-    activating_condition_edit = bpy.props.BoolProperty(name="")
-    deactivating_condition_name = bpy.props.EnumProperty(items=enum_drive, name="Deactivating condition")
-    deactivating_condition_edit = bpy.props.BoolProperty(name="")
-    @classmethod
-    def poll(cls, context):
-        return True
-    def prereqs(self, context):
-        self.matrix_exists(context, "3x3")
-        self.matrix_exists(context, "6x6")
-        self.drive_exists(context)
+    activating_condition_name = bpy.props.EnumProperty(items=enum_drive, name="Activating condition",
+        update=lambda self, context: update_drive(self, context, self.activating_condition_name))
+    deactivating_condition_name = bpy.props.EnumProperty(items=enum_drive, name="Deactivating condition",
+        update=lambda self, context: update_drive(self, context, self.deactivating_condition_name))
     def assign(self, context):
-        self.entity = database.constitutive[context.scene.constitutive_index]
         self.dimensions = self.entity.dimensions
         self.initial_status = self.entity.initial_status
         self.activating_condition_name = self.entity.links[0].name
@@ -1400,22 +1266,21 @@ class LinearViscoelasticBistopOperator(Base):
             self.stiffness_matrix_6x6_name = self.entity.links[2].name
             self.viscosity_matrix_6x6_name = self.entity.links[3].name
     def store(self, context):
-        self.entity = database.constitutive[self.index]
         self.entity.dimensions = self.dimensions
         self.entity.initial_status = self.initial_status
         self.entity.unlink_all()
-        self.link_drive(context, self.activating_condition_name, self.activating_condition_edit)
-        self.link_drive(context, self.deactivating_condition_name, self.deactivating_condition_edit)
+        self.link_drive(context, self.activating_condition_name)
+        self.link_drive(context, self.deactivating_condition_name)
         if self.dimensions == "1D":
             self.entity.stiffness = self.stiffness
             self.entity.viscosity = self.viscosity
         else:
             if self.dimensions == "3D":
-                self.link_matrix(context, self.stiffness_matrix_3x3_name, self.stiffness_matrix_edit)
-                self.link_matrix(context, self.viscosity_matrix_3x3_name, self.viscosity_matrix_edit)
+                self.link_matrix(context, self.stiffness_matrix_3x3_name)
+                self.link_matrix(context, self.viscosity_matrix_3x3_name)
             else:
-                self.link_matrix(context, self.stiffness_matrix_6x6_name, self.stiffness_matrix_edit)
-                self.link_matrix(context, self.viscosity_matrix_6x6_name, self.viscosity_matrix_edit)
+                self.link_matrix(context, self.stiffness_matrix_6x6_name)
+                self.link_matrix(context, self.viscosity_matrix_6x6_name)
         self.entity.increment_links()
     def draw(self, context):
         self.basis = self.dimensions
@@ -1426,13 +1291,13 @@ class LinearViscoelasticBistopOperator(Base):
             layout.prop(self, "viscosity")
         elif self.dimensions == "3D":
             for s in "stiffness viscosity".split():
-                self.draw_link(layout, s + "_matrix_3x3_name", "_matrix_edit", "matrix")
+                layout.prop(self, s + "_matrix_3x3_name")
         else:
             for s in "stiffness viscosity".split():
-                self.draw_link(layout, s + "_matrix_6x6_name", s + "_matrix_edit", "matrix")
+                layout.prop(self, s + "_matrix_6x6_name")
         layout.prop(self, "initial_status")
         for s in "activating deactivating".split():
-            self.draw_link(layout, s+ "_condition_name", s + "_condition_edit", "drive")
+            layout.prop(self, s+ "_condition_name")
     def check(self, context):
         return self.basis != self.dimensions
     def create_entity(self):

@@ -38,6 +38,9 @@ class Base(Operator):
     bl_label = "Drivers"
     bl_options = {'DEFAULT_CLOSED'}
     @classmethod
+    def poll(cls, context):
+        return True
+    @classmethod
     def make_list(self, ListItem):
         bpy.types.Scene.driver_uilist = bpy.props.CollectionProperty(type = ListItem)
         bpy.types.Scene.driver_index = bpy.props.IntProperty(default=-1)
@@ -50,8 +53,6 @@ class Base(Operator):
         return context.scene.driver_index, context.scene.driver_uilist
     def set_index(self, context, value):
         context.scene.driver_index = value
-    def prereqs(self, context):
-        pass
 
 klasses = dict()
 
@@ -61,10 +62,6 @@ for t in types:
         @classmethod
         def poll(cls, context):
             return False
-        def assign(self, context):
-            self.entity = database.driver[context.scene.driver_index]
-        def store(self, context):
-            self.entity = database.driver[self.index]
         def create_entity(self):
             return Entity(self.name)
     klasses[t] = Tester

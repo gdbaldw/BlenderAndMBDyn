@@ -29,6 +29,7 @@ if "bpy" in locals():
     imp.reload(Entity)
 else:
     from .base import bpy, database, Operator, Entity, Bundle, enum_function
+    from .base import update_function
     from .common import FORMAT
 
 types = ["Modlugre", "Discrete Coulomb"]
@@ -40,6 +41,9 @@ klasses = dict()
 class Base(Operator):
     bl_label = "Frictions"
     bl_options = {'DEFAULT_CLOSED'}
+    @classmethod
+    def poll(cls, context):
+        return True
     @classmethod
     def make_list(self, ListItem):
         bpy.types.Scene.friction_uilist = bpy.props.CollectionProperty(type = ListItem)
@@ -62,10 +66,6 @@ for t in types:
         @classmethod
         def poll(cls, context):
             return False
-        def assign(self, context):
-            self.entity = database.friction[context.scene.friction_index]
-        def store(self, context):
-            self.entity = database.friction[self.index]
         def create_entity(self):
             return Entity(self.name)
     klasses[t] = Tester
@@ -88,15 +88,9 @@ class ModlugreOperator(Base):
     kappa = bpy.props.FloatProperty(name="Kappa", description="", min=-9.9e10, max=9.9e10, precision=6, default=0.0)
     plane_hinge = bpy.props.BoolProperty(name="Plane hinge", description="Simple plane hinge (else just simple shape function)", default=False)
     radius = bpy.props.FloatProperty(name="Radius", description="", min=0.0, max=9.9e10, precision=6, default=0.0)
-    function_name = bpy.props.EnumProperty(items=enum_function, name="Shape Function")
-    function_edit = bpy.props.BoolProperty(name="")
-    @classmethod
-    def poll(cls, context):
-        return True
-    def prereqs(self, context):
-        self.function_exists(context)
+    function_name = bpy.props.EnumProperty(items=enum_function, name="Shape Function",
+        update=lambda self, context: update_function(self, context, self.function_name))
     def assign(self, context):
-        self.entity = database.friction[context.scene.friction_index]
         self.sigma0 = self.entity.sigma0
         self.sigma1 = self.entity.sigma1
         self.sigma2 = self.entity.sigma2
@@ -105,7 +99,6 @@ class ModlugreOperator(Base):
         self.radius = self.entity.radius
         self.function_name = self.entity.links[0].name
     def store(self, context):
-        self.entity = database.friction[self.index]
         self.entity.sigma0 = self.sigma0
         self.entity.sigma1 = self.sigma1
         self.entity.sigma2 = self.sigma2
@@ -113,7 +106,7 @@ class ModlugreOperator(Base):
         self.entity.plane_hinge = self.plane_hinge
         self.entity.radius = self.radius
         self.entity.unlink_all()
-        self.link_function(context, self.function_name, self.function_edit)
+        self.link_function(context, self.function_name)
         self.entity.increment_links()
     def draw(self, context):
         self.basis = self.plane_hinge
@@ -126,7 +119,7 @@ class ModlugreOperator(Base):
         row.prop(self, "plane_hinge")
         if self.plane_hinge:
             row.prop(self, "radius")
-        self.draw_link(layout, "function_name", "function_edit", "function")
+        layout.prop(self, "function_name")
     def create_entity(self):
         return Modlugre(self.name)
 

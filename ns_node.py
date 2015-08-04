@@ -44,6 +44,9 @@ class Base(Operator):
     bl_label = "NS Nodes"
     bl_options = {'DEFAULT_CLOSED'}
     @classmethod
+    def poll(cls, context):
+        return True
+    @classmethod
     def make_list(self, ListItem):
         bpy.types.Scene.ns_node_uilist = bpy.props.CollectionProperty(type = ListItem)
         bpy.types.Scene.ns_node_index = bpy.props.IntProperty(default=-1)
@@ -56,8 +59,6 @@ class Base(Operator):
         return context.scene.ns_node_index, context.scene.ns_node_uilist
     def set_index(self, context, value):
         context.scene.ns_node_index = value
-    def prereqs(self, context):
-        pass
 
 for t in types:
     class Tester(Base):
@@ -65,10 +66,6 @@ for t in types:
         @classmethod
         def poll(cls, context):
             return False
-        def assign(self, context):
-            self.entity = database.ns_node[context.scene.ns_node_index]
-        def store(self, context):
-            self.entity = database.ns_node[self.index]
         def create_entity(self):
             return Entity(self.name)
     klasses[t] = Tester
