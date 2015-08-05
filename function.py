@@ -367,10 +367,8 @@ class BinaryOperator(Base):
         self.f1_name = self.entity.links[0].name
         self.f2_name = self.entity.links[1].name
     def store(self, context):
-        self.entity.unlink_all()
-        self.link_function(context, self.f1_name)
-        self.link_function(context, self.f2_name)
-        self.entity.increment_links()
+        self.entity.links.append(database.function.get_by_name(self.f1_name))
+        self.entity.links.append(database.function.get_by_name(self.f2_name))
     def draw(self, context):
         layout = self.layout
         layout.prop(self, "f1_name")

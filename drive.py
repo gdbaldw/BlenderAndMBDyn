@@ -655,10 +655,8 @@ class FrequencySweepDriveOperator(Base):
         self.entity.forever = self.forever
         self.entity.final_time = self.final_time
         self.entity.final_value = self.final_value
-        self.entity.unlink_all()
-        self.link_drive(context, self.angular_velocity_drive_name)
-        self.link_drive(context, self.amplitude_drive_name)
-        self.entity.increment_links()
+        self.entity.links.append(database.drive.get_by_name(self.angular_velocity_drive_name))
+        self.entity.links.append(database.drive.get_by_name(self.amplitude_drive_name))
     def draw(self, context):
         self.basis = self.forever
         layout = self.layout
@@ -855,10 +853,8 @@ class MultDriveOperator(Base):
         self.drive_1_name = self.entity.links[0].name
         self.drive_2_name = self.entity.links[0].name
     def store(self, context):
-        self.entity.unlink_all()
-        self.link_drive(context, self.drive_1_name)
-        self.link_drive(context, self.drive_2_name)
-        self.entity.increment_links()
+        self.entity.links.append(database.drive.get_by_name(self.drive_1_name))
+        self.entity.links.append(database.drive.get_by_name(self.drive_2_name))
     def draw(self, context):
         layout = self.layout
         layout.prop(self, "drive_1_name")
@@ -906,9 +902,7 @@ class NodeDriveOperator(Base):
     def store(self, context):
         self.entity.objects = SelectedObjects(context)
         self.entity.symbolic_name = self.symbolic_name
-        self.entity.unlink_all()
-        self.link_drive(context, self.drive_name)
-        self.entity.increment_links()
+        self.entity.links.append(database.drive.get_by_name(self.drive_name))
     def draw(self, context):
         layout = self.layout
         layout.prop(self, "symbolic_name")
@@ -941,10 +935,8 @@ class ElementDriveOperator(Base):
         self.drive_name = self.entity.links[1].name
     def store(self, context):
         self.symbolic_name = self.symbolic_name
-        self.entity.unlink_all()
-        self.link_drive(context, self.element_name)
-        self.link_drive(context, self.drive_name)
-        self.entity.increment_links()
+        self.link_element(context, self.element_name)
+        self.entity.links.append(database.drive.get_by_name(self.drive_name))
     def draw(self, context):
         layout = self.layout
         layout.prop(slef, "element_name")
@@ -973,10 +965,8 @@ class DriveDriveOperator(Base):
         self.drive_1_name = self.entity.links[0].name
         self.drive_2_name = self.entity.links[0].name
     def store(self, context):
-        self.entity.unlink_all()
-        self.link_drive(context, self.drive_1_name)
-        self.link_drive(context, self.drive_2_name)
-        self.entity.increment_links()
+        self.entity.links.append(database.drive.get_by_name(self.drive_1_name))
+        self.entity.links.append(database.drive.get_by_name(self.drive_2_name))
     def draw(self, context):
         layout = self.layout
         layout.prop(self, "drive_1_name")
@@ -1011,10 +1001,8 @@ class ArrayDriveOperator(Base):
             self.drive_names[i].enable_popups = True
     def store(self, context):
         self.entity.N = self.N
-        self.entity.unlink_all()
         for d in self.drive_names[:self.N]:
-            self.link_drive(context, d.value)
-        self.entity.increment_links()
+            self.entity.links.append(database.drive.get_by_name(d.value))
     def draw(self, context):
         self.basis = self.N
         layout = self.layout

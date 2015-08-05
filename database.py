@@ -64,15 +64,19 @@ class Unpickler(pickle.Unpickler):
 
 bpy.types.Scene.pickled_database = bpy.props.StringProperty()
 
+class EntityLookupError(LookupError):
+    pass
+
 class Entities(list):
     def filter(self, type_name, obj=None):
         return [e for e in self if e.type == type_name and 
             (not obj or (hasattr(e, "objects") and e.objects[0] == obj))]
     def get_by_name(self, name):
-        for e in self:
-            if e.name == name:
-                return e
-        return None
+        if name != "New":
+            for e in self:
+                if e.name == name:
+                    return e
+        raise EntityLookupError
 
 class Database(Common):
     def __init__(self):

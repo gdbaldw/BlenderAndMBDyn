@@ -105,9 +105,7 @@ class ModlugreOperator(Base):
         self.entity.kappa = self.kappa
         self.entity.plane_hinge = self.plane_hinge
         self.entity.radius = self.radius
-        self.entity.unlink_all()
-        self.link_function(context, self.function_name)
-        self.entity.increment_links()
+        self.entity.links.append(database.function.get_by_name(self.function_name))
     def draw(self, context):
         self.basis = self.plane_hinge
         layout = self.layout

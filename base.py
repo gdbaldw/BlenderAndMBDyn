@@ -30,7 +30,7 @@ if "bpy" in locals():
 else:
     import bpy
     import addon_utils
-    from .database import Database
+    from .database import Database, EntityLookupError
     from .common import Common, method_types, nonlinear_solver_types
     from collections import OrderedDict
     from copy import copy
@@ -39,14 +39,14 @@ category = "MBDyn"
 root_dot = "_".join(category.lower().split()) + "."
 database = Database()
 
-def update_constitutive(self, context, name):
+def update_constitutive(self, context, name, dimension=""):
     if self.enable_popups:
         if name == "New":
-            bpy.ops.wm.call_menu(name=root_dot+"add_constitutive")
+            bpy.ops.wm.call_menu(name=root_dot+"add_constitutive"+dimension)
         else:
             entity = database.constitutive.get_by_name(name)
             context.scene.constitutive_index = database.constitutive.index(entity)
-            exec("bpy.ops." + root_dot + "e_" + "_".join(entity.type.lower().split()) + "('INVOKE_DEFAULT')")
+            entity.edit()
 def update_definition(self, context, name, menu_item):
     if self.enable_popups:
         if name == "New":
@@ -54,11 +54,10 @@ def update_definition(self, context, name, menu_item):
                 bpy.ops.wm.call_menu(name=root_dot + "_".join(menu_item.lower().split()))
             else:
                 exec("bpy.ops." + root_dot + "c_" + "_".join(menu_item.lower().split()) + "('INVOKE_DEFAULT')")
-                #bpy.ops.wm.call_menu(name=root_dot+"add_definition")
         else:
             entity = database.definition.get_by_name(name)
             context.scene.definition_index = database.definition.index(entity)
-            exec("bpy.ops." + root_dot + "e_" + "_".join(entity.type.lower().split()) + "('INVOKE_DEFAULT')")
+            entity.edit()
 def update_drive(self, context, name, menu_item=None):
     if self.enable_popups:
         if name == "New":
@@ -69,15 +68,12 @@ def update_drive(self, context, name, menu_item=None):
         else:
             entity = database.drive.get_by_name(name)
             context.scene.drive_index = database.drive.index(entity)
-            exec("bpy.ops." + root_dot + "e_" + "_".join(entity.type.lower().split()) + "('INVOKE_DEFAULT')")
+            entity.edit()
 def update_element(self, context, name):
     if self.enable_popups:
-        if name == "New":
-            bpy.ops.wm.call_menu(name=root_dot+"add_element")
-        else:
-            entity = database.element.get_by_name(name)
-            context.scene.element_index = database.element.index(entity)
-            exec("bpy.ops." + root_dot + "e_" + "_".join(entity.type.lower().split()) + "('INVOKE_DEFAULT')")
+        entity = database.element.get_by_name(name)
+        context.scene.element_index = database.element.index(entity)
+        entity.edit()
 def update_friction(self, context, name):
     if self.enable_popups:
         if name == "New":
@@ -85,7 +81,7 @@ def update_friction(self, context, name):
         else:
             entity = database.friction.get_by_name(name)
             context.scene.friction_index = database.friction.index(entity)
-            exec("bpy.ops." + root_dot + "e_" + "_".join(entity.type.lower().split()) + "('INVOKE_DEFAULT')")
+            entity.edit()
 def update_function(self, context, name):
     if self.enable_popups:
         if name == "New":
@@ -93,7 +89,7 @@ def update_function(self, context, name):
         else:
             entity = database.function.get_by_name(name)
             context.scene.function_index = database.function.index(entity)
-            exec("bpy.ops." + root_dot + "e_" + "_".join(entity.type.lower().split()) + "('INVOKE_DEFAULT')")
+            entity.edit()
 def update_matrix(self, context, name, menu_item):
     if self.enable_popups:
         if name == "New":
@@ -101,7 +97,7 @@ def update_matrix(self, context, name, menu_item):
         else:
             entity = database.matrix.get_by_name(name)
             context.scene.matrix_index = database.matrix.index(entity)
-            exec("bpy.ops." + root_dot + "e_" + "_".join(entity.type.lower().split()) + "('INVOKE_DEFAULT')")
+            entity.edit()
 
 def enum_scenes(self, context):
     return [(s.name, s.name, "") for s in bpy.data.scenes]
@@ -122,7 +118,7 @@ def enum_matrix_6xN(self, context):
     return enum_matrix(self, context, "6xN")
 def enum_constitutive(self, context, dimension):
     return  [(c.name, c.name, "") for i, c in enumerate(context.scene.constitutive_uilist)
-        if dimension in database.constitutive[i].dimensions] + [("New", "New", "")]
+        if dimension in database.constitutive[i].dimension] + [("New", "New", "")]
 def enum_constitutive_1D(self, context):
     return enum_constitutive(self, context, "1D")
 def enum_constitutive_3D(self, context):
@@ -134,7 +130,7 @@ def enum_drive(self, context):
 def enum_meter_drive(self, context):
     return [(d.name, d.name, "") for i, d in enumerate(context.scene.drive_uilist) if database.drive[i].type == "Meter drive"] + [("New", "New", "")]
 def enum_element(self, context):
-    return [(e.name, e.name, "") for e in context.scene.element_uilist] + [("New", "New", "")]
+    return [(e.name, e.name, "") for i, e in enumerate(context.scene.element_uilist) if not hasattr(database.element[i], "consumer")]
 def enum_function(self, context):
     return [(f.name, f.name, "") for f in context.scene.function_uilist] + [("New", "New", "")]
 def enum_friction(self, context):
@@ -238,6 +234,8 @@ class Entity(Common):
     def increment_links(self):
         for link in self.links:
             link.users += 1
+    def edit(self):
+        exec("bpy.ops." + root_dot + "e_" + "_".join(self.type.lower().split()) + "('INVOKE_DEFAULT')")
     def write(self, text):
         text.write("\t" + self.type + ".write(): FIXME please\n")
     def string(self):
@@ -295,36 +293,13 @@ class SelectedObjects(list):
             self.clear()
 
 class Operator:
-    def link_element(self, context, element_name):
+    def link_element(self, context, element_name, edit=False):
         context.scene.element_index = next(i for i, x in enumerate(context.scene.element_uilist)
             if x.name == element_name)
         element = database.element[context.scene.element_index]
         self.entity.links.append(element)
-    def link_matrix(self, context, matrix_name):
-        context.scene.matrix_index = next(i for i, x in enumerate(context.scene.matrix_uilist)
-            if x.name == matrix_name)
-        matrix = database.matrix[context.scene.matrix_index]
-        self.entity.links.append(matrix)
-    def link_constitutive(self, context, constitutive_name):
-        context.scene.constitutive_index = next(i for i, x in enumerate(context.scene.constitutive_uilist)
-            if x.name == constitutive_name)
-        constitutive = database.constitutive[context.scene.constitutive_index]
-        self.entity.links.append(constitutive)
-    def link_drive(self, context, drive_name):
-        context.scene.drive_index = next(i for i, x in enumerate(context.scene.drive_uilist)
-            if x.name == drive_name)
-        drive = database.drive[context.scene.drive_index]
-        self.entity.links.append(drive)
-    def link_function(self, context, function_name):
-        context.scene.function_index = next(i for i, x in enumerate(context.scene.function_uilist)
-            if x.name == function_name)
-        function = database.function[context.scene.function_index]
-        self.entity.links.append(function)
-    def link_friction(self, context, friction_name):
-        context.scene.friction_index = next(i for i, x in enumerate(context.scene.friction_uilist)
-            if x.name == friction_name)
-        friction = database.friction[context.scene.friction_index]
-        self.entity.links.append(friction)
+        if edit:
+            exec("bpy.ops." + root_dot + "e_" + "_".join(element.type.lower().split()) + "('INVOKE_DEFAULT')")
     def link_definition(self, context, definition_name):
         context.scene.definition_index = next(i for i, x in enumerate(context.scene.definition_uilist)
             if x.name == definition_name)
@@ -390,8 +365,10 @@ class Operators(list):
                     return context.window_manager.invoke_props_dialog(self)
                 def execute(self, context):
                     try:
+                        self.entity.unlink_all()
                         self.store(context)
-                    except StopIteration as e:
+                        self.entity.increment_links()
+                    except EntityLookupError:
                         self.entity.unlink_all()
                         self.report({'ERROR'}, "Incomplete (click on each 'New' selector)")
                         return {'CANCELLED'}
@@ -419,7 +396,9 @@ class Operators(list):
                     self.enable_popups = True
                     return context.window_manager.invoke_props_dialog(self)
                 def execute(self, context):
+                    self.entity.unlink_all()
                     self.store(context)
+                    self.entity.increment_links()
                     context.scene.dirty_simulator = True
                     self.set_index(context, self.index)
                     return {'FINISHED'}

@@ -71,10 +71,13 @@ class Base(Operator):
             bpy.ops.mesh.primitive_cube_add()
             for obj in objects:
                 obj.select = True
+            objects.insert(0, context.active_object)
+            if 1 < len(objects):
+                objects[0].location = objects[1].location
             exec("bpy.ops." + root_dot + "object_specifications('INVOKE_DEFAULT')")
+        return objects
     def store(self, context):
-        self.sufficient_objects(context)
-        self.entity.objects = SelectedObjects(context)
+        self.entity.objects = self.sufficient_objects(context)
     @classmethod
     def make_list(self, ListItem):
         bpy.types.Scene.element_uilist = bpy.props.CollectionProperty(type = ListItem)
@@ -146,11 +149,8 @@ class ForceBase(Base):
         self.drive_name = self.entity.links[0].name
     def store(self, context):
         self.entity.orientation = self.orientation
-        self.entity.unlink_all()
-        self.link_drive(context, self.drive_name)
-        self.entity.increment_links()
-        self.sufficient_objects(context)
-        self.entity.objects = SelectedObjects(context)
+        self.entity.links.append(database.drive.get_by_name(self.drive_name))
+        self.entity.objects = self.sufficient_objects(context)
     def draw(self, context):
         layout = self.layout
         layout.prop(self, "orientation")
@@ -299,11 +299,8 @@ class AxialRotationOperator(Base):
     def assign(self, context):
         self.drive_name = self.entity.links[0].name
     def store(self, context):
-        self.entity.unlink_all()
-        self.link_drive(context, self.drive_name)
-        self.entity.increment_links()
-        self.sufficient_objects(context)
-        self.entity.objects = SelectedObjects(context)
+        self.entity.links.append(database.drive.get_by_name(self.drive_name))
+        self.entity.objects = self.sufficient_objects(context)
     def draw(self, context):
         layout = self.layout
         layout.prop(self, "drive_name")
@@ -342,11 +339,8 @@ class ConstitutiveBase(Base):
     def assign(self, context):
         self.constitutive_name = self.entity.links[0].name
     def store(self, context):
-        self.entity.unlink_all()
-        self.link_constitutive(context, self.constitutive_name)
-        self.entity.increment_links()
-        self.sufficient_objects(context)
-        self.entity.objects = SelectedObjects(context)
+        self.entity.links.append(database.constitutive.get_by_name(self.constitutive_name))
+        self.entity.objects = self.sufficient_objects(context)
     def draw(self, context):
         layout = self.layout
         layout.prop(self, "constitutive_name")
@@ -417,11 +411,8 @@ class DistanceOperator(Base):
     def store(self, context):
         self.entity.from_nodes = self.from_nodes
         if not self.from_nodes:
-            self.entity.unlink_all()
-            self.link_drive(context, self.drive_name)
-            self.entity.increment_links()
-        self.sufficient_objects(context)
-        self.entity.objects = SelectedObjects(context)
+            self.entity.links.append(database.drive.get_by_name(self.drive_name))
+        self.entity.objects = self.sufficient_objects(context)
     def draw(self, context):
         self.basis = self.from_nodes
         layout = self.layout
@@ -521,11 +512,8 @@ class RevoluteHingeOperator(Base):
         self.entity.enable_preload = self.enable_preload
         self.entity.preload = self.preload
         if self.enable_friction:
-            self.entity.unlink_all()
-            self.link_friction(context, self.friction_name)
-            self.entity.increment_links()
-        self.sufficient_objects(context)
-        self.entity.objects = SelectedObjects(context)
+            self.entity.links.append(database.friction.get_by_name(self.friction_name))
+        self.entity.objects = self.sufficient_objects(context)
     def draw(self, context):
         self.basis = (self.enable_theta, self.enable_friction, self.enable_preload)
         layout = self.layout
@@ -685,16 +673,11 @@ class TotalJointOperator(Base):
         self.entity.angular_displacement_x = self.angular_displacement_x
         self.entity.angular_displacement_y = self.angular_displacement_y
         self.entity.angular_displacement_z = self.angular_displacement_z
-        self.entity.unlink_all()
-        self.link_drive(context, self.displacement_x_drive_name)
-        self.link_drive(context, self.displacement_y_drive_name)
-        self.link_drive(context, self.displacement_z_drive_name)
-        self.link_drive(context, self.angular_displacement_x_drive_name)
-        self.link_drive(context, self.angular_displacement_y_drive_name)
-        self.link_drive(context, self.angular_displacement_z_drive_name)
-        self.entity.increment_links()
-        self.sufficient_objects(context)
-        self.entity.objects = SelectedObjects(context)
+        for drive_name in [self.displacement_x_drive_name, self.displacement_y_drive_name,
+            self.displacement_z_drive_name, self.angular_displacement_x_drive_name,
+            self.angular_displacement_y_drive_name, self.angular_displacement_z_drive_name]:
+                self.entity.links.append(database.drive.get_by_name(drive_name))
+        self.entity.objects = self.sufficient_objects(context)
     def draw(self, context):
         self.basis = (self.displacement_x)
         layout = self.layout
@@ -727,11 +710,8 @@ class ViscousBodyOperator(Base):
         self.constitutive_name = self.entity.links[0].name
         self.object = self.entity.objects[0]
     def store(self, context):
-        self.entity.unlink_all()
-        self.link_constitutive(context, self.constitutive_name)
-        self.entity.increment_links()
-        self.sufficient_objects(context)
-        self.entity.objects = SelectedObjects(context)
+        self.entity.links.append(database.constitutive.get_by_name(self.constitutive_name))
+        self.entity.objects = self.sufficient_objects(context)
     def draw(self, context):
         layout = self.layout
         layout.prop(self, "constitutive_name")
@@ -764,11 +744,8 @@ class BodyOperator(Base):
         self.matrix_name = self.entity.links[0].name
     def store(self, context):
         self.entity.mass = self.mass
-        self.entity.unlink_all()
-        self.link_matrix(context, self.matrix_name)
-        self.entity.increment_links()
-        self.sufficient_objects(context)
-        self.entity.objects = SelectedObjects(context)
+        self.entity.links.append(database.matrix.get_by_name(self.matrix_name))
+        self.entity.objects = self.sufficient_objects(context)
     def draw(self, context):
         layout = self.layout
         layout.prop(self, "mass")
@@ -786,8 +763,7 @@ class RigidOffsetOperator(Base):
     bl_label = "Rigid offset"
     exclusive = True
     def store(self, context):
-        self.sufficient_objects(context)
-        self.entity.objects = SelectedObjects(context)
+        self.entity.objects = self.sufficient_objects(context)
         self.entity.objects[0].parent = self.entity.objects[1]
     def create_entity(self):
         return RigidOffset(self.name)
@@ -826,7 +802,7 @@ class BeamSegmentOperator(ConstitutiveBase):
     bl_label = "Beam segment"
     dimension = "6D"
     constitutive_name = bpy.props.EnumProperty(items=enum_constitutive_6D, name="Constitutive 6D",
-        update=lambda self, context: update_constitutive(self, context, self.constitutive_name))
+        update=lambda self, context: update_constitutive(self, context, self.constitutive_name, "6D"))
     def create_entity(self):
         return BeamSegment(self.name)
 
@@ -850,7 +826,6 @@ class ThreeNodeBeam(Entity):
     labels = "F1x F1y F1z M1x M1y M1z F2x F2y F2z M2x M2y M2z".split()
     def write(self, text):
         text.write("\tbeam3: " + str(database.element.index(self)) + ",\n")
-        #assert self.links[0].objects[1] == self.links[1].objects[0], "Disconnected beam segments"
         self.objects = self.links[0].objects + self.links[1].objects[1:]
         for i in range(3):
             self.write_node(text, i, node=True, position=True, orientation=True, p_label="position", o_label="orientation")
@@ -877,11 +852,11 @@ class ThreeNodeBeamOperator(Base, SegmentPair):
     def prereqs(self, context):
         self.beam_segments = self.segments(context, "Beam segment")
     def store(self, context):
-        self.entity.unlink_all()
-        for element, edit in zip(self.beam_segments, self.edit):
-            self.link_element(context, element.name, edit)
-            self.entity.links[-1].consumer = self.entity
-        self.entity.increment_links()
+        for segment, edit in zip(self.beam_segments, self.edit):
+            self.entity.links.append(segment)
+            segment.consumer = self.entity
+            if edit:
+                update_element(self, context, segment.name)
         self.entity.objects = self.beam_segments[0].objects + self.beam_segments[1].objects[1:]
     def draw(self, context):
         layout = self.layout
@@ -914,10 +889,8 @@ class GravityOperator(Base):
         self.matrix_name = self.entity.links[0].name
         self.drive_name = self.entity.links[1].name
     def store(self, context):
-        self.entity.unlink_all()
-        self.link_matrix(context, self.matrix_name)
-        self.link_drive(context, self.drive_name)
-        self.entity.increment_links()
+        self.entity.links.append(database.matrix.get_by_name(self.matrix_name))
+        self.entity.links.append(database.drive.get_by_name(self.drive_name))
     def draw(self, context):
         layout = self.layout
         layout.prop(self, "matrix_name")
@@ -949,10 +922,8 @@ class DrivenOperator(Base):
         self.drive_name = self.entity.links[0].name
         self.element_name = self.entity.links[1].name
     def store(self, context):
-        self.entity.unlink_all()
-        self.link_drive(context, self.drive_name)
-        self.link_element(context, self.element_name)
-        self.entity.increment_links()
+        self.entity.links.append(database.drive.get_by_name(self.drive_name))
+        self.entity.links.append(database.element.get_by_name(self.element_name))
     def draw(self, context):
         layout = self.layout
         layout.prop(self, "drive_name")

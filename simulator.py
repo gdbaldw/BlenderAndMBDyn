@@ -249,33 +249,31 @@ class InitialValueOperator(Base):
         self.entity.set_default_output = self.set_default_output
         self.entity.set_default_aerodynamic_output = self.set_default_aerodynamic_output
         self.entity.set_default_beam_output = self.set_default_beam_output
-        self.entity.unlink_all()
-        self.link_definition(context, self.general_data_name)
+        self.entity.links.append(database.definition.get_by_name(self.general_data_name))
         if self.set_method:
-            self.link_definition(context, self.method_name)
+            self.entity.links.append(database.definition.get_by_name(self.method_name))
         if self.set_nonlinear_solver:
-            self.link_definition(context, self.nonlinear_solver_name)
+            self.entity.links.append(database.definition.get_by_name(self.nonlinear_solver_name))
         if self.set_eigenanalysis:
-            self.link_definition(context, self.eigenanalysis_name)
+            self.entity.links.append(database.definition.get_by_name(self.eigenanalysis_name))
         if self.set_abort_after:
-            self.link_definition(context, self.abort_after_name)
+            self.entity.links.append(database.definition.get_by_name(self.abort_after_name))
         if self.set_linear_solver:
-            self.link_definition(context, self.linear_solver_name)
+            self.entity.links.append(database.definition.get_by_name(self.linear_solver_name))
         if self.set_dummy_steps:
-            self.link_definition(context, self.dummy_steps_name)
-        self.link_definition(context, self.output_data_name)
+            self.entity.links.append(database.definition.get_by_name(self.dummy_steps_name))
+        self.entity.links.append(database.definition.get_by_name(self.output_data_name))
         if self.set_real_time:
-            self.link_definition(context, self.real_time_name)
+            self.entity.links.append(database.definition.get_by_name(self.real_time_name))
         if self.set_assembly:
-            self.link_definition(context, self.assembly_name)
-        self.link_definition(context, self.job_control_name)
+            self.entity.links.append(database.definition.get_by_name(self.assembly_name))
+        self.entity.links.append(database.definition.get_by_name(self.job_control_name))
         if self.set_default_output:
-            self.link_definition(context, self.default_output_name)
+            self.entity.links.append(database.definition.get_by_name(self.default_output_name))
         if self.set_default_aerodynamic_output:
-            self.link_definition(context, self.default_aerodynamic_output_name)
+            self.entity.links.append(database.definition.get_by_name(self.default_aerodynamic_output_name))
         if self.set_default_beam_output:
-            self.link_definition(context, self.default_beam_output_name)
-        self.entity.increment_links()
+            self.entity.links.append(database.definition.get_by_name(self.default_beam_output_name))
         exec("bpy.ops." + root_dot + "save('INVOKE_DEFAULT')")
     def draw(self, context):
         self.basis = (self.forever, self.set_method, self.set_nonlinear_solver, self.set_eigenanalysis, self.set_abort_after, self.set_linear_solver, self.set_dummy_steps, self.set_real_time, self.set_assembly, self.set_default_output, self.set_default_aerodynamic_output, self.set_default_beam_output)

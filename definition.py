@@ -29,7 +29,7 @@ if "bpy" in locals():
     imp.reload(Entity)
 else:
     from .base import bpy, BPY, root_dot, database, Operator, Entity, Bundle, enum_drive, enum_meter_drive, enum_method
-    from .base import update_drive
+    from .base import update_definition, update_drive
     from .common import FORMAT, method_types, nonlinear_solver_types
 
 problem_types = ["General data"] + method_types + nonlinear_solver_types + ["Eigenanalysis", "Abort after", "Linear solver", "Dummy steps", "Output data", "Real time"]
@@ -238,10 +238,8 @@ class GeneralProblemOperator(Base):
         self.entity.derivatives_tolerance = self.derivatives_tolerance
         self.entity.derivatives_max_iterations = self.derivatives_max_iterations
         self.entity.derivatives_coefficient = self.derivatives_coefficient
-        self.entity.unlink_all()
         if self.strategy == "change":
-            self.link_drive(context, self.time_step_pattern_name)
-        self.entity.increment_links()
+            self.entity.links.append(database.drive.get_by_name(self.time_step_pattern_name))
     def draw(self, context):
         self.basis = (self.strategy, self.set_factor_max_iterations, self.unlimited, self.set_residual_tolerance, self.set_residual_test, self.set_solution_tolerance, self.set_solution_test, self.set_threads, self.set_assembly_solver)
         layout = self.layout
@@ -333,11 +331,9 @@ class MSHopeOperator(Base):
             self.algebraic_radius_drive_name = self.entity.links[1].name
     def store(self, context):
         self.entity.set_algebraic_radius = self.set_algebraic_radius
-        self.entity.unlink_all()
-        self.link_drive(context, self.differential_radius_drive_name)
+        self.entity.links.append(database.drive.get_by_name(self.differential_radius_drive_name))
         if self.set_algebraic_radius:
-            self.link_drive(context, self.algebraic_radius_drive_name)
-        self.entity.increment_links()
+            self.entity.links.append(database.drive.get_by_name(self.algebraic_radius_drive_name))
     def draw(self, context):
         self.basis = self.set_algebraic_radius
         layout = self.layout
@@ -381,9 +377,7 @@ class ThirdOrderOperator(Base):
         self.differential_radius_drive_name = self.entity.links[0].name
     def store(self, context):
         self.entity.ad_hoc = self.ad_hoc
-        self.entity.unlink_all()
-        self.link_drive(context, self.differential_radius_drive_name)
-        self.entity.increment_links()
+        self.entity.links.append(database.drive.get_by_name(self.differential_radius_drive_name))
     def draw(self, context):
         self.basis = self.ad_hoc
         layout = self.layout
@@ -1084,8 +1078,8 @@ class DummyStepsOperator(Base):
     dummy_steps_max_iterations = bpy.props.IntProperty(name="Dummy steps max iterations", default=0, min=0)
     dummy_steps_number = bpy.props.IntProperty(name="Dummy steps number", default=0, min=0)
     dummy_steps_ratio = bpy.props.FloatProperty(name="Dummy steps ratio", default=1.0, min=0.0, precision=6)
-    dummy_steps_method_name = bpy.props.EnumProperty(items=enum_method, name="Method")
-    dummy_steps_method_edit = bpy.props.BoolProperty(name="")
+    dummy_steps_method_name = bpy.props.EnumProperty(items=enum_method, name="Method",
+        update=lambda self, context: update_definition(self, context, self.dummy_steps_method_name, "Method"))
     def assign(self, context):
         self.dummy_steps_tolerance = self.entity.dummy_steps_tolerance
         self.dummy_steps_max_iterations = self.entity.dummy_steps_max_iterations
@@ -1097,16 +1091,14 @@ class DummyStepsOperator(Base):
         self.entity.dummy_steps_max_iterations = self.dummy_steps_max_iterations
         self.entity.dummy_steps_number = self.dummy_steps_number
         self.entity.dummy_steps_ratio = self.dummy_steps_ratio
-        self.entity.unlink_all()
-        self.link_definition(context, self.dummy_steps_method_name, self.dummy_steps_method_edit)
-        self.entity.increment_links()
+        self.entity.links.append(database.definition.get_by_name(self.dummy_steps_method_name))
     def draw(self, context):
         layout = self.layout
         layout.prop(self, "dummy_steps_tolerance")
         layout.prop(self, "dummy_steps_max_iterations")
         layout.prop(self, "dummy_steps_number")
         layout.prop(self, "dummy_steps_ratio")
-        self.draw_link(layout, "dummy_steps_method_name", "dummy_steps_method_edit", "definition")
+        layout.prop(self, "dummy_steps_method_name")
     def create_entity(self):
         return DummySteps(self.name)
 
@@ -1464,9 +1456,7 @@ class JobControlOperator(Base):
         self.entity.default_orientation = self.default_orientation
         self.entity.output_precision = self.output_precision
         self.entity.static_model = self.static_model
-        self.entity.unlink_all()
-        self.link_drive(context, self.meter_drive_name)
-        self.entity.increment_links()
+        self.entity.links.append(database.drive.get_by_name(self.meter_drive_name))
     def draw(self, context):
         self.basis = (self.set_simulation_title, self.set_select_timeout, self.forever)
         layout = self.layout
