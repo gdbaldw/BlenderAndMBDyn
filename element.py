@@ -29,7 +29,7 @@ if "bpy" in locals():
     imp.reload(Entity)
     imp.reload(enum_matrix_3x3)
 else:
-    from .common import (FORMAT, aerodynamic_types, beam_types, force_types, genel_types, joint_types, environment_types, node_types,
+    from .common import (FORMAT, Type, aerodynamic_types, beam_types, force_types, genel_types, joint_types, environment_types, node_types,
         structural_static_types, structural_dynamic_types, Ellipsoid, RhombicPyramid, Teardrop, Cylinder, Sphere, RectangularCuboid)
     from .base import bpy, BPY, root_dot, database, Operator, Entity, Bundle, enum_scenes, enum_matrix_3x1, enum_matrix_3x3, enum_constitutive_1D, enum_constitutive_3D, enum_constitutive_6D, enum_drive, enum_element, enum_friction, SelectedObjects
     from .base import update_constitutive, update_drive, update_element, update_friction, update_matrix
@@ -46,7 +46,7 @@ types = aerodynamic_types + beam_types + ["Body"] + force_types + genel_types + 
 tree = ["Add Element",
     ["Aerodynamic", aerodynamic_types,
     "Beam", beam_types,
-    ("Body", 1),
+    Type("Body", 1),
     "Force", force_types,
     "GENEL", genel_types,
     "Joint", joint_types,
@@ -125,11 +125,10 @@ class StructuralForce(Entity):
         rotT_0 = self.objects[0].matrix_world.to_quaternion().to_matrix()
         relative_dir = rot_0*rotT_0*Vector((0., 0., 1.))
         relative_arm_0 = rot_0*globalV_0
-        string = "\tforce: " + FORMAT(database.element.index(self)) + ", "
+        string = "\tforce: " + FORMAT(database.element.index(self)) + ", " + self.orientation
         if self.orientation == "follower":
             relative_dir = rot_0*rotT_0*Vector((0., 0., 1.))
         else:
-            string += "absolute"
             relative_dir = rotT_0*Vector((0., 0., 1.))
         text.write(string+
         ",\n\t\t" + FORMAT(Node_0)+

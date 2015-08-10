@@ -293,6 +293,71 @@ class SelectedObjects(list):
             self.clear()
 
 class Operator:
+    def general_data_exists(self, context):
+        if enum_general_data(self, context) == [("New", "New", "")]:
+            exec("bpy.ops." + root_dot + "c_general_data()")
+    def output_data_exists(self, context):
+        if enum_output_data(self, context) == [("New", "New", "")]:
+            exec("bpy.ops." + root_dot + "c_output_data()")
+    def job_control_exists(self, context):
+        if enum_job_control(self, context) == [("New", "New", "")]:
+            exec("bpy.ops." + root_dot + "c_job_control()")
+    def default_output_exists(self, context):
+        if enum_default_output(self, context) == [("New", "New", "")]:
+            exec("bpy.ops." + root_dot + "c_default_output()")
+    def meter_drive_exists(self, context):
+        if enum_meter_drive(self, context) == [("New", "New", "")]:
+            exec("bpy.ops." + root_dot + "c_meter_drive()")
+    """
+    def constitutive_exists(self, context, dimension):
+        if not enum_constitutive(self, context, dimension):
+            if dimension == "1D":
+                exec("bpy.ops." + root_dot + "c_linear_elastic(dimensions = \"1D\")")
+            else:
+                exec("bpy.ops." + root_dot + "c_linear_elastic(dimensions = \"3D, 6D\")")
+    def drive_exists(self, context):
+        if not enum_drive(self, context):
+            exec("bpy.ops." + root_dot + "c_unit_drive()")
+    def element_exists(self, context):
+        if not enum_element(self, context):
+            exec("bpy.ops." + root_dot + "c_gravity()")
+    def function_exists(self, context):
+        if not enum_function(self, context):
+            exec("bpy.ops." + root_dot + "c_const()")
+    def friction_exists(self, context):
+        if not enum_friction(self, context):
+            exec("bpy.ops." + root_dot + "c_modlugre()")
+    def method_exists(self, context):
+        if not enum_method(self, context):
+            exec("bpy.ops." + root_dot + "c_crank_nicolson()")
+    def nonlinear_solver_exists(self, context):
+        if not enum_nonlinear_solver(self, context):
+            exec("bpy.ops." + root_dot + "c_newton_raphston()")
+    def eigenanalysis_exists(self, context):
+        if not enum_eigenanalysis(self, context):
+            exec("bpy.ops." + root_dot + "c_eigenanalysis()")
+    def abort_after_exists(self, context):
+        if not enum_abort_after(self, context):
+            exec("bpy.ops." + root_dot + "c_abort_after()")
+    def linear_solver_exists(self, context):
+        if not enum_linear_solver(self, context):
+            exec("bpy.ops." + root_dot + "c_linear_solver()")
+    def dummy_steps_exists(self, context):
+        if not enum_dummy_steps(self, context):
+            exec("bpy.ops." + root_dot + "c_dummy_steps()")
+    def real_time_exists(self, context):
+        if not enum_real_time(self, context):
+            exec("bpy.ops." + root_dot + "c_real_time()")
+    def assembly_exists(self, context):
+        if not enum_assembly(self, context):
+            exec("bpy.ops." + root_dot + "c_assembly()")
+    def default_aerodynamic_output_exists(self, context):
+        if not enum_default_aerodynamic_output(self, context):
+            exec("bpy.ops." + root_dot + "c_default_aerodynamic_output()")
+    def default_beam_output_exists(self, context):
+        if not enum_default_beam_output(self, context):
+            exec("bpy.ops." + root_dot + "c_default_beam_output()")
+    """
     def link_element(self, context, element_name, edit=False):
         context.scene.element_index = next(i for i, x in enumerate(context.scene.element_uilist)
             if x.name == element_name)
@@ -315,6 +380,8 @@ class Operator:
         pass
     def store(self, context):
         pass
+    def draw(self, context):
+        pass
 
 class TreeMenu(list):
     def __init__(self, tree):
@@ -323,11 +390,9 @@ class TreeMenu(list):
         is_a_leaf = OrderedDict()
         for i in range(len(branch)):
             if isinstance(branch[i], list):
-                assert isinstance(branch[i-1], (str, tuple))
                 is_a_leaf[branch[i-1]] = False
                 self.leaf_maker(branch[i-1], branch[i])
             else:
-                assert isinstance(branch[i], (str, tuple))
                 is_a_leaf[branch[i]] = True
         class Menu(bpy.types.Menu):
             bl_label = base
@@ -336,7 +401,7 @@ class TreeMenu(list):
                 layout = self.layout
                 layout.operator_context = 'INVOKE_DEFAULT'
                 for item, leaf in is_a_leaf.items():
-                    name, N = item if isinstance(item, tuple) else (item, None)
+                    name, N = item, item.N if hasattr(item, "N") else None
                     if leaf:
                         layout.operator(root_dot + "c_" + "_".join(name.lower().split()), icon='OUTLINER_OB_MESH' if N == len(SelectedObjects(context)) + 1 else 'NONE')
                     else:
@@ -352,18 +417,24 @@ class TreeMenu(list):
 class Operators(list):
     def __init__(self, klasses, entity_list):
         for item, klass in klasses.items():
-            name = item[0] if isinstance(item, tuple) else item
+            name = item
             klass.entity_list = entity_list
             klass.module = klass.__module__.split(".")[1]
             class Create(bpy.types.Operator, klass):
                 bl_idname = root_dot + "c_" + "_".join(name.lower().split())
                 bl_options = {'REGISTER', 'INTERNAL'}
                 enable_popups = bpy.props.BoolProperty(default=True, options={'HIDDEN'})
+                entity_name = bpy.props.StringProperty(name="Name")
                 def invoke(self, context, event):
                     self.prereqs(context)
                     self.entity = self.create_entity()
+                    self.entity_name = self.name
                     return context.window_manager.invoke_props_dialog(self)
                 def execute(self, context):
+                    if not hasattr(self, "entity"):
+                        self.prereqs(context)
+                        self.entity = self.create_entity()
+                        self.entity_name = self.name
                     try:
                         self.entity.unlink_all()
                         self.store(context)
@@ -378,19 +449,24 @@ class Operators(list):
                     self.set_index(context, index)
                     self.entity_list.append(self.entity)
                     self.entity_list[-1].entity_list = self.entity_list
-                    uilist[index].name = self.name
+                    uilist[index].name = self.entity_name
                     context.scene.dirty_simulator = True
                     self.set_index(context, index)
                     return {'FINISHED'}
+                def draw(self, context):
+                    self.layout.prop(self, "entity_name")
+                    super().draw(context)
             class Edit(bpy.types.Operator, klass):
                 bl_label = " ".join(["Edit:", name, "instance"])
                 bl_idname = root_dot + "e_" + "_".join(name.lower().split())
                 bl_options = {'REGISTER', 'INTERNAL'}
                 enable_popups = bpy.props.BoolProperty(default=False, options={'HIDDEN'})
+                entity_name = bpy.props.StringProperty(name="Name")
                 def invoke(self, context, event):
                     self.enable_popups = False
                     self.prereqs(context)
-                    self.index, uilist = self.get_uilist(context)
+                    self.index, self.uilist = self.get_uilist(context)
+                    self.entity_name = self.uilist[self.index].name
                     self.entity = self.entity_list[self.index]
                     self.assign(context)
                     self.enable_popups = True
@@ -401,7 +477,11 @@ class Operators(list):
                     self.entity.increment_links()
                     context.scene.dirty_simulator = True
                     self.set_index(context, self.index)
+                    self.uilist[self.index].name = self.entity_name
                     return {'FINISHED'}
+                def draw(self, context):
+                    self.layout.prop(self, "entity_name")
+                    super().draw(context)
             class Duplicate(bpy.types.Operator, klass):
                 bl_label = "Duplicate"
                 bl_idname = root_dot + "d_" + "_".join(name.lower().split())
@@ -521,17 +601,13 @@ class UI(list):
         self.delete_list = klass.delete_list
         def segments_maker(base, branch):
             segments = OrderedDict()
-            def get_string(item):
-                return item if isinstance(item, str) else item[0]
             for i in range(len(branch)):
                 if isinstance(branch[i], list):
-                    assert isinstance(branch[i-1], (str, tuple))
                     if not [item for item in branch[i] if isinstance(item, list)]:
-                        segments[get_string(branch[i-1])] = [get_string(item) for item in branch[i]]
+                        segments[branch[i-1]] = [item for item in branch[i]]
                     segments.update(segments_maker(branch[i-1], branch[i]))
                 elif len(branch) <= i+1 or not isinstance(branch[i+1], list) :
-                    assert isinstance(branch[i], (str, tuple))
-                    item = get_string(branch[i])
+                    item = branch[i]
                     segments[item] = [item]
             return segments
         klass.types_dict = OrderedDict()

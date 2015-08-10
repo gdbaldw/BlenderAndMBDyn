@@ -34,43 +34,49 @@ else:
 
 FORMAT = "{:.6g}".format
 
+class Type(str):
+    def __new__(cls, data='', N=None):
+        return super(Type, cls).__new__(cls, data)
+    def __init__(self, data='', N=None):
+        self.N = N
+
 aerodynamic_types = [
-    ("Aerodynamic body", 1),
-    ("Aerodynamic beam2", 2),
+    Type("Aerodynamic body", 1),
+    Type("Aerodynamic beam2", 2),
     "Aerodynamic beam3",
     "Generic aerodynamic force",
     "Induced velocity"]
 beam_types = [
-    ("Beam segment", 2),
+    Type("Beam segment", 2),
     "Three node beam"]
 force_types = [
     "Abstract force",
-    ("Structural force", 1),
-    ("Structural internal force", 2),
-    ("Structural couple", 1),
-    ("Structural internal couple", 2)]
+    Type("Structural force", 1),
+    Type("Structural internal force", 2),
+    Type("Structural couple", 1),
+    Type("Structural internal couple", 2)]
 genel_types = [
     "Swashplate"]
 joint_types = [
-    ("Axial rotation", 2),
-    ("Clamp", 1),
-    ("Distance", 2),
-    ("Deformable displacement joint", 2),
-    ("Deformable hinge", 2),
-    ("Deformable joint", 2),
-    ("Inline", 2),
-    ("Inplane", 2),
-    ("Revolute hinge", 2),
-    ("Rod", 2),
-    ("Spherical hinge", 2),
-    ("Total joint", 2),
-    ("Viscous body", 1)]
+    Type("Axial rotation", 2),
+    Type("Clamp", 1),
+    Type("Distance", 2),
+    Type("Deformable displacement joint", 2),
+    Type("Deformable hinge", 2),
+    Type("Deformable joint", 2),
+    Type("Inline", 2),
+    Type("Inplane", 2),
+    Type("Revolute hinge", 2),
+    Type("Rod", 2),
+    Type("Spherical hinge", 2),
+    Type("Total joint", 2),
+    Type("Viscous body", 1)]
 environment_types = [
     "Air properties",
     "Gravity"]
 node_types = [
-    ("Rigid offset", 2),
-    ("Dummy node", 2),
+    Type("Rigid offset", 2),
+    Type("Dummy node", 2),
     "Feedback node"]
 
 rigid_body_types = ["Body"]

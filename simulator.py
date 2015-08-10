@@ -190,6 +190,10 @@ class InitialValueOperator(Base):
         update=lambda self, context: update_definition(self, context, self.default_beam_output_name, "Default beam output"))
     def prereqs(self, context):
         self.executable_path = BPY.executable_path
+        self.general_data_exists(context)
+        self.output_data_exists(context)
+        self.job_control_exists(context)
+        self.default_output_exists(context)
     def assign(self, context):
         self.executable_path = BPY.executable_path
         self.initial_time = self.entity.initial_time

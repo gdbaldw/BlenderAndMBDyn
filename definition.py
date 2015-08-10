@@ -1423,6 +1423,8 @@ class JobControlOperator(Base):
         ("orientation matrix", "Orientation matrix", ""),
         ], name="Default orientation", default="orientation matrix")
     static_model = bpy.props.BoolProperty(name="Static model")
+    def prereqs(self, context):
+        self.meter_drive_exists(context)
     def assign(self, context):
         self.set_simulation_title = self.entity.set_simulation_title
         self.simulation_title = self.entity.simulation_title
