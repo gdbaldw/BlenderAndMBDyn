@@ -390,7 +390,7 @@ class Simulate(bpy.types.Operator, Base):
             self.report({'ERROR'}, s)
         else:
             context.scene.clean_log = True
-            BPY.plot_data = dict()
+            BPY.plot_data.clear()
             if s:
                 self.report({'INFO'}, s)
         wm.event_timer_remove(self.timer)

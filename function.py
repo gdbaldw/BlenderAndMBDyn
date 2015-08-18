@@ -93,6 +93,8 @@ class ConstOperator(Base):
         self.constant = self.entity.constant
     def store(self, context):
         self.entity.constant = self.constant
+    def draw(self, context):
+        self.layout.prop(self, "constant")
     def create_entity(self):
         return Const(self.name)
 
@@ -180,6 +182,8 @@ class PowOperator(Base):
         self.power = self.entity.power
     def store(self, context):
         self.entity.power = self.power
+    def draw(self, context):
+        self.layout.prop(self, "power")
     def create_entity(self):
         return Pow(self.name)
 

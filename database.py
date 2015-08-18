@@ -142,7 +142,7 @@ class Database(Common):
                 if entity.objects[0] in objects:
                     entities.append(entity)
         for element in self.element:
-            if element.type == 'Driven' and element.links[1] in elements:
+            if element.type == 'Driven' and element.links[1] in entities:
                 elements.append(element)
         return entities
     def users_of(self, entity):

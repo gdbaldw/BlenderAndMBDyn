@@ -39,6 +39,20 @@ category = "MBDyn"
 root_dot = "_".join(category.lower().split()) + "."
 database = Database()
 
+def unique_name(name, names):
+    if name in names:
+        if ".001" <= name[-4:] and name[-4:] <= ".999":
+            name = name[:-4]
+        if name in names:
+            name += "." + str(1).zfill(3)
+        qty = 1
+        while name in names:
+            qty += 1
+            name = name[:-4] + "." + str(qty).zfill(3)
+            if qty >=999:
+                raise ValueError(name)
+    return name
+
 def update_constitutive(self, context, name, dimension=""):
     if self.enable_popups:
         if name == "New":
@@ -98,9 +112,14 @@ def update_matrix(self, context, name, menu_item):
             entity = database.matrix.get_by_name(name)
             context.scene.matrix_index = database.matrix.index(entity)
             entity.edit()
+def update_scene(self, context, name):
+    if name == "New":
+        #database.pickle()
+        context.blend_data.scenes.new(context.scene.name)
+        #database.unpickle()
 
 def enum_scenes(self, context):
-    return [(s.name, s.name, "") for s in bpy.data.scenes]
+    return [(s.name, s.name, "") for s in bpy.data.scenes] + [("New", "New", "")]
 def enum_objects(self, context):
     return [(o.name, o.name, "") for o in context.scene.objects if o.type == 'MESH']
 def enum_matrix(self, context, matrix_type):
@@ -197,6 +216,7 @@ class BPY:
         value = bpy.props.EnumProperty(items=enum_objects, name="Object")
     klasses = [Floats, Names, DriveNames, FunctionNames, ObjectNames]
     executable_path = "mbdyn"
+    plot_data = dict()
     @classmethod
     def register(cls):
         for klass in cls.klasses:
@@ -365,11 +385,13 @@ class Operator:
         self.entity.links.append(element)
         if edit:
             exec("bpy.ops." + root_dot + "e_" + "_".join(element.type.lower().split()) + "('INVOKE_DEFAULT')")
+    """
     def link_definition(self, context, definition_name):
         context.scene.definition_index = next(i for i, x in enumerate(context.scene.definition_uilist)
             if x.name == definition_name)
         definition = database.definition[context.scene.definition_index]
         self.entity.links.append(definition)
+    """
     def draw_panel_pre(self, context, layout):
         pass
     def draw_panel_post(self, context, layout):

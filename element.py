@@ -32,7 +32,7 @@ else:
     from .common import (FORMAT, Type, aerodynamic_types, beam_types, force_types, genel_types, joint_types, environment_types, node_types,
         structural_static_types, structural_dynamic_types, Ellipsoid, RhombicPyramid, Teardrop, Cylinder, Sphere, RectangularCuboid)
     from .base import bpy, BPY, root_dot, database, Operator, Entity, Bundle, enum_scenes, enum_matrix_3x1, enum_matrix_3x3, enum_constitutive_1D, enum_constitutive_3D, enum_constitutive_6D, enum_drive, enum_element, enum_friction, SelectedObjects
-    from .base import update_constitutive, update_drive, update_element, update_friction, update_matrix
+    from .base import update_constitutive, update_drive, update_element, update_friction, update_matrix, update_scene
     from mathutils import Vector
     from copy import copy
     import os
@@ -358,7 +358,7 @@ class DeformableHinge(Hinge):
         self.write_hinge(text, "deformable hinge", V1=False, V2=False)
         text.write(",\n\t\t" + self.links[0].string() + ";\n")
     def remesh(self):
-        Cylinder(self.objects[0])
+        Sphere(self.objects[0])
 
 class DeformableHingeOperator(ConstitutiveBase):
     bl_label = "Deformable hinge"
@@ -375,7 +375,7 @@ class DeformableJoint(Hinge):
         self.write_hinge(text, "deformable joint")
         text.write(",\n\t\t" + self.links[0].string() + ";\n")
     def remesh(self):
-        Cylinder(self.objects[0])
+        Sphere(self.objects[0])
 
 class DeformableJointOperator(ConstitutiveBase):
     bl_label = "Deformable joint"
@@ -764,6 +764,7 @@ class RigidOffsetOperator(Base):
     def store(self, context):
         self.entity.objects = self.sufficient_objects(context)
         self.entity.objects[0].parent = self.entity.objects[1]
+        self.entity.objects[0].matrix_parent_inverse = self.entity.objects[1].matrix_basis.inverted()
     def create_entity(self):
         return RigidOffset(self.name)
 
@@ -952,25 +953,15 @@ class Plot:
         if 'out' not in BPY.plot_data:
             BPY.plot_data['out'] = pd.read_table(".".join((self.base, 'out')), sep=" ", skiprows=2, usecols=[i for i in range(2, 9)])
             BPY.plot_data['timeseries'] = BPY.plot_data['out']['Time'][::BPY.plot_data['frequency']]
-        #for ext in "act aer air frc grv ine jnt mov".split():
         for ext in exts:
-            try:
-                assert ext not in BPY.plot_data
-                node_labels = list()
-                with open(".".join((self.base, ext)), 'r') as f:
-                    lines = f.readlines()
-                    for line in lines:
-                        label = line.split()[0]
-                        if not node_labels or node_labels[0] != label:
-                            node_labels.append(label)
-                        else:
-                            break
+            if ext not in BPY.plot_data:
+                df = pd.read_csv(".".join((self.base, ext)), sep=" ", header=None, skipinitialspace=True, names=[i for i in range(50)], lineterminator="\n")
+                value_counts = df[0].value_counts()
                 p = dict()
-                for i, node_label in enumerate(node_labels):
-                    p[node_label] = pd.read_table(StringIO("".join(lines[i::len(node_labels)])), sep=" ", header=None, skipinitialspace=True).iloc[:,1:]
+                for node_label in df[0].unique():
+                    p[str(int(node_label))] = df.ix[df[0]==node_label, 1:].dropna(1, 'all')
+                    p[str(int(node_label))].index = [i for i in range(value_counts[node_label])]
                 BPY.plot_data[ext] = pd.Panel(p)
-            except (AssertionError, FileNotFoundError):
-                pass
     def execute(self, context):
         select = [name.select for name in self.label_names]
         if True in select:
@@ -1044,7 +1035,8 @@ class DuplicateObjects(bpy.types.Operator):
     bl_idname = root_dot + "duplicate_objects"
     bl_options = {'REGISTER', 'INTERNAL'}
     full_copy = bpy.props.BoolProperty(default=False, name="Full copy")
-    to_scene = bpy.props.EnumProperty(items=enum_scenes, name="Scene")
+    to_scene = bpy.props.EnumProperty(items=enum_scenes, name="Scene",
+        update=lambda self, context: update_scene(self, context, self.to_scene))
     entity_names = bpy.props.CollectionProperty(type=BPY.Names, name="Users")
     @classmethod
     def poll(cls, context):
@@ -1121,6 +1113,7 @@ class DuplicateObjects(bpy.types.Operator):
                     link.consumer = entity
             if entity.type == "Rigid offset":
                 entity.objects[0].parent = entity.objects[1]
+                entity.objects[0].matrix_parent_inverse = entity.objects[1].matrix_basis.inverted()
         if self.full_copy:
             new_links = dict()
             may_have_links = copy(new_entities)
@@ -1151,6 +1144,7 @@ class DuplicateObjects(bpy.types.Operator):
                 database.to_be_unlinked = entity
                 exec("bpy.ops." + root_dot + "u_" + "_".join(entity.type.lower().split()) + "()")
             context.screen.scene = bpy.data.scenes[self.to_scene]
+            database.pickle()
             for entity in new_entities + new_frames + list(new_links.values()):
                 database.to_be_linked = entity
                 exec("bpy.ops." + root_dot + "l_" + "_".join(entity.type.lower().split()) + "()")

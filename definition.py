@@ -904,6 +904,8 @@ class AbortAfterOperator(Base):
         self.abort_after = self.entity.abort_after
     def store(self, context):
         self.entity.abort_after = self.abort_after
+    def draw(self, context):
+        self.layout.prop(self, "abort_after")
     def create_entity(self):
         return AbortAfter(self.name)
 

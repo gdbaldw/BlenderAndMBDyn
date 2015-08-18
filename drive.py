@@ -151,6 +151,8 @@ class ConstantDriveOperator(Base):
         self.constant = self.entity.constant
     def store(self, context):
         self.entity.constant = self.constant
+    def draw(self, context):
+        self.layout.prop(self, "constant")
     def create_entity(self):
         return ConstantDrive(self.name)
 
@@ -830,6 +832,8 @@ class StringDriveOperator(Base):
         self.expression_string = self.entity.expression_string
     def store(self, context):
         self.entity.expression_string = self.expression_string
+    def draw(self, context):
+        self.layout.prop(self, "expression_string")
     def create_entity(self):
         return StringDrive(self.name)
 

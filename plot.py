@@ -30,5 +30,6 @@ with sys.stdin as f:
     name = f.readline().strip()
     pd.read_csv(f, index_col=0).plot()
     plt.gcf().canvas.set_window_title(name)
+plt.xlabel("Time (in seconds)")
 plt.show()
 
