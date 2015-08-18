@@ -115,8 +115,8 @@ class FrameOperator(Base):
         self.angular_velocity_name = self.entity.links[1].name
     def store(self, context):
         self.entity.objects = SelectedObjects(context)
-        self.entity.links.append(database.drive.get_by_name(self.linear_velocity_name))
-        self.entity.links.append(database.drive.get_by_name(self.angular_velocity_name))
+        self.entity.links.append(database.matrix.get_by_name(self.linear_velocity_name))
+        self.entity.links.append(database.matrix.get_by_name(self.angular_velocity_name))
     def draw(self, context):
         layout = self.layout
         layout.prop(self, "linear_velocity_name")
