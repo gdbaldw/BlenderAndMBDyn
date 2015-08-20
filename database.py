@@ -89,7 +89,7 @@ class Database(Common):
         self.ns_node = Entities()
         self.constitutive = Entities()
         self.matrix = Entities()
-        self.frame = Entities()
+        self.input_card = Entities()
         self.definition = Entities()
         self.simulator = Entities()
         self.node = list()
@@ -110,7 +110,7 @@ class Database(Common):
         self.ns_node.clear()
         self.constitutive.clear()
         self.matrix.clear()
-        self.frame.clear()
+        self.input_card.clear()
         self.definition.clear()
         self.simulator.clear()
         self.node.clear()
@@ -123,7 +123,7 @@ class Database(Common):
         self.scene = None
     def all_entities(self):
         return (self.element + self.drive + self.driver + self.friction + self.shape + self.function +
-            self.ns_node + self.constitutive + self.matrix + self.frame + self.definition + self.simulator)
+            self.ns_node + self.constitutive + self.matrix + self.input_card + self.definition + self.simulator)
     def entities_using(self, objects):
         set_objects = set(objects)
         entities = list()
@@ -194,9 +194,10 @@ class Database(Common):
         self.node.sort(key = lambda x: x.name)
         f.write(
         "\n/* Label Indexes\n")
-        if self.frame:
+        self.reference_frames = self.input_card.filter("Reference frame")
+        if self.reference_frames:
             f.write("\nreference frames:\n")
-            for i, frame in enumerate(self.frame):
+            for i, frame in enumerate(self.reference_frames):
                 f.write("\t" + str(i) + "\t- " + frame.objects[0].name + "\n")
         if self.node:
             f.write("\nnodes:\n")
@@ -300,7 +301,7 @@ class Database(Common):
         if self.file_driver_count:
             f.write("\tfile drivers: " + str(self.file_driver_count) + ";\n")
     def write_structural_node(self, f, node, frame):
-        frame_label = str(self.frame.index(frame)) if frame else "global"
+        frame_label = str(self.input_card.index(frame)) if frame else "global"
         location, orientation = node.matrix_world.translation, node.matrix_world.to_quaternion().to_matrix()
         if frame:
             location = location - frame.objects[0].matrix_world.translation
@@ -314,11 +315,12 @@ class Database(Common):
             "\t\treference, " + frame_label + ", null;\n")
     def write(self, f):
         frame_for, frames, parent_of = dict(), list(), dict()
-        for frame in self.frame:
+        for frame in self.reference_frames:
             frame_for.update({ob : frame for ob in frame.objects[1:]})
             frames.append(frame)
-            parent_of.update({frame : parent for parent in self.frame if frame.objects[0] in parent.objects[1:]})
-        if self.frame:
+            parent_of.update({frame : parent for parent in self.reference_frames if frame.objects[0] in parent.objects[1:]})
+        if self.reference_frames:
+            del self.reference_frames
             f.write("\n")
         while frames:
             frame = frames.pop()
@@ -326,7 +328,7 @@ class Database(Common):
                 frames.appendleft(frame)
             else:
                 parent = parent_of[frame] if frame in parent_of else None
-                parent_label = str(self.frame.index(parent_of[frame])) if parent else "global"
+                parent_label = str(self.input_card.index(parent_of[frame])) if parent else "global"
                 vectors = list()
                 for link in frame.links:
                     if link.subtype in "null default".split():
@@ -337,7 +339,7 @@ class Database(Common):
                 rot = frame.objects[0].matrix_world.to_quaternion().to_matrix()
                 rot_parent = parent_of[frame].objects[0].matrix_world.to_quaternion().to_matrix() if parent else rot
                 orientation = rot_parent.transposed()*rot if parent else rot
-                f.write("reference: " + str(self.frame.index(frame)) + ",\n" + "\treference, " + parent_label + ", ")
+                f.write("reference: " + str(self.input_card.index(frame)) + ",\n" + "\treference, " + parent_label + ", ")
                 self.write_vector(rot_parent.transposed()*location if parent else location, f, ",\n")
                 f.write("\treference, " + parent_label + ", matr,\n")
                 self.write_matrix(orientation, f, "\t\t")

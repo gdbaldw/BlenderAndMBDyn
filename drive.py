@@ -65,7 +65,7 @@ types = [
     "Time drive",
     "Unit drive"]
 
-tree = ["Add Drive", types]
+tree = ["Drive", types]
 
 class Base(Operator):
     bl_label = "Drives"

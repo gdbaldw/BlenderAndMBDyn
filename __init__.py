@@ -43,9 +43,8 @@ if "BPY" in locals():
     imp.reload(shape)
     imp.reload(function)
     imp.reload(ns_node)
-    imp.reload(constitutive)
     imp.reload(matrix)
-    imp.reload(frame)
+    imp.reload(input_card)
 else:
     from .base import BPY
     from . import element
@@ -55,13 +54,12 @@ else:
     from . import shape
     from . import function
     from . import ns_node
-    from . import constitutive
     from . import matrix
-    from . import frame
+    from . import input_card
     from . import definition
     from . import simulator
 
-modules = [element, constitutive, drive, driver, frame, friction, function, matrix, ns_node, shape, definition, simulator]
+modules = [element, drive, driver, input_card, friction, function, matrix, ns_node, shape, definition, simulator]
 
 def register():
     BPY.register()

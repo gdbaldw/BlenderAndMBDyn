@@ -56,10 +56,10 @@ def unique_name(name, names):
 def update_constitutive(self, context, name, dimension=""):
     if self.enable_popups:
         if name == "New":
-            bpy.ops.wm.call_menu(name=root_dot+"add_constitutive"+dimension)
+            bpy.ops.wm.call_menu(name=root_dot+"constitutive"+dimension)
         else:
-            entity = database.constitutive.get_by_name(name)
-            context.scene.constitutive_index = database.constitutive.index(entity)
+            entity = database.input_card.get_by_name(name)
+            context.scene.input_card_index = database.input_card.index(entity)
             entity.edit()
 def update_definition(self, context, name, menu_item):
     if self.enable_popups:
@@ -78,7 +78,7 @@ def update_drive(self, context, name, menu_item=None):
             if menu_item:
                 exec("bpy.ops." + root_dot + "c_" + "_".join(menu_item.lower().split()) + "('INVOKE_DEFAULT')")
             else:
-                bpy.ops.wm.call_menu(name=root_dot+"add_drive")
+                bpy.ops.wm.call_menu(name=root_dot+"drive")
         else:
             entity = database.drive.get_by_name(name)
             context.scene.drive_index = database.drive.index(entity)
@@ -91,7 +91,7 @@ def update_element(self, context, name):
 def update_friction(self, context, name):
     if self.enable_popups:
         if name == "New":
-            bpy.ops.wm.call_menu(name=root_dot+"add_friction")
+            bpy.ops.wm.call_menu(name=root_dot+"friction")
         else:
             entity = database.friction.get_by_name(name)
             context.scene.friction_index = database.friction.index(entity)
@@ -99,7 +99,7 @@ def update_friction(self, context, name):
 def update_function(self, context, name):
     if self.enable_popups:
         if name == "New":
-            bpy.ops.wm.call_menu(name=root_dot+"add_function")
+            bpy.ops.wm.call_menu(name=root_dot+"function")
         else:
             entity = database.function.get_by_name(name)
             context.scene.function_index = database.function.index(entity)
@@ -136,8 +136,8 @@ def enum_matrix_6x6(self, context):
 def enum_matrix_6xN(self, context):
     return enum_matrix(self, context, "6xN")
 def enum_constitutive(self, context, dimension):
-    return  [(c.name, c.name, "") for i, c in enumerate(context.scene.constitutive_uilist)
-        if dimension in database.constitutive[i].dimension] + [("New", "New", "")]
+    return  [(c.name, c.name, "") for i, c in enumerate(context.scene.input_card_uilist)
+        if hasattr(database.input_card[i], "dimension") and  dimension in database.input_card[i].dimension] + [("New", "New", "")]
 def enum_constitutive_1D(self, context):
     return enum_constitutive(self, context, "1D")
 def enum_constitutive_3D(self, context):
@@ -640,9 +640,9 @@ class UI(list):
             def update(self, context):
                 index, uilist = self.get_uilist(context)
                 names = [e.name for i, e in enumerate(self.entity_list) if i != index] + ["New"]
-                name = uilist[index].name
+                name = " ".join(uilist[index].name.split("_"))
                 if name in names:
-                    if ".001" <= name[-4:] and name[-4:] <= ".999":
+                    if 3 < len(name) and name[-4] in " ." and name[-3:].isdigit():
                         name = name[:-4]
                     if name in names:
                         name += "." + str(1).zfill(3)

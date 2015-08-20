@@ -36,42 +36,43 @@ else:
     from .common import RhombicPyramid
     import bmesh
     from copy import copy
+    from . import constitutive
 
-types = ["Reference frame",]
+types = constitutive.types + ["Reference frame",]
 
-tree = ["Add Frame", types]
+tree = ["Input Card", constitutive.tree + ["Reference frame"]]
 
-klasses = dict()
+klasses = constitutive.klasses
 
 class Base(Operator):
-    bl_label = "Frames"
+    bl_label = "Input Cards"
     bl_options = {'DEFAULT_CLOSED'}
     @classmethod
     def poll(cls, context):
         return True
     @classmethod
     def make_list(self, ListItem):
-        bpy.types.Scene.frame_uilist = bpy.props.CollectionProperty(type = ListItem)
+        bpy.types.Scene.input_card_uilist = bpy.props.CollectionProperty(type = ListItem)
         def select_and_activate(self, context):
-            if database.frame and self.frame_index < len(database.frame):
+            if database.input_card and self.input_card_index < len(database.input_card) and hasattr(database.input_card[self.input_card_index], "objects"):
                 bpy.ops.object.select_all(action='DESELECT')
-                frame = database.frame[self.frame_index]
-                for ob in frame.objects:
+                input_card = database.input_card[self.input_card_index]
+                for ob in input_card.objects:
                     ob.select = True
-                context.scene.objects.active = frame.objects[0]
-                frame.remesh()
-        bpy.types.Scene.frame_index = bpy.props.IntProperty(default=-1, update=select_and_activate)
+                context.scene.objects.active = input_card.objects[0]
+                input_card.remesh()
+        bpy.types.Scene.input_card_index = bpy.props.IntProperty(default=-1, update=select_and_activate)
     @classmethod
     def delete_list(self):
-        del bpy.types.Scene.frame_uilist
-        del bpy.types.Scene.frame_index
+        del bpy.types.Scene.input_card_uilist
+        del bpy.types.Scene.input_card_index
     @classmethod
     def get_uilist(self, context):
-        return context.scene.frame_index, context.scene.frame_uilist
+        return context.scene.input_card_index, context.scene.input_card_uilist
     def set_index(self, context, value):
-        context.scene.frame_index = value
+        context.scene.input_card_index = value
 
-for t in types:
+for t in ["Reference frame",]:
     class Tester(Base):
         bl_label = t
         @classmethod
@@ -81,11 +82,11 @@ for t in types:
             return Entity(self.name)
     klasses[t] = Tester
 
-class Frame(Entity):
+class ReferenceFrame(Entity):
     def remesh(self):
         RhombicPyramid(self.objects[0])
 
-class FrameOperator(Base):
+class ReferenceFrameOperator(Base):
     bl_label = "Reference frame"
     linear_velocity_name = bpy.props.EnumProperty(items=enum_matrix_3x1, name="Linear velocity vector",
         update=lambda self, context: update_matrix(self, context, self.linear_velocity_name, "3x1"))
@@ -93,9 +94,9 @@ class FrameOperator(Base):
         update=lambda self, context: update_matrix(self, context, self.angular_velocity_name, "3x1"))
     @classmethod
     def poll(self, context):
-        frames = copy(database.frame)
+        frames = copy(database.input_card.filter("Reference frame"))
         if self.bl_idname.startswith(root_dot + "e_"):
-            frames.pop(context.scene.frame_index)
+            frames.pop(context.scene.input_card_index)
         selected = SelectedObjects(context)
         overlapped = False in [set(selected[1:]).isdisjoint(set(f.objects[1:])) for f in frames]
         duplicate = True in [selected[0] == f.objects[0] for f in frames if hasattr(f, "objects")]
@@ -122,8 +123,8 @@ class FrameOperator(Base):
         layout.prop(self, "linear_velocity_name")
         layout.prop(self, "angular_velocity_name")
     def create_entity(self):
-        return Frame(self.name)
+        return ReferenceFrame(self.name)
 
-klasses[FrameOperator.bl_label] = FrameOperator
+klasses[ReferenceFrameOperator.bl_label] = ReferenceFrameOperator
 
-bundle = Bundle(tree, Base, klasses, database.frame, "frame")
+bundle = Bundle(tree, Base, klasses, database.input_card, "input_card")

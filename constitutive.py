@@ -68,29 +68,16 @@ types = [
     "nlp viscoelastic",
     ]
 
-tree = ["Add Constitutive", types]
+tree = ["Constitutive", types]
 
 klasses = dict()
 
 class Base(Operator):
-    bl_label = "Constitutives"
-    bl_options = {'DEFAULT_CLOSED'}
-    @classmethod
-    def poll(cls, context):
-        return True
-    @classmethod
-    def make_list(self, ListItem):
-        bpy.types.Scene.constitutive_uilist = bpy.props.CollectionProperty(type = ListItem)
-        bpy.types.Scene.constitutive_index = bpy.props.IntProperty(default=-1)
-    @classmethod
-    def delete_list(self):
-        del bpy.types.Scene.constitutive_uilist
-        del bpy.types.Scene.constitutive_index
     @classmethod
     def get_uilist(self, context):
-        return context.scene.constitutive_index, context.scene.constitutive_uilist
+        return context.scene.input_card_index, context.scene.input_card_uilist
     def set_index(self, context, value):
-        context.scene.constitutive_index = value
+        context.scene.input_card_index = value
     def draw_dimension(self, layout):
         if self.bl_idname.endswith("c_" + "_".join(self.name.lower().split())):
             layout.prop(self, "dimension")
@@ -1307,5 +1294,3 @@ for dimension in "1D 3D 6D".split():
                     op = layout.operator(root_dot + "c_" + "_".join(key.lower().split()))
                     op.dimension = dimension
     BPY.klasses.append(Menu)
-
-bundle = Bundle(tree, Base, klasses, database.constitutive, "constitutive")

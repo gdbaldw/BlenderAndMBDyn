@@ -46,7 +46,7 @@ types = [
     "Mul",
     "Div"]
 
-tree = ["Add Function", types]
+tree = ["Function", types]
 
 klasses = dict()
 

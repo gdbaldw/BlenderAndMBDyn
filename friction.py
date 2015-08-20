@@ -34,7 +34,7 @@ else:
 
 types = ["Modlugre", "Discrete Coulomb"]
 
-tree = ["Add Friction", types]
+tree = ["Friction", types]
 
 klasses = dict()
 

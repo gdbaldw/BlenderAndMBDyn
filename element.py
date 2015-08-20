@@ -105,7 +105,7 @@ class Base(Operator):
         selected_obs = set(SelectedObjects(context))
         if selected_obs:
             used_obs = set()
-            for e in database.element + database.drive + database.frame:
+            for e in database.element + database.drive + database.input_card:
                 if hasattr(e, "objects"):
                     used_obs.update(set(e.objects))
             if selected_obs.intersection(used_obs):
@@ -338,7 +338,7 @@ class ConstitutiveBase(Base):
     def assign(self, context):
         self.constitutive_name = self.entity.links[0].name
     def store(self, context):
-        self.entity.links.append(database.constitutive.get_by_name(self.constitutive_name))
+        self.entity.links.append(database.input_card.get_by_name(self.constitutive_name))
         self.entity.objects = self.sufficient_objects(context)
     def draw(self, context):
         layout = self.layout
@@ -709,7 +709,7 @@ class ViscousBodyOperator(Base):
         self.constitutive_name = self.entity.links[0].name
         self.object = self.entity.objects[0]
     def store(self, context):
-        self.entity.links.append(database.constitutive.get_by_name(self.constitutive_name))
+        self.entity.links.append(database.input_card.get_by_name(self.constitutive_name))
         self.entity.objects = self.sufficient_objects(context)
     def draw(self, context):
         layout = self.layout
@@ -1055,7 +1055,7 @@ class DuplicateObjects(bpy.types.Operator):
         elements, drives, frames = list(), list(), list()
         for user in [u for u, n in zip(self.users, self.entity_names) if n.select]:
             module = user.__module__.split(".")[-1]
-            if module == "frame":
+            if user.type == "Reference frame":
                 frames.append(user)
             elif module == "drive":
                 drives.append(user)
@@ -1076,7 +1076,7 @@ class DuplicateObjects(bpy.types.Operator):
         for drive in drives:
             context.scene.drive_index = database.drive.index(drive)
             exec("bpy.ops." + root_dot + "d_" + "_".join(drive.type.lower().split()) + "()")
-            for entity in database.element + database.constitutive + database.drive:
+            for entity in database.element + database.input_card + database.drive:
                 for i, link in enumerate(entity.links):
                     if link == drive:
                         entity.links[i] = database.drive[-1]
@@ -1089,11 +1089,11 @@ class DuplicateObjects(bpy.types.Operator):
             bpy.ops.object.duplicate()
             new_obs[ob] = context.selected_objects[0]
         #frames = [frame for frame in database.frame if frame.objects[0] in obs]
-        len_frame = len(database.frame)
+        len_input_card = len(database.input_card)
         for frame in frames:
-            context.scene.frame_index = database.frame.index(frame)
+            context.scene.input_card_index = database.input_card.index(frame)
             exec("bpy.ops." + root_dot + "d_" + "_".join(frame.type.lower().split()) + "()")
-        new_frames = database.frame[len_frame:]
+        new_frames = database.input_card[len_input_card:]
         for frame in new_frames:
             old_objects = frame.objects
             frame.objects = [new_obs[ob] for ob in old_objects if ob in obs]
@@ -1116,7 +1116,7 @@ class DuplicateObjects(bpy.types.Operator):
                 entity.objects[0].matrix_parent_inverse = entity.objects[1].matrix_basis.inverted()
         if self.full_copy:
             new_links = dict()
-            may_have_links = copy(new_entities)
+            may_have_links = copy(new_entities + new_frames)
             while may_have_links:
                 entity = may_have_links.pop()
                 for i, link in enumerate(entity.links):
