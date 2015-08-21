@@ -39,27 +39,13 @@ category = "MBDyn"
 root_dot = "_".join(category.lower().split()) + "."
 database = Database()
 
-def unique_name(name, names):
-    if name in names:
-        if ".001" <= name[-4:] and name[-4:] <= ".999":
-            name = name[:-4]
-        if name in names:
-            name += "." + str(1).zfill(3)
-        qty = 1
-        while name in names:
-            qty += 1
-            name = name[:-4] + "." + str(qty).zfill(3)
-            if qty >=999:
-                raise ValueError(name)
-    return name
-
 def update_constitutive(self, context, name, dimension=""):
     if self.enable_popups:
         if name == "New":
             bpy.ops.wm.call_menu(name=root_dot+"constitutive"+dimension)
         else:
-            entity = database.input_card.get_by_name(name)
-            context.scene.input_card_index = database.input_card.index(entity)
+            entity = database.constitutive.get_by_name(name)
+            context.scene.constitutive_index = database.constitutive.index(entity)
             entity.edit()
 def update_definition(self, context, name, menu_item):
     if self.enable_popups:
@@ -114,9 +100,7 @@ def update_matrix(self, context, name, menu_item):
             entity.edit()
 def update_scene(self, context, name):
     if name == "New":
-        #database.pickle()
         context.blend_data.scenes.new(context.scene.name)
-        #database.unpickle()
 
 def enum_scenes(self, context):
     return [(s.name, s.name, "") for s in bpy.data.scenes] + [("New", "New", "")]
@@ -136,8 +120,8 @@ def enum_matrix_6x6(self, context):
 def enum_matrix_6xN(self, context):
     return enum_matrix(self, context, "6xN")
 def enum_constitutive(self, context, dimension):
-    return  [(c.name, c.name, "") for i, c in enumerate(context.scene.input_card_uilist)
-        if hasattr(database.input_card[i], "dimension") and  dimension in database.input_card[i].dimension] + [("New", "New", "")]
+    return  [(c.name, c.name, "") for i, c in enumerate(context.scene.constitutive_uilist)
+        if dimension in database.constitutive[i].dimension] + [("New", "New", "")]
 def enum_constitutive_1D(self, context):
     return enum_constitutive(self, context, "1D")
 def enum_constitutive_3D(self, context):
@@ -469,8 +453,8 @@ class Operators(list):
                     index = len(uilist)
                     uilist.add()
                     self.set_index(context, index)
-                    self.entity_list.append(self.entity)
-                    self.entity_list[-1].entity_list = self.entity_list
+                    entity_list.append(self.entity)
+                    entity_list[-1].entity_list = entity_list
                     uilist[index].name = self.entity_name
                     context.scene.dirty_simulator = True
                     self.set_index(context, index)
@@ -489,7 +473,7 @@ class Operators(list):
                     self.prereqs(context)
                     self.index, self.uilist = self.get_uilist(context)
                     self.entity_name = self.uilist[self.index].name
-                    self.entity = self.entity_list[self.index]
+                    self.entity = entity_list[self.index]
                     self.assign(context)
                     self.enable_popups = True
                     return context.window_manager.invoke_props_dialog(self)
@@ -521,8 +505,8 @@ class Operators(list):
                         entity = database.to_be_duplicated.duplicate()
                         del database.to_be_duplicated
                     else:
-                        entity = self.entity_list[index].duplicate()
-                    self.entity_list.append(entity)
+                        entity = entity_list[index].duplicate()
+                    entity_list.append(entity)
                     uilist[self.index].name = entity.name
                     context.scene.dirty_simulator = True
                     self.set_index(context, self.index)
@@ -541,7 +525,7 @@ class Operators(list):
                 def invoke(self, context, event):
                     self.entity_names.clear()
                     self.index, uilist = self.get_uilist(context)
-                    self.users = database.users_of(self.entity_list[self.index])
+                    self.users = database.users_of(entity_list[self.index])
                     for user in self.users:
                         name = self.entity_names.add()
                         name.value = user.name
@@ -567,11 +551,11 @@ class Operators(list):
                 def poll(cls, context):
                     return hasattr(database, "to_be_unlinked")
                 def execute(self, context):
-                    self.set_index(context, self.entity_list.index(database.to_be_unlinked))
+                    self.set_index(context, entity_list.index(database.to_be_unlinked))
                     del database.to_be_unlinked
                     index, uilist = self.get_uilist(context)
                     uilist.remove(index)
-                    entity = self.entity_list.pop(index)
+                    entity = entity_list.pop(index)
                     del entity.entity_list
                     context.scene.dirty_simulator = True
                     self.set_index(context, 0 if index == 0 and 0 < len(uilist) else index-1)
@@ -587,8 +571,8 @@ class Operators(list):
                     self.index = len(uilist)
                     uilist.add()
                     self.set_index(context, self.index)
-                    self.entity_list.append(database.to_be_linked)
-                    self.entity_list[-1].entity_list = self.entity_list
+                    entity_list.append(database.to_be_linked)
+                    entity_list[-1].entity_list = entity_list
                     del database.to_be_linked
                     uilist[self.index].name = self.name
                     context.scene.dirty_simulator = True
@@ -639,10 +623,14 @@ class UI(list):
         class ListItem(bpy.types.PropertyGroup, klass):
             def update(self, context):
                 index, uilist = self.get_uilist(context)
-                names = [e.name for i, e in enumerate(self.entity_list) if i != index] + ["New"]
-                name = " ".join(uilist[index].name.split("_"))
-                if name in names:
-                    if 3 < len(name) and name[-4] in " ." and name[-3:].isdigit():
+                entities = database.all_entities()
+                entities.remove(entity_list[index])
+                names = [e.name for e in entities] + ["New"]
+                name = uilist[index].name
+                if name in names or (3 < len(name) and name[-4] == " " and name[-3:].isdigit()) or "_" in name:
+                    name = " ".join(name.split("_"))
+                    while 3 < len(name) and name[-3:].isdigit() and (
+                        name[-4] == " " or (name in names and name[-4] == ".")):
                         name = name[:-4]
                     if name in names:
                         name += "." + str(1).zfill(3)
@@ -653,7 +641,7 @@ class UI(list):
                         if qty >=999:
                             raise ValueError(name)
                     uilist[index].name = name
-                self.entity_list[index].name = name
+                entity_list[index].name = name
             name = bpy.props.StringProperty(update=update)
         class List(bpy.types.UIList, klass):
             bl_idname = module_name
@@ -673,8 +661,10 @@ class UI(list):
                         or (filter_types and entity.type not in filter_types)):
                         entity_list.flags[i] = False
                 order = [i for i in range(len(uilist))]
+                entity_list.use_filter_sort_alpha = False
                 if self.use_filter_sort_alpha:
                     order.sort(key=lambda i: uilist[i].name)
+                    entity_list.use_filter_sort_alpha = True
                 bitflags = [b for b in map(lambda f: self.bitflag_filter_item if f else ~self.bitflag_filter_item, entity_list.flags)]
                 if self.use_filter_invert:
                     entity_list.flags = [not f for f in entity_list.flags]
@@ -701,11 +691,11 @@ class UI(list):
             @classmethod
             def poll(self, context):
                 index, uilist = super().get_uilist(context)
-                return len(uilist) > 0 and not self.entity_list[index].users and entity_list.flags[index]
+                return len(uilist) > 0 and not entity_list[index].users and entity_list.flags[index]
             def execute(self, context):
                 index, uilist = self.get_uilist(context)
                 uilist.remove(index)
-                entity = self.entity_list.pop(index)
+                entity = entity_list.pop(index)
                 for link in entity.links:
                     if hasattr(link, "consumer"):
                         del link.consumer
@@ -714,6 +704,44 @@ class UI(list):
                     entity.objects[0].parent = None
                 context.scene.dirty_simulator = True
                 self.set_index(context, 0 if index == 0 and 0 < len(uilist) else index-1)
+                return{'FINISHED'}
+        class MoveUp(bpy.types.Operator, klass):
+            bl_idname = module_name + ".move_up"
+            bl_options = {'REGISTER', 'INTERNAL'}
+            bl_label = "Move up"
+            bl_description = "Move up the selected " + module_name
+            @classmethod
+            def poll(self, context):
+                index, uilist = super().get_uilist(context)
+                return len(uilist) > 1 and entity_list.flags[index]
+            def execute(self, context):
+                index, uilist = self.get_uilist(context)
+                flagged = [i for i, v in enumerate(entity_list.flags) if v]
+                up = flagged[flagged.index(index) - 1]
+                entity_list.move(index, up)
+                uilist[index].name = entity_list[index].name
+                uilist[up].name = entity_list[up].name
+                context.scene.dirty_simulator = True
+                self.set_index(context, up)
+                return{'FINISHED'}
+        class MoveDown(bpy.types.Operator, klass):
+            bl_idname = module_name + ".move_down"
+            bl_options = {'REGISTER', 'INTERNAL'}
+            bl_label = "Move down"
+            bl_description = "Move down the selected " + module_name
+            @classmethod
+            def poll(self, context):
+                index, uilist = super().get_uilist(context)
+                return len(uilist) > 0 and entity_list.flags[index]
+            def execute(self, context):
+                index, uilist = self.get_uilist(context)
+                flagged = [i for i, v in enumerate(entity_list.flags) if v]
+                down = flagged[(flagged.index(index) + 1) % len(flagged)]
+                entity_list.move(index, down)
+                uilist[index].name = entity_list[index].name
+                uilist[down].name = entity_list[down].name
+                context.scene.dirty_simulator = True
+                self.set_index(context, down)
                 return{'FINISHED'}
         class Panel(bpy.types.Panel, klass):
             bl_space_type = 'VIEW_3D'
@@ -734,11 +762,14 @@ class UI(list):
                 col.menu(menu, icon='ZOOMIN', text="")
                 col.operator(module_name + ".delete", icon='ZOOMOUT', text="")
                 index, uilist = self.get_uilist(context)
+                if not entity_list.use_filter_sort_alpha:
+                    col.operator(module_name + ".move_up", icon='MOVE_UP_VEC', text="")
+                    col.operator(module_name + ".move_down", icon='MOVE_DOWN_VEC', text="")
                 if 0 < len(uilist) and entity_list.flags[index]:
                     col.menu(root_dot + "m_" +
                         "_".join(self.entity_list[index].type.lower().split()), icon='DOWNARROW_HLT', text="")
                 self.draw_panel_post(context, layout)
-        self.extend([ListItem, List, Delete, Panel])
+        self.extend([ListItem, List, Delete, MoveUp, MoveDown, Panel])
     def register(self):
         for klass in self:
             bpy.utils.register_class(klass)

@@ -338,7 +338,7 @@ class ConstitutiveBase(Base):
     def assign(self, context):
         self.constitutive_name = self.entity.links[0].name
     def store(self, context):
-        self.entity.links.append(database.input_card.get_by_name(self.constitutive_name))
+        self.entity.links.append(database.constitutive.get_by_name(self.constitutive_name))
         self.entity.objects = self.sufficient_objects(context)
     def draw(self, context):
         layout = self.layout
@@ -709,7 +709,7 @@ class ViscousBodyOperator(Base):
         self.constitutive_name = self.entity.links[0].name
         self.object = self.entity.objects[0]
     def store(self, context):
-        self.entity.links.append(database.input_card.get_by_name(self.constitutive_name))
+        self.entity.links.append(database.constitutive.get_by_name(self.constitutive_name))
         self.entity.objects = self.sufficient_objects(context)
     def draw(self, context):
         layout = self.layout
@@ -1076,7 +1076,7 @@ class DuplicateObjects(bpy.types.Operator):
         for drive in drives:
             context.scene.drive_index = database.drive.index(drive)
             exec("bpy.ops." + root_dot + "d_" + "_".join(drive.type.lower().split()) + "()")
-            for entity in database.element + database.input_card + database.drive:
+            for entity in database.element + database.constitutive + database.drive:
                 for i, link in enumerate(entity.links):
                     if link == drive:
                         entity.links[i] = database.drive[-1]

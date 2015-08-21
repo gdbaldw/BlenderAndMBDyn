@@ -40,7 +40,7 @@ else:
 
 types = ["Initial value"]
 
-tree = ["Add Simulator", types]
+tree = ["Simulator", types]
 
 klasses = dict()
 

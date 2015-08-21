@@ -36,7 +36,7 @@ types = [
 	"Hydraulic",
 	"Parameter"]
 
-tree = ["Add NS Node", types]
+tree = ["NS Node", types]
 
 klasses = dict()
 

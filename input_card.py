@@ -36,13 +36,12 @@ else:
     from .common import RhombicPyramid
     import bmesh
     from copy import copy
-    from . import constitutive
 
-types = constitutive.types + ["Reference frame",]
+types = ["c81 data", "Hydraulic fluid", "Include", "Module load", "Print symbol table", "Reference frame", "Remark", "Set", "Setenv"]
 
-tree = ["Input Card", constitutive.tree + ["Reference frame"]]
+tree = ["Input Card", types]
 
-klasses = constitutive.klasses
+klasses = dict()
 
 class Base(Operator):
     bl_label = "Input Cards"
@@ -72,7 +71,7 @@ class Base(Operator):
     def set_index(self, context, value):
         context.scene.input_card_index = value
 
-for t in ["Reference frame",]:
+for t in types:
     class Tester(Base):
         bl_label = t
         @classmethod

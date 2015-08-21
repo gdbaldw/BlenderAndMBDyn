@@ -32,7 +32,7 @@ else:
 
 types = ["File"]
 
-tree = ["Add Driver", types]
+tree = ["Driver", types]
 
 class Base(Operator):
     bl_label = "Drivers"

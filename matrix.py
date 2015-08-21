@@ -33,7 +33,7 @@ else:
 
 types = ["3x1", "6x1", "3x3", "6x6", "6xN"]
 
-tree = ["Add Matrix", types]
+tree = ["Matrix", types]
 
 class Base(Operator):
     bl_label = "Matrices"

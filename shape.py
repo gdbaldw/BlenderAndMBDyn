@@ -38,7 +38,7 @@ types = [
     "Piecewise linear shape",
     "Parabolic shape"]
 
-tree = ["Add Shape", types]
+tree = ["Shape", types]
 
 klasses = dict()
 

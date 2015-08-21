@@ -77,6 +77,8 @@ class Entities(list):
                 if e.name == name:
                     return e
         raise EntityLookupError
+    def move(self, i, j):
+        self[i], self[j] = self[j], self[i]
 
 class Database(Common):
     def __init__(self):
