@@ -35,7 +35,8 @@ if "bpy" in locals():
     imp.reload(structural_dynamic_types)
 else:
     import bpy
-    from .common import Common, aerodynamic_types, beam_types, force_types, genel_types, joint_types, environment_types, node_types, rigid_body_types, structural_static_types, structural_dynamic_types
+    from .common import Common, aerodynamic_types, beam_types, force_types, genel_types, joint_types, environment_types, node_types, rigid_body_types, structural_static_types, structural_dynamic_types, safe_name
+    import gc
 
 from io import BytesIO
 import pickle
@@ -95,7 +96,6 @@ class Database(Common):
         self.definition = Entities()
         self.simulator = Entities()
         self.node = list()
-        self.drive_callers = list()
         self.rigid_dict = dict()
         self.dummy_dict = dict()
         self.structural_dynamic_nodes = set()
@@ -116,7 +116,6 @@ class Database(Common):
         self.definition.clear()
         self.simulator.clear()
         self.node.clear()
-        self.drive_callers.clear()
         self.rigid_dict.clear()
         self.dummy_dict.clear()
         self.structural_dynamic_nodes.clear()
@@ -133,9 +132,7 @@ class Database(Common):
             if hasattr(entity, "objects"):
                 if not set_objects.isdisjoint(set(entity.objects)):
                     entities.append(entity)
-        for element in self.element:
-            if element.type == 'Driven' and element.links[1] in elements:
-                elements.append(element)
+        entities.extend([e for e in self.element if (e.type == 'Driven' and e.element in entities)])
         return entities
     def entities_originating_from(self, objects):
         entities = list()
@@ -143,12 +140,14 @@ class Database(Common):
             if hasattr(entity, "objects"):
                 if entity.objects[0] in objects:
                     entities.append(entity)
-        for element in self.element:
-            if element.type == 'Driven' and element.links[1] in entities:
-                elements.append(element)
+        entities.extend([e for e in self.element if (e.type == 'Driven' and e.element in entities)])
         return entities
     def users_of(self, entity):
-        return list({e for e in self.all_entities() if entity in e.links})
+        ret = list()
+        for e in self.all_entities():
+            if True in [((entity == v) or (isinstance(v, list) and entity in v)) for v in vars(e).values()]:
+                ret.append(e)
+        return ret
     def pickle(self):
         if not self.scene:
             self.scene = bpy.context.scene
@@ -159,18 +158,25 @@ class Database(Common):
             p = Pickler(f)
             p.dump(self)
             self.scene.pickled_database = b64encode(f.getvalue()).decode()
+            del p
+        gc.collect()
     def unpickle(self):
         self.clear()
         if bpy.context.scene.pickled_database:
             with BytesIO(b64decode(bpy.context.scene.pickled_database.encode())) as f:
                 up = Unpickler(f)
-                for k, v in vars(up.load()).items():
+                database = up.load()
+                for k, v in vars(database).items():
                     if type(v) in [list, Entities]:
                         self.__dict__[k].extend(v)
+                        #v.clear()
                     elif type(v) in [dict, set]:
                         self.__dict__[k].update(v)
+                        #v.clear()
                     else:
                         self.__dict__[k] = v
+                del up, database
+        gc.collect()
     def replace(self):
         self.pickle()
         self.unpickle()
@@ -192,44 +198,7 @@ class Database(Common):
                 dummy_dict[ob] = e.objects[1]
         self.structural_static_nodes -= self.structural_dynamic_nodes | self.structural_dummy_nodes
         self.node.clear()
-        self.node.extend(list(nodes))
-        self.node.sort(key = lambda x: x.name)
-        f.write(
-        "\n/* Label Indexes\n")
-        self.reference_frames = self.input_card.filter("Reference frame")
-        if self.reference_frames:
-            f.write("\nreference frames:\n")
-            for i, frame in enumerate(self.reference_frames):
-                f.write("\t" + str(i) + "\t- " + frame.objects[0].name + "\n")
-        if self.node:
-            f.write("\nnodes:\n")
-            for i, entity in enumerate(self.node):
-                f.write("\t" + str(i) + "\t- " + entity.name + "\n")
-        for clas in "ns_node drive driver element".split():
-            if eval("self." + clas):
-                f.write("\n" + clas + "s:\n")
-                for i, entity in enumerate(eval("self." + clas)):
-                    f.write("\t" + str(i) + "\t- " + entity.name + " (" + entity.type)
-                    if entity.users:
-                        f.write(", users=" + str(entity.users))
-                    f.write(")")
-                    if clas == "element" and hasattr(entity, "objects"):
-                        names = [o.name for o in entity.objects if o]
-                        if names:
-                            string = " objects: "
-                            for name in names:
-                                string += name + ", "
-                            string = string[:-2] + "."
-                            f.write(string)
-                    names = [l.name for l in entity.links if l]
-                    if names:
-                        string = " links: "
-                        for name in names:
-                            string += name + ", "
-                        string = string[:-2] + "."
-                        f.write(string)
-                    f.write("\n")
-        f.write("\n*/\n\n")
+        self.node.extend(sorted(nodes, key=lambda x: x.name))
     def write_control(self, f, context):
         structural_node_count = len(
             self.structural_static_nodes | self.structural_dynamic_nodes | self.structural_dummy_nodes)
@@ -247,12 +216,11 @@ class Database(Common):
         upper_bailout_time = 0.0
         for driver in self.driver:
             driver.columns = list()
-        self.drive_callers.clear()
+        """
         for drive in self.drive:
             if drive.type == "File drive":
                 drive.links[0].columns.append(drive)
-            if not drive.users:
-                self.drive_callers.append(drive)
+        """
         for driver in self.driver:
             if driver.columns:
                 self.file_driver_count += 1
@@ -302,61 +270,54 @@ class Database(Common):
             f.write("\trotors: " + str(rotor_count) + ";\n")
         if self.file_driver_count:
             f.write("\tfile drivers: " + str(self.file_driver_count) + ";\n")
-    def write_structural_node(self, f, node, frame):
-        frame_label = str(self.input_card.index(frame)) if frame else "global"
+    def write_structural_node(self, f, structural_type, node, frame):
+        f.write("\tstructural: " + ", ".join([safe_name(node.name), structural_type]) + ",\n")
+        frame_label = frame.safe_name() if frame else "global"
         location, orientation = node.matrix_world.translation, node.matrix_world.to_quaternion().to_matrix()
         if frame:
             location = location - frame.objects[0].matrix_world.translation
             orientation = frame.objects[0].matrix_world.to_quaternion().to_matrix().transposed()*orientation
         f.write("\t\treference, " + frame_label + ", ")
-        self.write_vector(location, f, ",\n")
+        self.write_vector(f, location, ",\n")
         f.write("\t\treference, " + frame_label + ", matr,\n")
-        self.write_matrix(orientation, f, "\t"*3)
+        self.write_matrix(f, orientation, "\t"*3)
         f.write(",\n" +
             "\t\treference, " + frame_label + ", null,\n" +
             "\t\treference, " + frame_label + ", null;\n")
     def write(self, f):
+        set_cards = self.input_card.filter("Set")
+        if set_cards:
+            f.write("\n")
+            for set_card in set_cards:
+                set_card.write(f)
         frame_for, frames, parent_of = dict(), list(), dict()
-        for frame in self.reference_frames:
+        reference_frames = self.input_card.filter("Reference frame")
+        for frame in reference_frames:
             frame_for.update({ob : frame for ob in frame.objects[1:]})
             frames.append(frame)
-            parent_of.update({frame : parent for parent in self.reference_frames if frame.objects[0] in parent.objects[1:]})
-        if self.reference_frames:
-            del self.reference_frames
-            f.write("\n")
+            parent_of.update({frame : parent for parent in reference_frames if frame.objects[0] in parent.objects[1:]})
+        frames_to_write = list()
         while frames:
             frame = frames.pop()
             if frame in parent_of and parent_of[frame] in frames:
                 frames.appendleft(frame)
             else:
-                parent = parent_of[frame] if frame in parent_of else None
-                parent_label = str(self.input_card.index(parent_of[frame])) if parent else "global"
-                vectors = list()
-                for link in frame.links:
-                    if link.subtype in "null default".split():
-                        vectors.append(Vector([0., 0., 0.]))
-                    else:
-                        vectors.append(Vector(link.floats) * (link.factor if link.scale else 1))
-                location = frame.objects[0].matrix_world.translation - (parent.objects[0].matrix_world.translation if parent else Vector([0., 0., 0.]))
-                rot = frame.objects[0].matrix_world.to_quaternion().to_matrix()
-                rot_parent = parent_of[frame].objects[0].matrix_world.to_quaternion().to_matrix() if parent else rot
-                orientation = rot_parent.transposed()*rot if parent else rot
-                f.write("reference: " + str(self.input_card.index(frame)) + ",\n" + "\treference, " + parent_label + ", ")
-                self.write_vector(rot_parent.transposed()*location if parent else location, f, ",\n")
-                f.write("\treference, " + parent_label + ", matr,\n")
-                self.write_matrix(orientation, f, "\t\t")
-                f.write(",\n\treference, " + parent_label + ", ")
-                self.write_vector(orientation*vectors[0], f, ",\n")
-                f.write("\treference, " + parent_label + ", ")
-                self.write_vector(orientation*vectors[1], f, ";\n")
+                frames_to_write.append(frame)
+        if frames_to_write:
+            f.write("\n")
+            for i, frame in enumerate(sorted(frames_to_write, key=lambda x: x.name)):
+                f.write("set: const integer " + safe_name(frame.name) + " = " + str(i) + ";\n")
+            for frame in frames_to_write:
+                frame.write(f, parent_of[frame] if frame in parent_of else None)
         if self.node:
-            f.write("\nbegin: nodes;\n")
+            f.write("\n")
+            for i, node in enumerate(self.node):
+                f.write("set: const integer " + safe_name(node.name) + " = " + str(i) + ";\n")
+            f.write("begin: nodes;\n")
             for node in self.structural_static_nodes:
-                f.write("\tstructural: " + str(self.node.index(node)) + ", static,\n")
-                self.write_structural_node(f, node, frame_for[node] if node in frame_for else None)
+                self.write_structural_node(f, "static", node, frame_for[node] if node in frame_for else None)
             for node in self.structural_dynamic_nodes:
-                f.write("\tstructural: " + str(self.node.index(node)) + ", dynamic,\n")
-                self.write_structural_node(f, node, frame_for[node] if node in frame_for else None)
+                self.write_structural_node(f, "dynamic", node, frame_for[node] if node in frame_for else None)
             for node in self.structural_dummy_nodes:
                 base_node = dummy_dict[node]
                 rot = base_node.matrix_world.to_quaternion().to_matrix()
@@ -365,8 +326,8 @@ class Database(Common):
                 rotT = node.matrix_world.to_quaternion().to_matrix()
                 f.write("\tstructural: " + str(self.node.index(node)) + ", dummy,\n\t\t" +
                     str(self.node.index(base_node)) + ", offset,\n\t\t\t")
-                self.write_vector(localV, f, ",\n\t\t\tmatr,\n")
-                self.write_matrix(rot*rotT, f, "\t\t\t\t")
+                self.write_vector(f, localV, ",\n\t\t\tmatr,\n")
+                self.write_matrix(f, rot*rotT, "\t\t\t\t")
                 f.write(";\n")
             """
             for i, ns_node in enumerate(self.ns_node):
@@ -384,27 +345,32 @@ class Database(Common):
             f.write("end: nodes;\n")
         if self.file_driver_count:
             f.write("\nbegin: drivers;\n")
-            for driver in self.Driver:
-                if driver.users:
-                    driver.write(f)
+            for driver in sorted(self.driver, key=lambda x: x.name):
+                driver.write(f)
             f.write("end: drivers;\n")
         self.drive_indenture = 1
-        drive_callers = [drive for drive in self.drive_callers if drive.users]
-        if drive_callers:
+        if self.function:
             f.write("\n")
-            for drive in drive_callers:
-                name = drive.name.replace(" ", "").replace(".", "__")
-                f.write("set: integer " + name + " = " + str(self.drive.index(drive)) + ";\n\tdrive caller: " + name + ", " + drive.string() + ";\n")
-        functions = [function for function in self.function if function.users]
-        if functions:
-            f.write("\n")
-            for function in self.function:
-                function.written = False
-            for function in functions:
+            for function in sorted(self.function, key=lambda x: x.name):
                 function.write(f)
+        if self.constitutive:
+            f.write("\n")
+            for i, constitutive in enumerate(sorted(self.constitutive, key=lambda x: x.name)):
+                f.write("set: const integer " + constitutive.safe_name() + " = " + str(i + 1) + ";\n")
+            for i, constitutive in enumerate(self.constitutive):
+                f.write("constitutive law: " + ", ".join([constitutive.safe_name(), constitutive.dimension[0], constitutive.string()]) + ";\n")
+        if self.drive:
+            f.write("\n")
+            for i, drive in enumerate(sorted(self.drive, key=lambda x: x.name)):
+                f.write("set: const integer " + drive.safe_name() + " = " + str(i) + ";\n")
+            for i, drive in enumerate(self.drive):
+                f.write("drive caller: " + ", ".join([drive.safe_name(), drive.string()]) + ";\n")
         if self.element:
+            f.write("\n")
+            for i, element in enumerate(sorted(self.element, key=lambda x: x.name)):
+                f.write("set: const integer " + element.safe_name() + " = " + str(i) + ";\n")
             self.drive_indenture = 2
-            f.write("\nbegin: elements;\n")
+            f.write("begin: elements;\n")
             try:
                 for element_type in aerodynamic_types + beam_types + ["Body"] + force_types + genel_types + joint_types + ["Rotor"] + environment_types + ["Driven"]:
                     for element in self.element:

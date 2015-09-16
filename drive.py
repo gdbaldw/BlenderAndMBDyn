@@ -28,9 +28,7 @@ if "bpy" in locals():
     imp.reload(Operator)
     imp.reload(Entity)
 else:
-    from .base import bpy, root_dot, database, Operator, Entity, Bundle, BPY, enum_drive, enum_element, SelectedObjects
-    from .base import update_drive, update_element
-    from .common import FORMAT
+    from .base import bpy, root_dot, database, Operator, Entity, Bundle, BPY, SelectedObjects
 
 types = [
     "Array drive",
@@ -141,18 +139,23 @@ klasses[UnitDriveOperator.bl_label] = UnitDriveOperator
 class ConstantDrive(Entity):
     def string(self, indent=False):
         ret = database.drive_indenture*"\t" if indent else ""
-        ret += FORMAT(self.constant)
+        ret += BPY.FORMAT(self.constant)
         return ret
 
 class ConstantDriveOperator(Base):
     bl_label = "Constant drive"
-    constant = bpy.props.FloatProperty(name="Constant", description="", min=-9.9e10, max=9.9e10, precision=6, default=0.0)
+    constant = bpy.props.PointerProperty(type = BPY.Float)
+    def prereqs(self, context):
+        self.constant.mandatory = True
     def assign(self, context):
-        self.constant = self.entity.constant
+        self.constant.assign(self.entity.constant)
     def store(self, context):
-        self.entity.constant = self.constant
+        self.entity.constant = self.constant.store()
     def draw(self, context):
-        self.layout.prop(self, "constant")
+        layout = self.layout
+        self.constant.draw(layout, "Constant")
+    def check(self, context):
+        return self.constant.check(context)
     def create_entity(self):
         return ConstantDrive(self.name)
 
@@ -174,25 +177,30 @@ klasses[TimeDriveOperator.bl_label] = TimeDriveOperator
 class LinearDrive(Entity):
     def string(self, indent=False):
         ret = database.drive_indenture*"\t" if indent else ""
-        ret += "cubic"
+        ret += "linear"
         for v in [self.constant, self.linear]:
-            ret += ", " + FORMAT(v)
+            ret += ", " + BPY.FORMAT(v)
         return ret
 
 class LinearDriveOperator(Base):
     bl_label = "Linear drive"
-    constant = bpy.props.FloatProperty(name="Constant", description="", min=-9.9e10, max=9.9e10, precision=6, default=0.0)
-    linear = bpy.props.FloatProperty(name="Linear", description="", min=-9.9e10, max=9.9e10, precision=6, default=0.0)
+    constant = bpy.props.PointerProperty(type = BPY.Float)
+    slope = bpy.props.PointerProperty(type = BPY.Float)
+    def prereqs(self, context):
+        self.constant.mandatory = True
+        self.slope.mandatory = True
     def assign(self, context):
-        self.constant = self.entity.constant
-        self.linear = self.entity.linear
+        self.constant.assign(self.entity.constant)
+        self.slope.assign(self.entity.slope)
     def store(self, context):
-        self.entity.constant = self.constant
-        self.entity.linear = self.linear
+        self.entity.constant = self.constant.store()
+        self.entity.slope = self.slope.store()
     def draw(self, context):
         layout = self.layout
-        layout.prop(self, "constant")
-        layout.prop(self, "linear")
+        self.constant.draw(layout, "Constant")
+        self.slope.draw(layout, "Slope")
+    def check(self, context):
+        return self.constant.check(context) or self.slope.check(context)
     def create_entity(self):
         return LinearDrive(self.name)
 
@@ -203,27 +211,33 @@ class ParabolicDrive(Entity):
         ret = database.drive_indenture*"\t" if indent else ""
         ret += "parabolic"
         for v in [self.constant, self.linear, self.parabolic]:
-            ret += ", " + FORMAT(v)
+            ret += ", " + BPY.FORMAT(v)
         return ret
 
 class ParabolicDriveOperator(Base):
     bl_label = "Parabolic drive"
-    constant = bpy.props.FloatProperty(name="Constant", description="", min=-9.9e10, max=9.9e10, precision=6, default=0.0)
-    linear = bpy.props.FloatProperty(name="Linear", description="", min=-9.9e10, max=9.9e10, precision=6, default=0.0)
-    parabolic = bpy.props.FloatProperty(name="Parabolic", description="", min=-9.9e10, max=9.9e10, precision=6, default=0.0)
+    constant = bpy.props.PointerProperty(type = BPY.Float)
+    linear = bpy.props.PointerProperty(type = BPY.Float)
+    parabolic = bpy.props.PointerProperty(type = BPY.Float)
+    def prereqs(self, context):
+        self.constant.mandatory = True
+        self.linear.mandatory = True
+        self.parabolic.mandatory = True
     def assign(self, context):
-        self.constant = self.entity.constant
-        self.linear = self.entity.linear
-        self.parabolic = self.entity.parabolic
+        self.constant.assign(self.entity.constant)
+        self.linear.assign(self.entity.linear)
+        self.parabolic.assign(self.entity.parabolic)
     def store(self, context):
-        self.entity.constant = self.constant
-        self.entity.linear = self.linear
-        self.entity.parabolic = self.parabolic
+        self.entity.constant = self.constant.store()
+        self.entity.linear = self.linear.store()
+        self.entity.parabolic = self.parabolic.store()
     def draw(self, context):
         layout = self.layout
-        layout.prop(self, "constant")
-        layout.prop(self, "linear")
-        layout.prop(self, "parabolic")
+        self.constant.draw(layout, "Constant")
+        self.linear.draw(layout, "Linear")
+        self.parabolic.draw(layout, "Parabolic")
+    def check(self, context):
+        return True in [v.check(context) for v in [self.constant, self.linear, self.parabolic]]
     def create_entity(self):
         return ParabolicDrive(self.name)
 
@@ -234,31 +248,38 @@ class CubicDrive(Entity):
         ret = database.drive_indenture*"\t" if indent else ""
         ret += "cubic"
         for v in [self.constant, self.linear, self.parabolic, self.cubic]:
-            ret += ", " + FORMAT(v)
+            ret += ", " + BPY.FORMAT(v)
         return ret
 
 class CubicDriveOperator(Base):
     bl_label = "Cubic drive"
-    constant = bpy.props.FloatProperty(name="Constant", description="", min=-9.9e10, max=9.9e10, precision=6, default=0.0)
-    linear = bpy.props.FloatProperty(name="Linear", description="", min=-9.9e10, max=9.9e10, precision=6, default=0.0)
-    parabolic = bpy.props.FloatProperty(name="Parabolic", description="", min=-9.9e10, max=9.9e10, precision=6, default=0.0)
-    cubic = bpy.props.FloatProperty(name="Cubic", description="", min=-9.9e10, max=9.9e10, precision=6, default=0.0)
+    constant = bpy.props.PointerProperty(type = BPY.Float)
+    linear = bpy.props.PointerProperty(type = BPY.Float)
+    parabolic = bpy.props.PointerProperty(type = BPY.Float)
+    cubic = bpy.props.PointerProperty(type = BPY.Float)
+    def prereqs(self, context):
+        self.constant.mandatory = True
+        self.linear.mandatory = True
+        self.parabolic.mandatory = True
+        self.cubic.mandatory = True
     def assign(self, context):
-        self.constant = self.entity.constant
-        self.linear = self.entity.linear
-        self.parabolic = self.entity.parabolic
-        self.cubic = self.entity.cubic
+        self.constant.assign(self.entity.constant)
+        self.linear.assign(self.entity.linear)
+        self.parabolic.assign(self.entity.parabolic)
+        self.cubic.assign(self.entity.cubic)
     def store(self, context):
-        self.entity.constant = self.constant
-        self.entity.linear = self.linear
-        self.entity.parabolic = self.parabolic
-        self.entity.cubic = self.cubic
+        self.entity.constant = self.constant.store()
+        self.entity.linear = self.linear.store()
+        self.entity.parabolic = self.parabolic.store()
+        self.entity.cubic = self.cubic.store()
     def draw(self, context):
         layout = self.layout
-        layout.prop(self, "constant")
-        layout.prop(self, "linear")
-        layout.prop(self, "parabolic")
-        layout.prop(self, "cubic")
+        self.constant.draw(layout, "Constant")
+        self.linear.draw(layout, "Linear")
+        self.parabolic.draw(layout, "Parabolic")
+        self.cubic.draw(layout, "Cubic")
+    def check(self, context):
+        return True in [v.check(context) for v in [self.constant, self.linear, self.parabolic, self.cubic]]
     def create_entity(self):
         return CubicDrive(self.name)
 
@@ -269,27 +290,33 @@ class StepDrive(Entity):
         ret = database.drive_indenture*"\t" if indent else ""
         ret += "step"
         for v in [self.initial_time, self.step_value, self.initial_value]:
-            ret += ", " + FORMAT(v)
+            ret += ", " + BPY.FORMAT(v)
         return ret
 
 class StepDriveOperator(Base):
     bl_label = "Step drive"
-    initial_time = bpy.props.FloatProperty(name="Initial time", description="", min=0.0, max=9.9e10, precision=6, default=0.0)
-    step_value = bpy.props.FloatProperty(name="Step value", description="", min=-9.9e10, max=9.9e10, precision=6, default=0.0)
-    initial_value = bpy.props.FloatProperty(name="Initial value", description="", min=-9.9e10, max=9.9e10, precision=6, default=0.0)
+    initial_time = bpy.props.PointerProperty(type = BPY.Float)
+    step_value = bpy.props.PointerProperty(type = BPY.Float)
+    initial_value = bpy.props.PointerProperty(type = BPY.Float)
+    def prereqs(self, context):
+        self.initial_time.mandatory = True
+        self.step_value.mandatory = True
+        self.initial_value.mandatory = True
     def assign(self, context):
-        self.initial_time = self.entity.initial_time
-        self.step_value = self.entity.step_value
-        self.initial_value = self.entity.initial_value
+        self.initial_time.assign(self.entity.initial_time)
+        self.step_value.assign(self.entity.step_value)
+        self.initial_value.assign(self.entity.initial_value)
     def store(self, context):
-        self.entity.initial_time = self.initial_time
-        self.entity.step_value = self.step_value
-        self.entity.initial_value = self.initial_value
+        self.entity.initial_time = self.initial_time.store()
+        self.entity.step_value = self.step_value.store()
+        self.entity.initial_value = self.initial_value.store()
     def draw(self, context):
         layout = self.layout
-        layout.prop(self, "initial_time")
-        layout.prop(self, "step_value")
-        layout.prop(self, "initial_value")
+        self.initial_time.draw(layout, "Initial time")
+        self.step_value.draw(layout, "Step value")
+        self.initial_value.draw(layout, "Initial value")
+    def check(self, context):
+        return True in [v.check(context) for v in [self.initial_time, self.step_value, self.initial_value]]
     def create_entity(self):
         return StepDrive(self.name)
 
@@ -300,31 +327,38 @@ class DoubleStepDrive(Entity):
         ret = database.drive_indenture*"\t" if indent else ""
         ret += "double step"
         for v in [self.initial_time, self.final_time, self.step_value, self.initial_value]:
-            ret += ", " + FORMAT(v)
+            ret += ", " + BPY.FORMAT(v)
         return ret
 
 class DoubleStepDriveOperator(Base):
     bl_label = "Double step drive"
-    initial_time = bpy.props.FloatProperty(name="Initial time", description="", min=0.0, max=9.9e10, precision=6, default=0.0)
-    final_time = bpy.props.FloatProperty(name="Final time", description="", min=0.0, max=9.9e10, precision=6, default=0.0)
-    step_value = bpy.props.FloatProperty(name="Step value", description="", min=-9.9e10, max=9.9e10, precision=6, default=0.0)
-    initial_value = bpy.props.FloatProperty(name="Initial value", description="", min=-9.9e10, max=9.9e10, precision=6, default=0.0)
+    initial_time = bpy.props.PointerProperty(type = BPY.Float)
+    final_time = bpy.props.PointerProperty(type = BPY.Float)
+    step_value = bpy.props.PointerProperty(type = BPY.Float)
+    initial_value = bpy.props.PointerProperty(type = BPY.Float)
+    def prereqs(self, context):
+        self.initial_time.mandatory = True
+        self.final_time.mandatory = True
+        self.step_value.mandatory = True
+        self.initial_value.mandatory = True
     def assign(self, context):
-        self.initial_time = self.entity.initial_time
-        self.final_time = self.entity.final_time
-        self.step_value = self.entity.step_value
-        self.initial_value = self.entity.initial_value
+        self.initial_time.assign(self.entity.initial_time)
+        self.final_time.assign(self.entity.final_time)
+        self.step_value.assign(self.entity.step_value)
+        self.initial_value.assign(self.entity.initial_value)
     def store(self, context):
-        self.entity.initial_time = self.initial_time
-        self.entity.final_time = self.final_time
-        self.entity.step_value = self.step_value
-        self.entity.initial_value = self.initial_value
+        self.entity.initial_time = self.initial_time.store()
+        self.entity.final_time = self.final_time.store()
+        self.entity.step_value = self.step_value.store()
+        self.entity.initial_value = self.initial_value.store()
     def draw(self, context):
         layout = self.layout
-        layout.prop(self, "initial_time")
-        layout.prop(self, "final_time")
-        layout.prop(self, "step_value")
-        layout.prop(self, "initial_value")
+        self.initial_time.draw(layout, "Initial time")
+        self.final_time.draw(layout, "Final time")
+        self.step_value.draw(layout, "Step value")
+        self.initial_value.draw(layout, "Initial value")
+    def check(self, context):
+        return True in [v.check(context) for v in [self.initial_time, self.final_time, self.step_value, self.initial_value]]
     def create_entity(self):
         return DoubleStepDrive(self.name)
 
@@ -335,44 +369,42 @@ class RampDrive(Entity):
         ret = database.drive_indenture*"\t" if indent else ""
         ret += "ramp"
         for v in [self.slope, self.initial_time]:
-            ret += ", " + FORMAT(v)
-        if self.forever:
+            ret += ", " + BPY.FORMAT(v)
+        if self.final_time is None:
             ret += ", forever"
         else:
-            ret += ", " + FORMAT(self.final_time)
-        ret += ", " + FORMAT(self.initial_value)
+            ret += ", " + BPY.FORMAT(self.final_time)
+        ret += ", " + BPY.FORMAT(self.initial_value)
         return ret
 
 class RampDriveOperator(Base):
     bl_label = "Ramp drive"
-    slope = bpy.props.FloatProperty(name="Slope", description="", min=-9.9e10, max=9.9e10, precision=6, default=0.0)
-    initial_time = bpy.props.FloatProperty(name="Initial time", description="", min=0.0, max=9.9e10, precision=6, default=0.0)
-    forever = bpy.props.BoolProperty(name="Forever", description="", default=False)
-    final_time = bpy.props.FloatProperty(name="Final time", description="", min=0.0, max=9.9e10, precision=6, default=0.0)
-    initial_value = bpy.props.FloatProperty(name="Initial value", description="", min=-9.9e10, max=9.9e10, precision=6, default=0.0)
+    slope = bpy.props.PointerProperty(type = BPY.Float)
+    initial_time = bpy.props.PointerProperty(type = BPY.Float)
+    final_time = bpy.props.PointerProperty(type = BPY.Float)
+    initial_value = bpy.props.PointerProperty(type = BPY.Float)
+    def prereqs(self, context):
+        self.slope.mandatory = True
+        self.initial_time.mandatory = True
+        self.initial_value.mandatory = True
     def assign(self, context):
-        self.slope = self.entity.slope
-        self.initial_time = self.entity.initial_time
-        self.forever = self.entity.forever
-        self.final_time = self.entity.final_time
-        self.initial_value = self.entity.initial_value
+        self.slope.assign(self.entity.slope)
+        self.initial_time.assign(self.entity.initial_time)
+        self.final_time.assign(self.entity.final_time)
+        self.initial_value.assign(self.entity.initial_value)
     def store(self, context):
-        self.entity.slope = self.slope
-        self.entity.initial_time = self.initial_time
-        self.entity.forever = self.forever
-        self.entity.final_time = self.final_time
-        self.entity.initial_value = self.initial_value
+        self.entity.slope = self.slope.store()
+        self.entity.initial_time = self.initial_time.store()
+        self.entity.final_time = self.final_time.store()
+        self.entity.initial_value = self.initial_value.store()
     def draw(self, context):
-        self.basis = self.forever
         layout = self.layout
-        layout.prop(self, "slope")
-        layout.prop(self, "initial_time")
-        layout.prop(self, "forever")
-        if not self.forever:
-            layout.prop(self, "final_time")
-        layout.prop(self, "initial_value")
+        self.slope.draw(layout, "Slope")
+        self.initial_time.draw(layout, "Initial time")
+        self.final_time.draw(layout, "Final time")
+        self.initial_value.draw(layout, "Initial value")
     def check(self, context):
-        return self.basis != self.forever
+        return True in [v.check(context) for v in [self.slope, self.initial_time, self.final_time, self.initial_value]]
     def create_entity(self):
         return RampDrive(self.name)
 
@@ -381,33 +413,34 @@ klasses[RampDriveOperator.bl_label] = RampDriveOperator
 class PiecewiseLinearDrive(Entity):
     def string(self, indent=False):
         ret = database.drive_indenture*"\t" if indent else ""
-        ret += "piecewise linear, " + FORMAT(self.N)
+        ret += "piecewise linear, " + BPY.FORMAT(self.N)
         for i in range(self.N):
-            ret += ",\n" + database.drive_indenture*"\t" + FORMAT(self.T[i]) + ", " + FORMAT(self.X[i])
+            ret += ",\n" + database.drive_indenture*"\t" + BPY.FORMAT(self.T[i]) + ", " + BPY.FORMAT(self.X[i])
         return ret
 
 class PiecewiseLinearDriveOperator(Base):
     bl_label = "Piecewise linear drive"
-    N = bpy.props.IntProperty(name="Number of points", min=2, max=50, description="")
-    T = bpy.props.CollectionProperty(name="Times", type = BPY.Floats)
-    X = bpy.props.CollectionProperty(name="Values", type = BPY.Floats)
+    N = bpy.props.IntProperty(name="Number of points", min=2, max=50, description="", default=2)
+    T = bpy.props.CollectionProperty(type = BPY.Float)
+    X = bpy.props.CollectionProperty(type = BPY.Float)
     def prereqs(self, context):
-        self.N = 2
         self.T.clear()
         self.X.clear()
         for i in range(50):
-            self.T.add()
-            self.X.add()
+            t = self.T.add()
+            t.mandatory = True
+            x = self.X.add()
+            x.mandatory = True
     def assign(self, context):
         self.N = self.entity.N
-        for i, value in enumerate(self.entity.T):
-            self.T[i].value = value
-        for i, value in enumerate(self.entity.X):
-            self.X[i].value = value
+        for i, t in enumerate(self.entity.T):
+            self.T[i].assign(t)
+        for i, x in enumerate(self.entity.X):
+            self.X[i].assign(x)
     def store(self, context):
         self.entity.N = self.N
-        self.entity.T = [t.value for t in self.T]
-        self.entity.X = [x.value for x in self.X]
+        self.entity.T = [t.store() for t in self.T][:self.entity.N]
+        self.entity.X = [x.store() for x in self.X][:self.entity.N]
     def draw(self, context):
         self.basis = self.N
         layout = self.layout
@@ -417,10 +450,10 @@ class PiecewiseLinearDriveOperator(Base):
         row.label("Value")
         for i in range(self.N):
             row = layout.row()
-            row.prop(self.T[i], "value", text="")
-            row.prop(self.X[i], "value", text="")
+            self.T[i].draw(row, "")
+            self.X[i].draw(row, "")
     def check(self, context):
-        return self.basis != self.N
+        return (self.basis != self.N) or True in [t.check(context) for t in self.T] + [x.check(context) for x in self.X]
     def create_entity(self):
         return PiecewiseLinearDrive(self.name)
 
@@ -431,51 +464,67 @@ class SineDrive(Entity):
         ret = database.drive_indenture*"\t" if indent else ""
         ret += "sine"
         for v in [self.initial_time, self.omega, self.amplitude]:
-            ret += ", " + FORMAT(v)
+            ret += ", " + BPY.FORMAT(v)
         if self.duration == "cycles":
-            ret += ", " + FORMAT(self.cycles)
+            ret += ", " + BPY.FORMAT(self.cycles)
         else:
             ret += ", " + self.duration
-        ret += ", " + FORMAT(self.initial_value)
+        ret += ", " + BPY.FORMAT(self.initial_value)
         return ret
 
-class PeriodicDriveOperator(Base):
-    initial_time = bpy.props.FloatProperty(name="Initial time", description="", min=0.0, max=9.9e10, precision=6, default=0.0)
-    omega = bpy.props.FloatProperty(name="Omega", description="", min=-9.9e10, max=9.9e10, precision=6, default=0.0)
-    amplitude = bpy.props.FloatProperty(name="Amplitude", description="", min=-9.9e10, max=9.9e10, precision=6, default=0.0)
-    cycles = bpy.props.IntProperty(name="Cycles", description="Number of full cycles", default=1)
-    initial_value = bpy.props.FloatProperty(name="Initial value", description="", min=-9.9e10, max=9.9e10, precision=6, default=0.0)
+class Periodic(Base):
+    initial_time = bpy.props.PointerProperty(type = BPY.Float)
+    omega = bpy.props.PointerProperty(type = BPY.Float)
     duration = bpy.props.EnumProperty(items=[("cycles", "N-cycles", ""), ("half", "Half cycle", ""), ("one", "Full cycle", ""), ("forever", "Infinite cycle", "")], default="cycles")
+    cycles = bpy.props.PointerProperty(type = BPY.Int)
+    initial_value = bpy.props.PointerProperty(type = BPY.Float)
+    def prereqs(self, context):
+        self.initial_time.mandatory = True
+        self.omega.mandatory = True
+        self.cycles.mandatory = True
+        self.initial_value.mandatory = True
     def assign(self, context):
-        self.initial_time = self.entity.initial_time
-        self.omega = self.entity.omega
-        self.amplitude = self.entity.amplitude
-        self.cycles = self.entity.cycles
-        self.initial_value = self.entity.initial_value
+        self.initial_time.assign(self.entity.initial_time)
+        self.omega.assign(self.entity.omega)
         self.duration = self.entity.duration
+        self.cycles.assign(self.entity.cycles)
+        self.initial_value.assign(self.entity.initial_value)
     def store(self, context):
-        self.entity.initial_time = self.initial_time
-        self.entity.omega = self.omega
-        self.entity.amplitude = self.amplitude
-        self.entity.cycles = self.cycles
-        self.entity.initial_value = self.initial_value
+        self.entity.initial_time = self.initial_time.store()
+        self.entity.omega = self.omega.store()
         self.entity.duration = self.duration
+        self.entity.cycles = self.cycles.store()
+        self.entity.initial_value = self.initial_value.store()
+    def check(self, context):
+        return True in [v.check(context) for v in [self.initial_time, self.omega, self.cycles, self.initial_value]]
+
+class SineCosine(Periodic):
+    amplitude = bpy.props.PointerProperty(type = BPY.Float)
+    def prereqs(self, context):
+        self.amplitude.mandatory = True
+        super().prereqs(context)
+    def assign(self, context):
+        self.amplitude.assign(self.entity.amplitude)
+        super().assign(context)
+    def store(self, context):
+        self.entity.amplitude = self.amplitude.store()
+        super().store(context)
     def draw(self, context):
         self.basis = self.duration
         layout = self.layout
-        layout.prop(self, "initial_time")
-        layout.prop(self, "omega")
-        layout.prop(self, "amplitude")
-        layout.prop(self, "duration")
+        self.initial_time.draw(layout, "Initial time")
+        self.omega.draw(layout, "Omega")
+        self.amplitude.draw(layout, "Amplitude")
+        layout.prop(self, "duration", text="Duration")
         if self.duration == "cycles":
-            layout.prop(self, "cycles")
-        layout.prop(self, "initial_value")
+            self.cycles.draw(layout, "Cycles")
+        self.initial_value.draw(layout, "Initial value")
     def check(self, context):
-        return self.basis != self.duration
+        return (self.basis != self.duration) or self.amplitude.check(context) or super().check(context)
     def create_entity(self):
         return SineDrive(self.name)
 
-class SineDriveOperator(PeriodicDriveOperator):
+class SineDriveOperator(SineCosine):
     bl_label = "Sine drive"
     def create_entity(self):
         return SineDrive(self.name)
@@ -487,15 +536,15 @@ class CosineDrive(Entity):
         ret = database.drive_indenture*"\t" if indent else ""
         ret += "cosine"
         for v in [self.initial_time, self.omega, self.amplitude]:
-            ret += ", " + FORMAT(v)
+            ret += ", " + BPY.FORMAT(v)
         if self.duration == "cycles":
-            ret += ", " + FORMAT(self.cycles)
+            ret += ", " + BPY.FORMAT(self.cycles)
         else:
             ret += ", " + self.duration
-        ret += ", " + FORMAT(self.initial_value)
+        ret += ", " + BPY.FORMAT(self.initial_value)
         return ret
 
-class CosineDriveOperator(PeriodicDriveOperator):
+class CosineDriveOperator(SineCosine):
     bl_label = "Cosine drive"
     def create_entity(self):
         return CosineDrive(self.name)
@@ -506,32 +555,38 @@ class TanhDrive(Entity):
     def string(self, indent=False):
         ret = database.drive_indenture*"\t" if indent else ""
         ret += "tanh"
-        for v in [self.initial_time, self.amplitude, self.slope, self.initial_value]:
-            ret += ", " + FORMAT(v)
+        ret += ", ".join([BPY.FORMAT(v) for v in [self.initial_time, self.amplitude, self.slope, self.initial_value]])
         return ret
 
 class TanhDriveOperator(Base):
     bl_label = "Tanh drive"
-    initial_time = bpy.props.FloatProperty(name="Initial time", description="", min=0.0, max=9.9e10, precision=6, default=0.0)
-    amplitude = bpy.props.FloatProperty(name="Amplitude", description="", min=-9.9e10, max=9.9e10, precision=6, default=0.0)
-    slope = bpy.props.FloatProperty(name="Slope", description="", min=-9.9e10, max=9.9e10, precision=6, default=0.0)
-    initial_value = bpy.props.FloatProperty(name="Initial value", description="", min=-9.9e10, max=9.9e10, precision=6, default=0.0)
+    initial_time = bpy.props.PointerProperty(type = BPY.Float)
+    amplitude = bpy.props.PointerProperty(type = BPY.Float)
+    slope = bpy.props.PointerProperty(type = BPY.Float)
+    initial_value = bpy.props.PointerProperty(type = BPY.Float)
+    def prereqs(self, context):
+        self.initial_time.mandatory = True
+        self.amplitude.mandatory = True
+        self.slope.mandatory = True
+        self.initial_value.mandatory = True
     def assign(self, context):
-        self.initial_time = self.entity.initial_time
-        self.amplitude = self.entity.amplitude
-        self.slope = self.entity.slope
-        self.initial_value = self.entity.initial_value
+        self.initial_time.assign(self.entity.initial_time)
+        self.amplitude.assign(self.entity.amplitude)
+        self.slope.assign(self.entity.slope)
+        self.initial_value.assign(self.entity.initial_value)
     def store(self, context):
-        self.entity.initial_time = self.initial_time
-        self.entity.amplitude = self.amplitude
-        self.entity.slope = self.slope
-        self.entity.initial_value = self.initial_value
+        self.entity.initial_time = self.initial_time.store()
+        self.entity.amplitude = self.amplitude.store()
+        self.entity.slope = self.slope.store()
+        self.entity.initial_value = self.initial_value.store()
     def draw(self, context):
         layout = self.layout
-        layout.prop(self, "initial_time")
-        layout.prop(self, "amplitude")
-        layout.prop(self, "slope")
-        layout.prop(self, "initial_value")
+        self.initial_time.draw(layout, "Initial time")
+        self.amplitude.draw(layout, "Final time")
+        self.slope.draw(layout, "Slope")
+        self.initial_value.draw(layout, "Initial value")
+    def check(self, context):
+        return True in [v.check(context) for v in [self.initial_time, self.amplitude, self.slope, self.initial_value]]
     def create_entity(self):
         return TanhDrive(self.name)
 
@@ -543,75 +598,62 @@ class FourierSeriesDrive(Entity):
         ret += "fourier series"
         indenture = database.drive_indenture*"\t"
         for v in [self.initial_time, self.omega, self.N]:
-            ret += ", " + FORMAT(v)
-        ret += ",\n" + indenture + FORMAT(self.A[0])
+            ret += ", " + BPY.FORMAT(v)
+        ret += ",\n" + indenture + BPY.FORMAT(self.A[0])
         for i in range(1, self.N):
-            ret += ",\n" + indenture + FORMAT(self.A[i]) + ", " + FORMAT(self.B[i])
+            ret += ",\n" + indenture + BPY.FORMAT(self.A[i]) + ", " + BPY.FORMAT(self.B[i])
         if self.duration == "cycles":
-            ret += ",\n" + indenture + FORMAT(self.cycles)
+            ret += ",\n" + indenture + BPY.FORMAT(self.cycles)
         else:
             ret += ",\n" + indenture + self.duration
-        ret += ", " + FORMAT(self.initial_value)
+        ret += ", " + BPY.FORMAT(self.initial_value)
         return ret
 
-class FourierSeriesDriveOperator(Base):
+class FourierSeriesDriveOperator(Periodic):
     bl_label = "Fourier series drive"
-    initial_time = bpy.props.FloatProperty(name="Initial time", description="", min=0.0, max=9.9e10, precision=6, default=0.0)
-    omega = bpy.props.FloatProperty(name="Omega", description="", min=-9.9e10, max=9.9e10, precision=6, default=0.0)
-    N = bpy.props.IntProperty(name="Number of terms", min=1, max=50, description="", default=1)
-    cycles = bpy.props.IntProperty(name="Cycles", description="Number of full cycles", default=1)
-    duration = bpy.props.EnumProperty(items=[("cycles", "N-cycles", ""), ("one", "Full cycle", ""), ("forever", "Infinite cycle", "")], default="cycles")
-    initial_value = bpy.props.FloatProperty(name="Initial value", description="", min=-9.9e10, max=9.9e10, precision=6, default=0.0)
-    A = bpy.props.CollectionProperty(name="A values", type = BPY.Floats)
-    B = bpy.props.CollectionProperty(name="B values", type = BPY.Floats)
+    N = bpy.props.IntProperty(name="Number of terms", min=2, max=50, description="", default=2)
+    A = bpy.props.CollectionProperty(type = BPY.Float)
+    B = bpy.props.CollectionProperty(type = BPY.Float)
     def prereqs(self, context):
         self.A.clear()
         self.B.clear()
         for i in range(50):
-            self.A.add()
-            self.B.add()
+            a = self.A.add()
+            a.mandatory = True
+            b = self.B.add()
+            b.mandatory = True
+        super().prereqs(context)
     def assign(self, context):
-        self.initial_time = self.entity.initial_time
-        self.omega = self.entity.omega
         self.N = self.entity.N
-        self.cycles = self.entity.cycles
-        self.duration = self.entity.duration
-        self.initial_value = self.entity.initial_value
-        for i, value in enumerate(self.entity.A):
-            self.A[i].value = value
-        for i, value in enumerate(self.entity.B):
-            self.B[i].value = value
+        for i, t in enumerate(self.entity.A):
+            self.A[i].assign(a)
+        for i, x in enumerate(self.entity.B):
+            self.B[i].assign(b)
+        super().assign(context)
     def store(self, context):
-        self.entity.initial_time = self.initial_time
-        self.entity.omega = self.omega
         self.entity.N = self.N
-        self.entity.cycles = self.cycles
-        self.entity.duration = self.duration
-        self.entity.initial_value = self.initial_value
-        self.entity.A = [a.value for a in self.A]
-        self.entity.B = [b.value for b in self.B]
+        self.entity.A = [a.store() for a in self.A][:self.entity.N]
+        self.entity.B = [b.store() for b in self.B][:self.entity.N]
+        super().store(context)
     def draw(self, context):
-        self.basis = (self.duration, self.N)
+        self.basis = (self.N, self.duration)
         layout = self.layout
-        layout.prop(self, "initial_time")
-        layout.prop(self, "omega")
-        layout.prop(self, "duration")
+        self.initial_time.draw(layout, "Initial time")
+        self.omega.draw(layout, "Omega")
+        layout.prop(self, "duration", text="Duration")
         if self.duration == "cycles":
-            layout.prop(self, "cycles")
-        layout.prop(self, "initial_value")
+            self.cycles.draw(layout, "Cycles")
+        self.initial_value.draw(layout, "Initial value")
         layout.prop(self, "N")
         row = layout.row()
-        row.label("A:")
-        row.label("B:")
-        row = layout.row()
-        row.prop(self.A[0], "value", text="")
-        row.label("")
-        for i in range(1, self.N):
+        row.label("Time")
+        row.label("Value")
+        for i in range(self.N):
             row = layout.row()
-            row.prop(self.A[i], "value", text="")
-            row.prop(self.B[i], "value", text="")
+            self.A[i].draw(row, "")
+            self.B[i].draw(row, "")
     def check(self, context):
-        return self.basis != (self.duration, self.N)
+        return (self.basis != (self.N, self.duration)) or True in [a.check(context) for a in self.A] + [b.check(context) for b in self.B] or super().check(context)
     def create_entity(self):
         return FourierSeriesDrive(self.name)
 
@@ -620,58 +662,57 @@ klasses[FourierSeriesDriveOperator.bl_label] = FourierSeriesDriveOperator
 class FrequencySweepDrive(Entity):
     def string(self, indent=False):
         ret = database.drive_indenture*"\t" if indent else ""
-        ret += "frequency sweep, " + FORMAT(self.initial_time)
+        ret += "frequency sweep, " + BPY.FORMAT(self.initial_time)
         indenture = database.drive_indenture*"\t"
-        ret += ",\n" + self.links[0].string(True)
-        ret += ",\n" + self.links[1].string(True)
-        ret += ",\n" + indenture + FORMAT(self.initial_value)
+        ret += ",\nreference, " + self.angular_velocity_drive.safe_name()
+        ret += ",\nreference, " + self.amplitude_drive.safe_name()
+        ret += ",\n" + indenture + BPY.FORMAT(self.initial_value)
         if self.forever:
             ret += ", forever"
         else:
-            ret += ", " + FORMAT(self.final_time)
-        ret += ", " + FORMAT(self.final_value)
+            ret += ", " + BPY.FORMAT(self.final_time)
+        ret += ", " + BPY.FORMAT(self.final_value)
         return ret
 
 class FrequencySweepDriveOperator(Base):
     bl_label = "Frequency sweep drive"
-    initial_time = bpy.props.FloatProperty(name="Initial time", description="", min=0.0, max=9.9e10, precision=6, default=0.0)
-    angular_velocity_drive_name = bpy.props.EnumProperty(items=enum_drive, name="Angular velocity drive",
-        update=lambda self, context: update_drive(self, context, self.angular_velocity_drive_name))
-    amplitude_drive_name = bpy.props.EnumProperty(items=enum_drive, name="Amplitude drive",
-        update=lambda self, context: update_drive(self, context, self.amplitude_drive_name))
-    initial_value = bpy.props.FloatProperty(name="Initial value", description="", min=-9.9e10, max=9.9e10, precision=6, default=0.0)
-    forever = bpy.props.BoolProperty(name="Forever", description="", default=False)
-    final_time = bpy.props.FloatProperty(name="Final time", description="", min=0.0, max=9.9e10, precision=6, default=0.0)
-    final_value = bpy.props.FloatProperty(name="Final value", description="", min=-9.9e10, max=9.9e10, precision=6, default=0.0)
+    initial_time = bpy.props.PointerProperty(type = BPY.Float)
+    initial_value = bpy.props.PointerProperty(type = BPY.Float)
+    angular_velocity_drive = bpy.props.PointerProperty(type = BPY.Drive)
+    amplitude_drive = bpy.props.PointerProperty(type = BPY.Drive)
+    final_time = bpy.props.PointerProperty(type = BPY.Float)
+    final_value = bpy.props.PointerProperty(type = BPY.Float)
+    def prereqs(self, context):
+        self.initial_time.mandatory = True
+        self.initial_value.mandatory = True
+        self.angular_velocity_drive.mandatory = True
+        self.amplitude_drive.mandatory = True
+        self.final_value.mandatory = True
     def assign(self, context):
-        self.angular_velocity_drive_name = self.entity.links[0].name
-        self.amplitude_drive_name = self.entity.links[0].name
-        self.initial_time = self.entity.initial_time
-        self.initial_value = self.entity.initial_value
-        self.forever = self.entity.forever
-        self.final_time = self.entity.final_time
-        self.final_value = self.entity.final_value
+        self.initial_time.assign(self.entity.initial_time)
+        self.initial_value.assign(self.entity.initial_value)
+        self.angular_velocity_drive.assign(self.entity.angular_velocity_drive)
+        self.amplitude_drive.assign(self.entity.amplitude_drive)
+        self.final_time.assign(self.entity.final_time)
+        self.final_value.assign(self.entity.final_value)
     def store(self, context):
-        self.entity.initial_time = self.initial_time
-        self.entity.initial_value = self.initial_value
-        self.entity.forever = self.forever
-        self.entity.final_time = self.final_time
-        self.entity.final_value = self.final_value
-        self.entity.links.append(database.drive.get_by_name(self.angular_velocity_drive_name))
-        self.entity.links.append(database.drive.get_by_name(self.amplitude_drive_name))
+        self.entity.initial_time = self.initial_time.store()
+        self.entity.initial_value = self.initial_value.store()
+        self.entity.angular_velocity_drive = self.angular_velocity_drive.store()
+        self.entity.amplitude_drive = self.amplitude_drive.store()
+        self.entity.final_time = self.final_time.store()
+        self.entity.final_value = self.final_value.store() if self.entity.final_time is not None else None
     def draw(self, context):
-        self.basis = self.forever
         layout = self.layout
-        layout.prop(self, "initial_time")
-        layout.prop(self, "initial_value")
-        layout.prop(self, "angular_velocity_drive_name")
-        layout.prop(self, "amplitude_drive_name")
-        layout.prop(self, "forever")
-        if not self.forever:
-            layout.prop(self, "final_time")
-            layout.prop(self, "final_value")
+        self.initial_time.draw(layout, "Initial time")
+        self.initial_value.draw(layout, "Initial value")
+        self.angular_velocity_drive.draw(layout, "Angular velocity")
+        self.amplitude_drive.draw(layout, "Amplitude drive")
+        self.final_time.draw(layout, "Final time")
+        self.final_value.draw(layout, "Final value")
     def check(self, context):
-        return self.basis != self.forever
+        return True in [v.check(context) for v in [self.initial_time, self.initial_value,
+            self.angular_velocity_drive, self.amplitude_drive, self.final_time, self.final_value]]
     def create_entity(self):
         return FrequencySweepDrive(self.name)
 
@@ -682,31 +723,38 @@ class ExponentialDrive(Entity):
         ret = database.drive_indenture*"\t" if indent else ""
         ret += "exponential"
         for v in [self.amplitude, self.time_constant, self.initial_time, self.initial_value]:
-            ret += ", " + FORMAT(v)
+            ret += ", " + BPY.FORMAT(v)
         return ret
 
 class ExponentialDriveOperator(Base):
     bl_label = "Exponential drive"
-    amplitude = bpy.props.FloatProperty(name="Amplitude", description="", min=-9.9e10, max=9.9e10, precision=6, default=0.0)
-    time_constant = bpy.props.FloatProperty(name="Time constant", description="", min=-9.9e10, max=9.9e10, precision=6, default=0.0)
-    initial_time = bpy.props.FloatProperty(name="Initial time", description="", min=-9.9e10, max=9.9e10, precision=6, default=0.0)
-    initial_value = bpy.props.FloatProperty(name="Initial value", description="", min=-9.9e10, max=9.9e10, precision=6, default=0.0)
+    amplitude = bpy.props.PointerProperty(type = BPY.Float)
+    time_constant = bpy.props.PointerProperty(type = BPY.Float)
+    initial_time = bpy.props.PointerProperty(type = BPY.Float)
+    initial_value = bpy.props.PointerProperty(type = BPY.Float)
+    def prereqs(self, context):
+        self.amplitude.mandatory = True
+        self.time_constant.mandatory = True
+        self.initial_time.mandatory = True
+        self.initial_value.mandatory = True
     def assign(self, context):
-        self.amplitude = self.entity.amplitude
-        self.time_constant = self.entity.time_constant
-        self.initial_time = self.entity.initial_time
-        self.initial_value = self.entity.initial_value
+        self.amplitude.assign(self.entity.amplitude)
+        self.time_constant.assign(self.entity.time_constant)
+        self.initial_time.assign(self.entity.initial_time)
+        self.initial_value.assign(self.entity.initial_value)
     def store(self, context):
-        self.entity.amplitude = self.amplitude
-        self.entity.time_constant = self.time_constant
-        self.entity.initial_time = self.initial_time
-        self.entity.initial_value = self.initial_value
+        self.entity.amplitude = self.amplitude.store()
+        self.entity.time_constant = self.time_constant.store()
+        self.entity.initial_time = self.initial_time.store()
+        self.entity.initial_value = self.initial_value.store()
     def draw(self, context):
         layout = self.layout
-        layout.prop(self, "amplitude")
-        layout.prop(self, "time_constant")
-        layout.prop(self, "initial_time")
-        layout.prop(self, "initial_value")
+        self.amplitude.draw(layout, "Amplitude")
+        self.time_constant.draw(layout, "Time constant")
+        self.initial_time.draw(layout, "Initial time")
+        self.initial_value.draw(layout, "Initial value")
+    def check(self, context):
+        return True in [v.check(context) for v in [self.amplitude, self.time_constant, self.initial_time, self.initial_value]]
     def create_entity(self):
         return ExponentialDrive(self.name)
 
@@ -717,61 +765,62 @@ class RandomDrive(Entity):
         ret = database.drive_indenture*"\t" if indent else ""
         ret += "random"
         for v in [self.amplitude, self.mean, self.initial_time]:
-            ret += ", " + FORMAT(v)
-        if self.forever:
+            ret += ", " + BPY.FORMAT(v)
+        if self.final_time is None:
             ret += ", forever"
         else:
-            ret += ", " + FORMAT(self.final_time)
-        ret += ", steps, " + FORMAT(self.steps)
+            ret += ", " + BPY.FORMAT(self.final_time)
+        ret += ", steps, " + BPY.FORMAT(self.steps)
         if self.seed_type == "time_seed":
             ret += ", seed, time"
         else:
-            ret += ", seed, " + FORMAT(self.specified_seed)
+            ret += ", seed, " + BPY.FORMAT(self.specified_seed)
         return ret
 
 class RandomDriveOperator(Base):
     bl_label = "Random drive"
-    amplitude = bpy.props.FloatProperty(name="Amplitude", description="", min=-9.9e10, max=9.9e10, precision=6, default=0.0)
-    mean = bpy.props.FloatProperty(name="Mean", description="", min=-9.9e10, max=9.9e10, precision=6, default=0.0)
-    initial_time = bpy.props.FloatProperty(name="Initial time", description="", min=0.0, max=9.9e10, precision=6, default=0.0)
-    forever = bpy.props.BoolProperty(name="Forever", description="", default=False)
-    final_time = bpy.props.FloatProperty(name="Final time", description="", min=0.0, max=9.9e10, precision=6, default=0.0)
-    steps = bpy.props.FloatProperty(name="Steps", description="", min=-9.9e10, max=9.9e10, precision=6, default=0.0)
+    amplitude = bpy.props.PointerProperty(type = BPY.Float)
+    mean = bpy.props.PointerProperty(type = BPY.Float)
+    initial_time = bpy.props.PointerProperty(type = BPY.Float)
+    final_time = bpy.props.PointerProperty(type = BPY.Float)
+    steps = bpy.props.PointerProperty(type = BPY.Float)
     seed_type = bpy.props.EnumProperty(items=[("time_seed", "Time seed", ""), ("specified_seed", "Specified seed", "")], name="Seed type", default="specified_seed")
-    specified_seed = bpy.props.FloatProperty(name="Specified seed", description="", min=0.0, max=9.9e10, precision=6, default=0.0)
+    specified_seed = bpy.props.PointerProperty(type = BPY.Float)
+    def prereqs(self, context):
+        self.amplitude.mandatory = True
+        self.mean.mandatory = True
+        self.initial_time.mandatory = True
+        self.steps.mandatory = True
+        self.specified_seed.mandatory = True
     def assign(self, context):
-        self.amplitude = self.entity.amplitude
-        self.mean = self.entity.mean
-        self.initial_time = self.entity.initial_time
-        self.forever = self.entity.forever
-        self.final_time = self.entity.final_time
-        self.steps = self.entity.steps
+        self.amplitude.assign(self.entity.amplitude)
+        self.mean.assign(self.entity.mean)
+        self.initial_time.assign(self.entity.initial_time)
+        self.final_time.assign(self.entity.final_time)
+        self.steps.assign(self.entity.steps)
         self.seed_type = self.entity.seed_type
-        self.specified_seed = self.entity.specified_seed
+        self.specified_seed.assign(self.entity.specified_seed)
     def store(self, context):
-        self.entity.amplitude = self.amplitude
-        self.entity.mean = self.mean
-        self.entity.initial_time = self.initial_time
-        self.entity.forever = self.forever
-        self.entity.final_time = self.final_time
-        self.entity.steps = self.steps
+        self.entity.amplitude = self.amplitude.store()
+        self.entity.mean = self.mean.store()
+        self.entity.initial_time = self.initial_time.store()
+        self.entity.final_time = self.final_time.store()
+        self.entity.steps = self.steps.store()
         self.entity.seed_type = self.seed_type
-        self.entity.specified_seed = self.specified_seed
+        self.entity.specified_seed = self.specified_seed.store() if self.seed_type == "specified_seed" else None
     def draw(self, context):
-        self.basis = (self.forever, self.seed_type)
+        self.basis = self.seed_type
         layout = self.layout
-        layout.prop(self, "amplitude")
-        layout.prop(self, "mean")
-        layout.prop(self, "initial_time")
-        layout.prop(self, "forever")
-        if not self.forever:
-            layout.prop(self, "final_time")
-        layout.prop(self, "steps")
+        self.amplitude.draw(layout, "Amplitude")
+        self.mean.draw(layout, "Mean")
+        self.initial_time.draw(layout, "Initial time")
+        self.final_time.draw(layout, "Final time")
+        self.steps.draw(layout, "Steps")
         layout.prop(self, "seed_type")
         if self.seed_type == "specified_seed":
-            layout.prop(self, "specified_seed")
+            self.specified_seed.draw(layout, "Specified seed")
     def check(self, context):
-        return self.basis != (self.forever, self.seed_type)
+        return (self.basis != self.seed_type) or True in [v.check(context) for v in [self.amplitude, self.mean, self.initial_time, self.final_time, self.steps, self.specified_seed]]
     def create_entity(self):
         return RandomDrive(self.name)
 
@@ -780,40 +829,38 @@ klasses[RandomDriveOperator.bl_label] = RandomDriveOperator
 class MeterDrive(Entity):
     def string(self, indent=False):
         ret = database.drive_indenture*"\t" if indent else ""
-        ret += "meter, " + FORMAT(self.initial_time)
-        if self.forever:
+        ret += "meter, " + BPY.FORMAT(self.initial_time)
+        if self.final_time is None:
             ret += ", forever"
         else:
-            ret += ", " + FORMAT(self.final_time)
-        ret += ", steps, " + FORMAT(self.steps)
+            ret += ", " + BPY.FORMAT(self.final_time)
+        ret += ", steps, " + BPY.FORMAT(self.steps)
         return ret
 
 class MeterDriveOperator(Base):
     bl_label = "Meter drive"
-    initial_time = bpy.props.FloatProperty(name="Initial time", description="", min=0.0, max=9.9e10, precision=6)
-    forever = bpy.props.BoolProperty(name="Forever", description="", default=True)
-    final_time = bpy.props.FloatProperty(name="Final time", description="", min=0.0, max=9.9e10, precision=6)
-    steps = bpy.props.IntProperty(name="Steps", description="", min=1, default=1)
+    initial_time = bpy.props.PointerProperty(type = BPY.Float)
+    final_time = bpy.props.PointerProperty(type = BPY.Float)
+    steps = bpy.props.PointerProperty(type = BPY.Int)
+    def prereqs(self, context):
+        self.initial_time.mandatory = True
+        self.steps.mandatory = True
+        self.steps.assign(1)
     def assign(self, context):
-        self.initial_time = self.entity.initial_time
-        self.forever = self.entity.forever
-        self.final_time = self.entity.final_time
-        self.steps = self.entity.steps
+        self.initial_time.assign(self.entity.initial_time)
+        self.final_time.assign(self.entity.final_time)
+        self.steps.assign(self.entity.steps)
     def store(self, context):
-        self.entity.initial_time = self.initial_time
-        self.entity.forever = self.forever
-        self.entity.final_time = self.final_time
-        self.entity.steps = self.steps
+        self.entity.initial_time = self.initial_time.store()
+        self.entity.final_time = self.final_time.store()
+        self.entity.steps = self.steps.store()
     def draw(self, context):
-        self.basis = self.forever
         layout = self.layout
-        layout.prop(self, "initial_time")
-        layout.prop(self, "forever")
-        if not self.forever:
-            layout.prop(self, "final_time")
-        layout.prop(self, "steps")
+        self.initial_time.draw(layout, "Initial time")
+        self.final_time.draw(layout, "Final time")
+        self.steps.draw(layout, "Steps")
     def check(self, context):
-        return self.basis != self.forever
+        return True in [v.check(context) for v in [self.initial_time, self.final_time, self.steps]]
     def create_entity(self):
         return MeterDrive(self.name)
 
@@ -827,13 +874,18 @@ class StringDrive(Entity):
 
 class StringDriveOperator(Base):
     bl_label = "String drive"
-    expression_string = bpy.props.StringProperty(name="Expression string", maxlen=100, default="")
+    expression_string = bpy.props.PointerProperty(type = BPY.Str)
+    def prereqs(self, context):
+        self.expression_string.mandatory = True
     def assign(self, context):
-        self.expression_string = self.entity.expression_string
+        self.expression_string.assign(self.entity.expression_string)
     def store(self, context):
-        self.entity.expression_string = self.expression_string
+        self.entity.expression_string = self.expression_string.store()
     def draw(self, context):
-        self.layout.prop(self, "expression_string")
+        layout = self.layout
+        self.expression_string.draw(layout, "Expression")
+    def check(self, context):
+        return self.expression_string.check(context)
     def create_entity(self):
         return StringDrive(self.name)
 
@@ -843,26 +895,29 @@ class MultDrive(Entity):
     def string(self, indent=False):
         ret = database.drive_indenture*"\t" if indent else ""
         ret += "mult"
-        ret += ",\n" + self.links[0].string(True)
-        ret += ",\n" + self.links[1].string(True)
+        ret += ",\nreference, " + self.drive_1.safe_name()
+        ret += ",\nreference, " + self.drive_2.safe_name()
         return ret
 
 class MultDriveOperator(Base):
     bl_label = "Mult drive"
-    drive_1_name = bpy.props.EnumProperty(items=enum_drive, name="Drive 1",
-        update=lambda self, context: update_drive(self, context, self.drive_1_name))
-    drive_2_name = bpy.props.EnumProperty(items=enum_drive, name="Drive 2",
-        update=lambda self, context: update_drive(self, context, self.drive_2_name))
+    drive_1 = bpy.props.PointerProperty(type = BPY.Drive)
+    drive_2 = bpy.props.PointerProperty(type = BPY.Drive)
+    def prereqs(self, context):
+        self.drive_1.mandatory = True
+        self.drive_2.mandatory = True
     def assign(self, context):
-        self.drive_1_name = self.entity.links[0].name
-        self.drive_2_name = self.entity.links[0].name
+        self.drive_1.assign(self.entity.drive_1)
+        self.drive_2.assign(self.entity.drive_2)
     def store(self, context):
-        self.entity.links.append(database.drive.get_by_name(self.drive_1_name))
-        self.entity.links.append(database.drive.get_by_name(self.drive_2_name))
+        self.entity.drive_1 = self.drive_1.store()
+        self.entity.drive_2 = self.drive_2.store()
     def draw(self, context):
         layout = self.layout
-        layout.prop(self, "drive_1_name")
-        layout.prop(self, "drive_2_name")
+        self.drive_1.draw(layout, "Drive 1")
+        self.drive_2.draw(layout, "Drive 2")
+    def check(self, context):
+        return self.drive_1.check(context) or self.drive_2.check(context)
     def create_entity(self):
         return MultDrive(self.name)
 
@@ -884,33 +939,36 @@ class NodeDrive(Entity):
             return
         if ob in (database.structural_dynamic_nodes | database.structural_static_nodes |
             database.structural_dummy_nodes):
-            ret += ", " + FORMAT(database.node.index(ob)) + ", structural"
+            ret += ", " + safe_name(ob.name) + ", structural"
         if self.symbolic_name:
-            ret += ", string, \"" + self.symbolic_name + "\""
-        ret += ",\n" + self.links[0].string(True)
+            ret += ", string, \"" + BPY.FORMAT(self.symbolic_name) + "\""
+        ret += ",\nreference, " + self.drive.safe_name()
         return ret
 
 class NodeDriveOperator(Base):
     bl_label = "Node drive"
-    symbolic_name = bpy.props.StringProperty(name="Symbolic name", maxlen=100,
-        description="Private data of the structural node", default="")
-    drive_name = bpy.props.EnumProperty(items=enum_drive, name="Drive",
-        update=lambda self, context: update_drive(self, context, self.drive_name))
+    symbolic_name = bpy.props.PointerProperty(type = BPY.Str)
+    drive = bpy.props.PointerProperty(type = BPY.Drive)
     @classmethod
     def poll(cls, context):
         obs = SelectedObjects(context)
         return cls.bl_idname.startswith(root_dot + "e_") or len(obs) == 1
+    def prereqs(self, context):
+        self.symbolic_name.mandatory = True
+        self.drive.mandatory = True
     def assign(self, context):
-        self.symbolic_name = self.entity.symbolic_name
-        self.drive_name = self.entity.links[0].name
+        self.symbolic_name.assign(self.entity.symbolic_name)
+        self.drive.assign(self.entity.drive)
     def store(self, context):
         self.entity.objects = SelectedObjects(context)
-        self.entity.symbolic_name = self.symbolic_name
-        self.entity.links.append(database.drive.get_by_name(self.drive_name))
+        self.entity.symbolic_name = self.symbolic_name.store()
+        self.entity.drive = self.drive.store()
     def draw(self, context):
         layout = self.layout
-        layout.prop(self, "symbolic_name")
-        layout.prop(self, "drive_name")
+        self.symbolic_name.draw(layout, "Symbolic name")
+        self.drive.draw(layout, "Drive")
+    def check(self, context):
+        return self.symbolic_name.check(context) or self.drive.check(context)
     def create_entity(self):
         return NodeDrive(self.name)
 
@@ -919,33 +977,36 @@ klasses[NodeDriveOperator.bl_label] = NodeDriveOperator
 class ElementDrive(Entity):
     def string(self, indent=False):
         ret = database.drive_indenture*"\t" if indent else ""
-        ret += "element, " + FORMAT(database.element.index(self.links[0])) + ", " + self.links[0].type
+        ret += "element, " + self.element.safe_name() + ", " + self.element.type
         if self.symbolic_name:
-            ret += ", string, \"" + selfsymbolic_name + "\""
-        ret += ",\n" + self.links[1].string(True)
+            ret += ", string, \"" + self.symbolic_name + "\""
+        ret += ",\nreference, " + self.drive.safe_name()
         return ret
 
 class ElementDriveOperator(Base):
     bl_label = "Structural node drive"
-    element_name = bpy.props.EnumProperty(items=enum_element, name="Element",
-        update=lambda self, context: update_element(self, context, self.element_name))
-    symbolic_name = bpy.props.StringProperty(name="Symbolic name", maxlen=100,
-        description="Private data of the structural node", default="")
-    drive_name = bpy.props.EnumProperty(items=enum_drive, name="Drive",
-        update=lambda self, context: update_drive(self, context, self.drive_name))
+    element = bpy.props.PointerProperty(type = BPY.Element)
+    symbolic_name = bpy.props.PointerProperty(type = BPY.Str)
+    drive = bpy.props.PointerProperty(type = BPY.Drive)
+    def prereqs(self, context):
+        self.element.mandatory = True
+        self.symbolic_name.mandatory = True
+        self.drive.mandatory = True
     def assign(self, context):
-        self.symbolic_name = self.entity.symbolic_name
-        self.element_name = self.entity.links[0].name
-        self.drive_name = self.entity.links[1].name
+        self.element.assign(self.entity.element)
+        self.symbolic_name.assign(self.entity.symbolic_name)
+        self.drive.assign(self.entity.drive)
     def store(self, context):
-        self.symbolic_name = self.symbolic_name
-        self.link_element(context, self.element_name)
-        self.entity.links.append(database.drive.get_by_name(self.drive_name))
+        self.entity.element = self.element.store()
+        self.entity.symbolic_name = self.symbolic_name.store()
+        self.entity.drive = self.drive.store()
     def draw(self, context):
         layout = self.layout
-        layout.prop(slef, "element_name")
-        layout.prop(self, "symbolic_name")
-        layout.prop(self, "drive_name")
+        self.element.draw(layout, "Element")
+        self.symbolic_name.draw(layout, "Symbol")
+        self.drive.draw(layout, "Drive")
+    def check(self, context):
+        return self.element.check(context) or self.symbolic_name.check(context) or self.drive.check(context)
     def create_entity(self):
         return ElementDrive(self.name)
 
@@ -955,26 +1016,12 @@ class DriveDrive(Entity):
     def string(self, indent=False):
         ret = database.drive_indenture*"\t" if indent else ""
         ret += "drive"
-        ret += ",\n" + self.links[0].string(True)
-        ret += ",\n" + self.links[1].string(True)
+        ret += ",\n" + self.drive_1.string(True)
+        ret += ",\n" + self.drive_2.string(True)
         return ret
 
-class DriveDriveOperator(Base):
+class DriveDriveOperator(MultDriveOperator):
     bl_label = "Drive drive"
-    drive_1_name = bpy.props.EnumProperty(items=enum_drive, name="Drive 1",
-        update=lambda self, context: update_drive(self, context, self.drive_1_name))
-    drive_2_name = bpy.props.EnumProperty(items=enum_drive, name="Drive 2",
-        update=lambda self, context: update_drive(self, context, self.drive_2_name))
-    def assign(self, context):
-        self.drive_1_name = self.entity.links[0].name
-        self.drive_2_name = self.entity.links[0].name
-    def store(self, context):
-        self.entity.links.append(database.drive.get_by_name(self.drive_1_name))
-        self.entity.links.append(database.drive.get_by_name(self.drive_2_name))
-    def draw(self, context):
-        layout = self.layout
-        layout.prop(self, "drive_1_name")
-        layout.prop(self, "drive_2_name")
     def create_entity(self):
         return DriveDrive(self.name)
 
@@ -983,38 +1030,36 @@ klasses[DriveDriveOperator.bl_label] = DriveDriveOperator
 class ArrayDrive(Entity):
     def string(self, indent=False):
         ret = database.drive_indenture*"\t" if indent else ""
-        ret += "array, " + FORMAT(self.N)
+        ret += "array, " + BPY.FORMAT(self.N)
         for i in range(self.N):
-            ret += ",\n\t" + self.links[i].string(True)
+            ret += ",\n\treference, " + self.drives[i].safe_name()
         return ret
 
 class ArrayDriveOperator(Base):
     bl_label = "Array drive"
     N = bpy.props.IntProperty(min=2, max=20)
-    drive_names = bpy.props.CollectionProperty(name="Drive Names", type = BPY.DriveNames)
+    drives = bpy.props.CollectionProperty(type = BPY.Drive)
     def prereqs(self, context):
-        self.drive_names.clear()
+        self.drives.clear()
         self.N = 2
         for i in range(20):
-            self.drive_names.add()
+            d = self.drives.add()
+            d.mandatory = True
     def assign(self, context):
         self.N = self.entity.N
-        for i, link in enumerate(self.entity.links):
-            self.drive_names[i].enable_popups = False
-            self.drive_names[i].value = link.name
-            self.drive_names[i].enable_popups = True
+        for i, d in enumerate(self.entity.drives):
+            self.drives[i].assign(d)
     def store(self, context):
         self.entity.N = self.N
-        for d in self.drive_names[:self.N]:
-            self.entity.links.append(database.drive.get_by_name(d.value))
+        self.entity.drives = [d.store() for d in self.drives][:self.entity.N]
     def draw(self, context):
         self.basis = self.N
         layout = self.layout
         layout.prop(self, "N")
         for i in range(self.N):
-            layout.prop(self.drive_names[i], "value", text="")
+            self.drives[i].draw(layout)
     def check(self, context):
-        return self.basis != self.N
+        return (self.basis != self.N) or True in [d.check(context) for d in self.drives]
     def create_entity(self):
         return ArrayDrive(self.name)
 

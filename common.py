@@ -34,6 +34,9 @@ else:
 
 FORMAT = "{:.6g}".format
 
+def safe_name(name):
+    return "_".join("_".join(name.split(".")).split())
+
 class Type(str):
     def __new__(cls, data='', N=None):
         return super(Type, cls).__new__(cls, data)
@@ -99,9 +102,9 @@ nonlinear_solver_types = [
     "Matrix free"]
 
 class Common:
-    def write_vector(self, v, f, end=""):
+    def write_vector(self, f, v, end=""):
         f.write(", ".join([FORMAT(round(x, 6) if round(x, 6) != -0. else 0) for x in v]) + end)
-    def write_matrix(self, m, f, pad=""):
+    def write_matrix(self, f, m, pad=""):
         f.write(",\n".join([pad + ", ".join(FORMAT(round(x, 6) if round(x, 6) != -0. else 0) for x in r) for r in m]))
 
 def subsurf(obj):
@@ -110,12 +113,14 @@ def subsurf(obj):
     subsurf.levels = 3
 
 def Ellipsoid(obj, mass, mat):
-    if mat.subtype == "eye":
-        diag = [1.]*3
-    else:
-        diag = [mat.floats[4*i] for i in range(3)]
-    s = mat.factor if mat.scale else 1.0
-    s = [0.5*sqrt(x*s/mass) for x in diag]
+    def v_or_1(value):
+        return value if isinstance(value, (int, float)) else 1.0
+    diag, scale = 3*[1.0], 1.0
+    if mat is not None:
+        if mat.subtype != "eye":
+            diag = [v_or_1(mat.floats[4*i]) for i in range(3)]
+        scale = v_or_1(mat.scale)
+    s = [0.5*sqrt(x*scale/v_or_1(mass)) for x in diag]
     bm = bmesh.new()
     for v in [(x*s[0],y*s[1],z*s[2]) for z in [-1., 1.] for y in [-1., 1.] for x in [-1., 1.]]:
         bm.verts.new(v)

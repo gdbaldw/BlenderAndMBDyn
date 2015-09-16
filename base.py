@@ -31,16 +31,17 @@ else:
     import bpy
     import addon_utils
     from .database import Database, EntityLookupError
-    from .common import Common, method_types, nonlinear_solver_types
+    from .common import Common, FORMAT, safe_name, method_types, nonlinear_solver_types
     from collections import OrderedDict
     from copy import copy
+    from sys import getrefcount
 
 category = "MBDyn"
 root_dot = "_".join(category.lower().split()) + "."
 database = Database()
 
 def update_constitutive(self, context, name, dimension=""):
-    if self.enable_popups:
+    if context.scene.popups_enabled:
         if name == "New":
             bpy.ops.wm.call_menu(name=root_dot+"constitutive"+dimension)
         else:
@@ -48,7 +49,7 @@ def update_constitutive(self, context, name, dimension=""):
             context.scene.constitutive_index = database.constitutive.index(entity)
             entity.edit()
 def update_definition(self, context, name, menu_item):
-    if self.enable_popups:
+    if context.scene.popups_enabled:
         if name == "New":
             if menu_item in ["Method", "Nonlinear solver"]:
                 bpy.ops.wm.call_menu(name=root_dot + "_".join(menu_item.lower().split()))
@@ -59,7 +60,7 @@ def update_definition(self, context, name, menu_item):
             context.scene.definition_index = database.definition.index(entity)
             entity.edit()
 def update_drive(self, context, name, menu_item=None):
-    if self.enable_popups:
+    if context.scene.popups_enabled:
         if name == "New":
             if menu_item:
                 exec("bpy.ops." + root_dot + "c_" + "_".join(menu_item.lower().split()) + "('INVOKE_DEFAULT')")
@@ -70,12 +71,13 @@ def update_drive(self, context, name, menu_item=None):
             context.scene.drive_index = database.drive.index(entity)
             entity.edit()
 def update_element(self, context, name):
-    if self.enable_popups:
+    if context.scene.popups_enabled:
         entity = database.element.get_by_name(name)
         context.scene.element_index = database.element.index(entity)
         entity.edit()
+        del entity
 def update_friction(self, context, name):
-    if self.enable_popups:
+    if context.scene.popups_enabled:
         if name == "New":
             bpy.ops.wm.call_menu(name=root_dot+"friction")
         else:
@@ -83,20 +85,37 @@ def update_friction(self, context, name):
             context.scene.friction_index = database.friction.index(entity)
             entity.edit()
 def update_function(self, context, name):
-    if self.enable_popups:
+    if context.scene.popups_enabled:
         if name == "New":
             bpy.ops.wm.call_menu(name=root_dot+"function")
         else:
             entity = database.function.get_by_name(name)
             context.scene.function_index = database.function.index(entity)
             entity.edit()
+def update_shape(self, context, name):
+    if context.scene.popups_enabled:
+        if name == "New":
+            bpy.ops.wm.call_menu(name=root_dot+"shape")
+        else:
+            entity = database.shape.get_by_name(name)
+            context.scene.shape_index = database.shape.index(entity)
+            entity.edit()
 def update_matrix(self, context, name, menu_item):
-    if self.enable_popups:
+    if context.scene.popups_enabled:
         if name == "New":
             exec("bpy.ops." + root_dot + "c_" + "_".join(menu_item.lower().split()) + "('INVOKE_DEFAULT')")
         else:
             entity = database.matrix.get_by_name(name)
             context.scene.matrix_index = database.matrix.index(entity)
+            entity.edit()
+def update_input_card(self, context, name, menu_item, value_type=None):
+    if context.scene.popups_enabled:
+        if name == "New":
+            kwargs = ("value_type='" + value_type + "'") if value_type else ""
+            exec("bpy.ops." + root_dot + "c_" + "_".join(menu_item.lower().split()) + "('INVOKE_DEFAULT', " + kwargs + ")")
+        else:
+            entity = database.input_card.get_by_name(name)
+            context.scene.input_card_index = database.input_card.index(entity)
             entity.edit()
 def update_scene(self, context, name):
     if name == "New":
@@ -109,35 +128,21 @@ def enum_objects(self, context):
 def enum_matrix(self, context, matrix_type):
     return [(m.name, m.name, "") for i, m in enumerate(context.scene.matrix_uilist)
         if database.matrix[i].type == matrix_type] + [("New", "New", "")]
-def enum_matrix_3x1(self, context):
-    return enum_matrix(self, context, "3x1")
-def enum_matrix_6x1(self, context):
-    return enum_matrix(self, context, "6x1")
-def enum_matrix_3x3(self, context):
-    return enum_matrix(self, context, "3x3")
-def enum_matrix_6x6(self, context):
-    return enum_matrix(self, context, "6x6")
-def enum_matrix_6xN(self, context):
-    return enum_matrix(self, context, "6xN")
 def enum_constitutive(self, context, dimension):
     return  [(c.name, c.name, "") for i, c in enumerate(context.scene.constitutive_uilist)
         if dimension in database.constitutive[i].dimension] + [("New", "New", "")]
-def enum_constitutive_1D(self, context):
-    return enum_constitutive(self, context, "1D")
-def enum_constitutive_3D(self, context):
-    return enum_constitutive(self, context, "3D")
-def enum_constitutive_6D(self, context):
-    return enum_constitutive(self, context, "6D")
 def enum_drive(self, context):
     return [(d.name, d.name, "") for d in context.scene.drive_uilist] + [("New", "New", "")]
 def enum_meter_drive(self, context):
     return [(d.name, d.name, "") for i, d in enumerate(context.scene.drive_uilist) if database.drive[i].type == "Meter drive"] + [("New", "New", "")]
 def enum_element(self, context):
-    return [(e.name, e.name, "") for i, e in enumerate(context.scene.element_uilist) if not hasattr(database.element[i], "consumer")]
+    return [(e.name, e.name, "") for i, e in enumerate(context.scene.element_uilist)] # if not hasattr(database.element[i], "consumer")]
 def enum_function(self, context):
     return [(f.name, f.name, "") for f in context.scene.function_uilist] + [("New", "New", "")]
 def enum_friction(self, context):
     return [(f.name, f.name, "") for f in context.scene.friction_uilist] + [("New", "New", "")]
+def enum_shape(self, context):
+    return [(s.name, s.name, "") for s in context.scene.shape_uilist] + [("New", "New", "")]
 def enum_general_data(self, context):
     return [(d.name, d.name, "") for i, d in enumerate(context.scene.definition_uilist) if database.definition[i].type == "General data"] + [("New", "New", "")]
 def enum_method(self, context):
@@ -166,6 +171,11 @@ def enum_default_aerodynamic_output(self, context):
     return [(d.name, d.name, "") for i, d in enumerate(context.scene.definition_uilist) if database.definition[i].type == "Default aerodynamic output"] + [("New", "New", "")]
 def enum_default_beam_output(self, context):
     return [(d.name, d.name, "") for i, d in enumerate(context.scene.definition_uilist) if database.definition[i].type == "Default beam output"] + [("New", "New", "")]
+def enum_input_card(self, context, card_type, value_type=None):
+    return [(c.name, c.name, "") for i, c in enumerate(context.scene.input_card_uilist)
+        if database.input_card[i].type == card_type and ((not value_type) or database.input_card[i].value_type == value_type)] + [("New", "New", "")]
+def enum_set(self, context):
+    return enum_input_card(self, context, "Set")
 
 @bpy.app.handlers.persistent
 def load_post(*args, **kwargs):
@@ -183,26 +193,215 @@ def save_pre(*args, **kwargs):
     database.pickle()
 
 class BPY:
+    @classmethod
+    def FORMAT(cls, prop):
+        return prop.safe_name() if isinstance(prop, Entity) else (prop if isinstance(prop, str) else FORMAT(prop))
+    class Mode:
+        mandatory = bpy.props.BoolProperty(default=False)
+        use = bpy.props.BoolProperty(default=False, update=lambda self, context: self.set_check_use())
+        check_use_value = bpy.props.BoolProperty(default=False)
+        def set_check_use(self):
+            self.check_use_value = True
+        def to_be_stored(self):
+            return self.mandatory or self.use
+        def to_be_assigned(self, arg):
+            self.use = False if self.mandatory else arg is not None 
+            return self.use or self.mandatory
+        def draw(self, layout, text=""):
+            row = layout.row()
+            if not self.mandatory:
+                row.prop(self, "use", text="")
+                if not self.use:
+                    row.label("Use " + text)
+            if self.mandatory or self.use:
+                if 12 < len(text):
+                    row.label(text + ":")
+                    text=""
+                    row = layout.row()
+                row.prop(self, "name", text)
+        def check(self, context):
+            ret = self.check_use_value
+            self.check_use_value = False
+            return ret
+    class InputCardPrototype:
+        name = bpy.props.EnumProperty(items=lambda self, context: enum_input_card(self, context, self.type, {bool: "bool", float: "real", int: "integer", str: "string"}[type(self.value)]),
+            name="Name", description="Select a card, or New to create one",
+            update=lambda self, context: update_input_card(self, context, self.name, self.type, {bool: "bool", float: "real", int: "integer", str: "string"}[type(self.value)]))
+        type = bpy.props.StringProperty(default="Set")
+    class ValueMode(InputCardPrototype, Mode):
+        is_card = bpy.props.BoolProperty(update=lambda self, context: self.set_check_is_card())
+        check_is_card_value = bpy.props.BoolProperty(default=False)
+        value_type = bpy.props.StringProperty()
+        def set_check_is_card(self):
+            self.check_is_card_value = True
+        def assign(self, arg):
+            if self.to_be_assigned(arg):
+                if isinstance(arg, (bool, int, float, str)):
+                    self.is_card = False
+                    self.value = arg
+                else:
+                    self.is_card = True
+                    self.name = arg.name
+                    self.type = arg.type
+        def store(self):
+            if not self.to_be_stored():
+                return None
+            elif self.is_card:
+                return database.input_card.get_by_name(self.name) if self.to_be_stored() else None
+            else:
+                return self.value
+        def draw(self, layout, text=""):
+            row = layout.row()
+            if not self.mandatory:
+                row.prop(self, "use", text="")
+                if not self.use:
+                    row.label("Use " + text)
+            if self.mandatory or self.use:
+                if 12 < len(text):
+                    row.label(text + ":")
+                    text=""
+                    row = layout.row()
+                if self.is_card:
+                    row.prop(self, "name", text=text)
+                else:
+                    row.prop(self, "value", text=text)
+                row.prop(self, "is_card", text="", toggle=True)
+        def check(self, context):
+            ret = self.check_is_card_value
+            self.check_is_card_value = False
+            self.value_type = {bool: "bool", float: "real", int: "integer", str: "string"}[type(self.value)]
+            return ret or super().check(context)
+    class InputCard(bpy.types.PropertyGroup, InputCardPrototype, Mode):
+        def assign(self, arg):
+            if self.to_be_assigned(arg):
+                self.name = arg.name
+                self.type = arg.type
+        def store(self):
+            return database.input_card.get_by_name(self.name) if self.to_be_stored() else None
+        def draw(self, layout, text=""):
+            layout.prop(self, "name", text=text)
+    class Constitutive(bpy.types.PropertyGroup, Mode):
+        name = bpy.props.EnumProperty(items=lambda self, context: enum_constitutive(self, context, self.dimension), name="Name", description="Select a constitutive, or New to create one",
+            update=lambda self, context: update_constitutive(self, context, self.name, self.dimension))
+        dimension = bpy.props.StringProperty()
+        def assign(self, arg):
+            if self.to_be_assigned(arg):
+                self.name = arg.name
+                self.dimension = arg.dimension
+        def store(self):
+            return database.constitutive.get_by_name(self.name) if self.to_be_stored() else None
+    class Drive(bpy.types.PropertyGroup, Mode):
+        name = bpy.props.EnumProperty(items=enum_drive, name="Name", description="Select a drive, or New to create one",
+            update=lambda self, context: update_drive(self, context, self.name))
+        def assign(self, arg):
+            if self.to_be_assigned(arg):
+                self.name = arg.name
+        def store(self):
+            return database.drive.get_by_name(self.name) if self.to_be_stored() else None
+    class Element(bpy.types.PropertyGroup, Mode):
+        name = bpy.props.EnumProperty(items=enum_element, name="Name", description="Select an element, or New to create one",
+            update=lambda self, context: update_element(self, context, self.name))
+        def assign(self, arg):
+            if self.to_be_assigned(arg):
+                self.name = arg.name
+        def store(self):
+            return database.element.get_by_name(self.name) if self.to_be_stored() else None
+    class Segment(bpy.types.PropertyGroup):
+        name = bpy.props.StringProperty()
+        edit = bpy.props.BoolProperty(set=lambda self, value: update_element(self, bpy.context, self.name))
+        def assign(self, arg):
+            self.name = arg.name
+        def store(self):
+            return database.element.get_by_name(self.name)
+    class Friction(bpy.types.PropertyGroup, Mode):
+        name = bpy.props.EnumProperty(items=enum_friction, name="Name", description="Select a friction, or New to create one",
+            update=lambda self, context: update_friction(self, context, self.name))
+        def assign(self, arg):
+            if self.to_be_assigned(arg):
+                self.name = arg.name
+        def store(self):
+            return database.friction.get_by_name(self.name) if self.to_be_stored() else None
+    class Function(bpy.types.PropertyGroup, Mode):
+        name = bpy.props.EnumProperty(items=enum_function, name="Name", description="Select a function, or New to create one",
+            update=lambda self, context: update_function(self, context, self.name))
+        def assign(self, arg):
+            if self.to_be_assigned(arg):
+                self.name = arg.name
+        def store(self):
+            return database.function.get_by_name(self.name) if self.to_be_stored() else None
+    class Matrix(bpy.types.PropertyGroup, Mode):
+        name = bpy.props.EnumProperty(items=lambda self, context: enum_matrix(self, context, self.type), name="Name", description="Select a matrix, or New to create one",
+            update=lambda self, context: update_matrix(self, context, self.name, self.type))
+        type = bpy.props.StringProperty()
+        def assign(self, arg):
+            if self.to_be_assigned(arg):
+                self.type = arg.type
+                self.name = arg.name
+        def store(self):
+            return database.matrix.get_by_name(self.name) if self.to_be_stored() else None
+    class Shape(bpy.types.PropertyGroup, Mode):
+        name = bpy.props.EnumProperty(items=enum_shape, name="Name", description="Select a shape, or New to create one",
+            update=lambda self, context: update_shape(self, context, self.name))
+        def assign(self, arg):
+            if self.to_be_assigned(arg):
+                self.name = arg.name
+        def store(self):
+            return database.shape.get_by_name(self.name) if self.to_be_stored() else None
+    class Scene(bpy.types.PropertyGroup, Mode):
+        name = bpy.props.EnumProperty(items=enum_scenes, name="Name", description="Select a scene, or New to create one",
+            update=lambda self, context: update_scene(self, context, self.name))
+    class Bool(bpy.types.PropertyGroup, ValueMode):
+        value = bpy.props.BoolProperty()
+    class Float(bpy.types.PropertyGroup, ValueMode):
+        value = bpy.props.FloatProperty(min=-9.9e10, max=9.9e10, step=100, precision=6)
+    class Int(bpy.types.PropertyGroup, ValueMode):
+        value = bpy.props.IntProperty()
+    class Str(bpy.types.PropertyGroup, ValueMode):
+        value = bpy.props.StringProperty()
+    class MatrixFloat(bpy.types.PropertyGroup):
+        mandatory = bpy.props.BoolProperty(default=False)
+        type = bpy.props.StringProperty()
+        is_matrix = bpy.props.BoolProperty(update=lambda self, context: self.set_check_is_matrix())
+        check_is_matrix_value = bpy.props.BoolProperty(default=False)
+        def set_check_is_matrix(self):
+            self.check_is_matrix_value = True
+        def assign(self, arg):
+            if arg in database.matrix:
+                self.is_matrix = True
+                self.matrix.assign(arg)
+            else:
+                self.is_matrix = False
+                self.float.assign(arg)
+        def store(self):
+            if self.is_matrix:
+                return self.matrix.store()
+            else:
+                return self.float.store()
+        def draw(self, layout, text=""):
+            self.float.mandatory = self.matrix.mandatory = self.mandatory
+            if self.type == "float":
+                self.is_matrix = False
+                self.float.draw(layout, text)
+            else:
+                self.is_matrix = True
+                self.matrix.type = self.type
+                self.matrix.draw(layout, text)
+        def check(self, context):
+            ret = self.check_is_matrix_value
+            self.check_is_matrix_value = False
+            return ret or self.float.check(context) or self.matrix.check(context)
     class Floats(bpy.types.PropertyGroup):
         value = bpy.props.FloatProperty(min=-9.9e10, max=9.9e10, step=100, precision=6)
     class Names(bpy.types.PropertyGroup):
         value = bpy.props.StringProperty(name="")
         select = bpy.props.BoolProperty(name="")
-    class DriveNames(bpy.types.PropertyGroup):
-        value = bpy.props.EnumProperty(items=enum_drive, name="Drive",
-            update=lambda self, context: update_drive(self, context, self.value))
-        enable_popups = bpy.props.BoolProperty(default=True, options={'HIDDEN'})
-    class FunctionNames(bpy.types.PropertyGroup):
-        value = bpy.props.EnumProperty(items=enum_function, name="Function",
-            update=lambda self, context: update_function(self, context, self.value))
-        enable_popups = bpy.props.BoolProperty(default=True, options={'HIDDEN'})
-    class ObjectNames(bpy.types.PropertyGroup):
-        value = bpy.props.EnumProperty(items=enum_objects, name="Object")
-    klasses = [Floats, Names, DriveNames, FunctionNames, ObjectNames]
+    klasses = [InputCard, Constitutive, Drive, Element, Segment, Friction, Function, Matrix, Shape, Scene, Bool, Int, Float, Str, MatrixFloat, Floats, Names]
     executable_path = "mbdyn"
     plot_data = dict()
     @classmethod
     def register(cls):
+        cls.MatrixFloat.matrix = bpy.props.PointerProperty(type = cls.Matrix)
+        cls.MatrixFloat.float = bpy.props.PointerProperty(type = cls.Float)
         for klass in cls.klasses:
             bpy.utils.register_class(klass)
         bpy.app.handlers.load_post.append(load_post)
@@ -211,6 +410,7 @@ class BPY:
         bpy.types.Scene.dirty_simulator = bpy.props.BoolProperty(default=True)
         bpy.types.Scene.clean_log = bpy.props.BoolProperty(default=False)
         bpy.types.Scene.mbdyn_name = bpy.props.StringProperty()
+        bpy.types.Scene.popups_enabled = bpy.props.BoolProperty(default=False)
         bpy.types.Object.mbdyn_name = bpy.props.StringProperty()
     @classmethod
     def unregister(cls):
@@ -222,26 +422,19 @@ class BPY:
         del bpy.types.Scene.dirty_simulator
         del bpy.types.Scene.clean_log
         del bpy.types.Scene.mbdyn_name
+        del bpy.types.Scene.popups_enabled
         del bpy.types.Object.mbdyn_name
 
 class Entity(Common):
     def __init__(self, name):
         self.type = name
-        self.users = 0
         self.links = list()
-    def unlink_all(self):
-        for link in self.links:
-            if hasattr(link, "consumer"):
-                del link.consumer
-            link.users -= 1
-        self.links.clear()
-    def increment_links(self):
-        for link in self.links:
-            link.users += 1
+    def safe_name(self):
+        return "_".join("_".join(self.name.split(".")).split())
     def edit(self):
         exec("bpy.ops." + root_dot + "e_" + "_".join(self.type.lower().split()) + "('INVOKE_DEFAULT')")
-    def write(self, text):
-        text.write("\t" + self.type + ".write(): FIXME please\n")
+    def write(self, f):
+        f.write("\t" + self.type + ".write(): FIXME please\n")
     def string(self):
         return self.type + ".string(): FIXME please\n"
     def remesh(self):
@@ -259,32 +452,42 @@ class Entity(Common):
             raise Exception("***Model Error: Object " + name + " is not associated with a Node")
         rot = ob.matrix_world.to_quaternion().to_matrix().transposed()
         globalV = self.objects[i].matrix_world.translation - ob.matrix_world.translation
-        return rot, globalV, database.node.index(ob)
-    def write_node(self, text, i, node=False, position=False, orientation=False, p_label="", o_label=""):
+        return rot, globalV, ob
+    def write_node(self, f, i, node=False, position=False, orientation=False, p_label="", o_label=""):
         rot_i, globalV_i, Node_i = self.rigid_offset(i)
         localV_i = rot_i*globalV_i
         rot = self.objects[i].matrix_world.to_quaternion().to_matrix()
         if node:
-            text.write("\t\t" + str(Node_i) + ",\n")
+            f.write("\t\t" + safe_name(Node_i.name) + ",\n")
         if position:
-            text.write("\t\t\t")
+            f.write("\t\t\t")
             if p_label:
-                text.write(p_label + ", ")
-            self.write_vector(localV_i, text)
+                f.write(p_label + ", ")
+            self.write_vector(f, localV_i)
         if orientation:
-            text.write(",\n\t\t\t")
+            f.write(",\n\t\t\t")
             if o_label:
-                text.write(o_label + ", ")
-            text.write("matr,\n")
-            self.write_matrix(rot_i*rot, text, "\t\t\t\t")
+                f.write(o_label + ", ")
+            f.write("matr,\n")
+            self.write_matrix(f, rot_i*rot, "\t\t\t\t")
     def duplicate(self):
-        new_entity = copy(self)
-        if hasattr(self, "objects"):
-            new_entity.objects = copy(self.objects)
-        new_entity.links = copy(self.links)
-        new_entity.increment_links()
-        new_entity.users = 0
-        return new_entity
+        dup = type(self)(self.type)
+        for key, value in vars(self).items():
+            dup.__dict__[key] = value if isinstance(value, Entity) else copy(value)
+        return dup
+
+
+class SegmentList(list):
+    def __init__(self, l=list()):
+        super().__init__(l)
+    def clear(self):
+        for item in self:
+            if isinstance(item, Entity) and hasattr(item, "consumer"):
+                del item.consumer
+        super().clear()
+    def append(self, item):
+        item.consumer = True
+        super().append(item)
 
 class SelectedObjects(list):
     def __init__(self, context):
@@ -362,20 +565,6 @@ class Operator:
         if not enum_default_beam_output(self, context):
             exec("bpy.ops." + root_dot + "c_default_beam_output()")
     """
-    def link_element(self, context, element_name, edit=False):
-        context.scene.element_index = next(i for i, x in enumerate(context.scene.element_uilist)
-            if x.name == element_name)
-        element = database.element[context.scene.element_index]
-        self.entity.links.append(element)
-        if edit:
-            exec("bpy.ops." + root_dot + "e_" + "_".join(element.type.lower().split()) + "('INVOKE_DEFAULT')")
-    """
-    def link_definition(self, context, definition_name):
-        context.scene.definition_index = next(i for i, x in enumerate(context.scene.definition_uilist)
-            if x.name == definition_name)
-        definition = database.definition[context.scene.definition_index]
-        self.entity.links.append(definition)
-    """
     def draw_panel_pre(self, context, layout):
         pass
     def draw_panel_post(self, context, layout):
@@ -424,17 +613,18 @@ class Operators(list):
     def __init__(self, klasses, entity_list):
         for item, klass in klasses.items():
             name = item
-            klass.entity_list = entity_list
+            #klass.entity_list = entity_list
             klass.module = klass.__module__.split(".")[1]
             class Create(bpy.types.Operator, klass):
                 bl_idname = root_dot + "c_" + "_".join(name.lower().split())
                 bl_options = {'REGISTER', 'INTERNAL'}
-                enable_popups = bpy.props.BoolProperty(default=True, options={'HIDDEN'})
                 entity_name = bpy.props.StringProperty(name="Name")
                 def invoke(self, context, event):
+                    context.scene.popups_enabled = False
                     self.prereqs(context)
                     self.entity = self.create_entity()
                     self.entity_name = self.name
+                    context.scene.popups_enabled = True
                     return context.window_manager.invoke_props_dialog(self)
                 def execute(self, context):
                     if not hasattr(self, "entity"):
@@ -442,11 +632,12 @@ class Operators(list):
                         self.entity = self.create_entity()
                         self.entity_name = self.name
                     try:
-                        self.entity.unlink_all()
+                        if hasattr(self.entity, "links"):
+                            self.entity.links.clear()
                         self.store(context)
-                        self.entity.increment_links()
                     except EntityLookupError:
-                        self.entity.unlink_all()
+                        if hasattr(self.entity, "links"):
+                            self.entity.links.clear()
                         self.report({'ERROR'}, "Incomplete (click on each 'New' selector)")
                         return {'CANCELLED'}
                     index, uilist = self.get_uilist(context)
@@ -454,10 +645,10 @@ class Operators(list):
                     uilist.add()
                     self.set_index(context, index)
                     entity_list.append(self.entity)
-                    entity_list[-1].entity_list = entity_list
                     uilist[index].name = self.entity_name
                     context.scene.dirty_simulator = True
                     self.set_index(context, index)
+                    del self.entity
                     return {'FINISHED'}
                 def draw(self, context):
                     self.layout.prop(self, "entity_name")
@@ -466,24 +657,24 @@ class Operators(list):
                 bl_label = " ".join(["Edit:", name, "instance"])
                 bl_idname = root_dot + "e_" + "_".join(name.lower().split())
                 bl_options = {'REGISTER', 'INTERNAL'}
-                enable_popups = bpy.props.BoolProperty(default=False, options={'HIDDEN'})
                 entity_name = bpy.props.StringProperty(name="Name")
                 def invoke(self, context, event):
-                    self.enable_popups = False
+                    context.scene.popups_enabled = False
                     self.prereqs(context)
                     self.index, self.uilist = self.get_uilist(context)
                     self.entity_name = self.uilist[self.index].name
                     self.entity = entity_list[self.index]
                     self.assign(context)
-                    self.enable_popups = True
+                    context.scene.popups_enabled = True
                     return context.window_manager.invoke_props_dialog(self)
                 def execute(self, context):
-                    self.entity.unlink_all()
+                    if hasattr(self.entity, "links"):
+                        self.entity.links.clear()
                     self.store(context)
-                    self.entity.increment_links()
                     context.scene.dirty_simulator = True
                     self.set_index(context, self.index)
                     self.uilist[self.index].name = self.entity_name
+                    del self.entity
                     return {'FINISHED'}
                 def draw(self, context):
                     self.layout.prop(self, "entity_name")
@@ -492,7 +683,6 @@ class Operators(list):
                 bl_label = "Duplicate"
                 bl_idname = root_dot + "d_" + "_".join(name.lower().split())
                 bl_options = {'REGISTER', 'INTERNAL'}
-                attach_duplicate = bpy.props.BoolProperty(default=False)
                 @classmethod
                 def poll(cls, context):
                     return True
@@ -500,19 +690,17 @@ class Operators(list):
                     index, uilist = self.get_uilist(context)
                     self.index = len(uilist)
                     uilist.add()
-                    self.set_index(context, self.index)
-                    if self.attach_duplicate:
+                    if hasattr(database, "to_be_duplicated"):
                         entity = database.to_be_duplicated.duplicate()
-                        del database.to_be_duplicated
                     else:
                         entity = entity_list[index].duplicate()
                     entity_list.append(entity)
+                    self.set_index(context, self.index)
                     uilist[self.index].name = entity.name
                     context.scene.dirty_simulator = True
-                    self.set_index(context, self.index)
-                    if self.attach_duplicate:
+                    if hasattr(database, "to_be_duplicated"):
+                        del database.to_be_duplicated
                         database.dup = entity
-                        self.attach_duplicate = False
                     return {'FINISHED'}
             class Users(bpy.types.Operator, klass):
                 bl_label = "Users"
@@ -534,6 +722,7 @@ class Operators(list):
                     for name, user in zip(self.entity_names, self.users):
                         if name.select:
                             exec("bpy.ops." + root_dot + "e_" + "_".join(user.type.lower().split()) + "('INVOKE_DEFAULT')")
+                    del self.users
                     return {'FINISHED'}
                 def draw(self, context):
                     layout = self.layout
@@ -556,7 +745,6 @@ class Operators(list):
                     index, uilist = self.get_uilist(context)
                     uilist.remove(index)
                     entity = entity_list.pop(index)
-                    del entity.entity_list
                     context.scene.dirty_simulator = True
                     self.set_index(context, 0 if index == 0 and 0 < len(uilist) else index-1)
                     return{'FINISHED'}
@@ -572,9 +760,8 @@ class Operators(list):
                     uilist.add()
                     self.set_index(context, self.index)
                     entity_list.append(database.to_be_linked)
-                    entity_list[-1].entity_list = entity_list
+                    uilist[self.index].name = database.to_be_linked.name
                     del database.to_be_linked
-                    uilist[self.index].name = self.name
                     context.scene.dirty_simulator = True
                     self.set_index(context, self.index)
                     return {'FINISHED'}
@@ -586,7 +773,7 @@ class Operators(list):
                     layout.operator_context = 'INVOKE_DEFAULT'
                     layout.operator(root_dot + "e_" + self.bl_idname[len(root_dot)+2:])
                     layout.operator(root_dot + "s_" + self.bl_idname[len(root_dot)+2:])
-                    if self.module not in "element frame".split():
+                    if self.module != "element" and self.bl_label != "Reference frame":
                         layout.operator(root_dot + "d_" + self.bl_idname[len(root_dot)+2:])
                     if self.module in "element".split():
                         layout.operator(root_dot + "object_specifications")
@@ -602,7 +789,7 @@ class Operators(list):
 class UI(list):
     def __init__(self, entity_tree, klass, entity_list, module_name):
         menu = root_dot + "_".join(entity_tree[0].lower().split())
-        klass.entity_list = entity_list
+        #klass.entity_list = entity_list
         self.make_list = klass.make_list
         self.delete_list = klass.delete_list
         def segments_maker(base, branch):
@@ -643,7 +830,7 @@ class UI(list):
                     uilist[index].name = name
                 entity_list[index].name = name
             name = bpy.props.StringProperty(update=update)
-        class List(bpy.types.UIList, klass):
+        class UIList(bpy.types.UIList, klass):
             bl_idname = module_name
             types = bpy.props.EnumProperty(items=enum_types, name="", description="Show only items of this type")
             test = enum_types
@@ -691,17 +878,16 @@ class UI(list):
             @classmethod
             def poll(self, context):
                 index, uilist = super().get_uilist(context)
-                return len(uilist) > 0 and not entity_list[index].users and entity_list.flags[index]
+                return len(uilist) > 0 and getrefcount(entity_list[index]) == 2 and entity_list.flags[index]
             def execute(self, context):
                 index, uilist = self.get_uilist(context)
                 uilist.remove(index)
                 entity = entity_list.pop(index)
-                for link in entity.links:
-                    if hasattr(link, "consumer"):
-                        del link.consumer
-                    link.users -= 1
                 if entity.type == "Rigid offset":
                     entity.objects[0].parent = None
+                for attr in vars(entity).values():
+                    if isinstance(attr, SegmentList):
+                        attr.clear()
                 context.scene.dirty_simulator = True
                 self.set_index(context, 0 if index == 0 and 0 < len(uilist) else index-1)
                 return{'FINISHED'}
@@ -713,7 +899,7 @@ class UI(list):
             @classmethod
             def poll(self, context):
                 index, uilist = super().get_uilist(context)
-                return len(uilist) > 1 and entity_list.flags[index]
+                return len(uilist) > 0 and entity_list.flags[index]
             def execute(self, context):
                 index, uilist = self.get_uilist(context)
                 flagged = [i for i, v in enumerate(entity_list.flags) if v]
@@ -767,9 +953,9 @@ class UI(list):
                     col.operator(module_name + ".move_down", icon='MOVE_DOWN_VEC', text="")
                 if 0 < len(uilist) and entity_list.flags[index]:
                     col.menu(root_dot + "m_" +
-                        "_".join(self.entity_list[index].type.lower().split()), icon='DOWNARROW_HLT', text="")
+                        "_".join(entity_list[index].type.lower().split()), icon='DOWNARROW_HLT', text="")
                 self.draw_panel_post(context, layout)
-        self.extend([ListItem, List, Delete, MoveUp, MoveDown, Panel])
+        self.extend([ListItem, UIList, Delete, MoveUp, MoveDown, Panel])
     def register(self):
         for klass in self:
             bpy.utils.register_class(klass)

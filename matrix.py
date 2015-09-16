@@ -67,38 +67,27 @@ for t in types:
 class MatrixBase(Base):
     N = None
     subtype = None
-    floats = bpy.props.CollectionProperty(type = BPY.Floats)
-    scale = bpy.props.BoolProperty(name="Scale", description="Scale the vector")
-    factor = bpy.props.FloatProperty(name="Factor", description="Scale factor", default=1.0, min=-9.9e10, max=9.9e10, precision=6)
+    ordinals = {}
+    floats = bpy.props.CollectionProperty(type = BPY.Float)
+    scale = bpy.props.PointerProperty(type = BPY.Float)
     def prereqs(self, context):
+        self.basis = self.subtype
         self.floats.clear()
         for i in range(self.N):
-            self.floats.add()
+            f = self.floats.add()
+            f.mandatory = True
     def assign(self, context):
         self.subtype = self.entity.subtype
-        for i, value in enumerate(self.entity.floats):
-            self.floats[i].value = value
-        self.scale = self.entity.scale
-        self.factor = self.entity.factor
+        for i, f in enumerate(self.entity.floats):
+            self.floats[i].assign(f)
+        self.scale.assign(self.entity.scale)
     def store(self, context):
+        self.basis = self.subtype
         self.entity.subtype = self.subtype
-        self.entity.floats = [f.value for f in self.floats] if self.floats else self.N*[0.0]
-        self.entity.scale = self.scale
-        self.entity.factor = self.factor
-    def draw(self, context):
-        self.basis = (self.subtype, self.scale)
-        layout = self.layout
-        layout.prop(self, "subtype")
-        if self.subtype == "matr":
-            row = layout.row()
-            rowrow = row.row()
-            rowrow.enabled = self.scale
-            rowrow.prop(self, "factor")
-            row.prop(self, "scale")
-            for i in range(self.N):
-                layout.prop(self.floats[i], "value", text="x" + FORMAT(i+1))
+        self.entity.floats = [f.store() if i in self.ordinals[self.subtype] else 0 for i, f in enumerate(self.floats)]
+        self.entity.scale = self.scale.store()
     def check(self, context):
-        return self.basis != (self.subtype, self.scale)
+        return (self.basis != self.subtype) or self.scale.check(context) or True in [f.check(context) for f in self.floats]
 
 class Matrix3x1(Entity):
     def string(self):
@@ -107,9 +96,9 @@ class Matrix3x1(Entity):
         elif self.subtype == "default":
             ret = "\n\t\t\tdefault"
         else:
-            ret = "\n\t\t\t" + ", ".join([FORMAT(v) for v in self.floats])
-            if self.scale:
-                ret += ", scale, " + FORMAT(self.factor)
+            ret = "\n\t\t\t" + ", ".join([BPY.FORMAT(prop) for prop in self.floats])
+            if self.scale is not None:
+                ret += ", scale, " + BPY.FORMAT(self.scale)
         return ret
 
 class Matrix3x1Operator(MatrixBase):
@@ -120,20 +109,20 @@ class Matrix3x1Operator(MatrixBase):
         ("null", "Null", ""),
         ("default", "Default", "")],
         name="Subtype")
+    ordinals = {
+        "matr": [i for i in range(3)],
+        "null": [],
+        "default": []}
     def draw(self, context):
-        self.basis = (self.subtype, self.scale)
         layout = self.layout
         layout.prop(self, "subtype")
         if self.subtype not in "null default".split():
-            row = layout.row()
-            rowrow = row.row()
-            rowrow.enabled = self.scale
-            rowrow.prop(self, "factor")
-            row.prop(self, "scale")
+            self.scale.draw(layout, "Scale")
             for i in range(self.N):
-                layout.prop(self.floats[i], "value", text="x" + FORMAT(i+1))
+                self.floats[i].draw(layout, "x" + str(i+1))
     def create_entity(self):
         return Matrix3x1(self.name)
+
 
 klasses[Matrix3x1Operator.bl_label] = Matrix3x1Operator
 
@@ -143,6 +132,10 @@ class Matrix6x1(Matrix3x1):
 class Matrix6x1Operator(Matrix3x1Operator):
     N = 6
     bl_label = "6x1"
+    ordinals = {
+        "matr": [i for i in range(6)],
+        "null": [],
+        "default": []}
     def create_entity(self):
         return Matrix6x1(self.name)
 
@@ -152,24 +145,23 @@ class Matrix3x3(Entity):
     def string(self):
         if self.subtype == "matr":
             ret = ("\n\t\t\tmatr,\n" +
-            "\t"*4 + ", ".join([FORMAT(v) for v in self.floats[0:3]]) + ",\n" +
-            "\t"*4 + ", ".join([FORMAT(v) for v in self.floats[3:6]]) + ",\n" +
-            "\t"*4 + ", ".join([FORMAT(v) for v in self.floats[6:9]]))
+            "\t"*4 + ", ".join([BPY.FORMAT(prop) for prop in self.floats[0:3]]) + ",\n" +
+            "\t"*4 + ", ".join([BPY.FORMAT(prop) for prop in self.floats[3:6]]) + ",\n" +
+            "\t"*4 + ", ".join([BPY.FORMAT(prop) for prop in self.floats[6:9]]))
         elif self.subtype == "sym":
             ret = ("\n\t\t\tsym,\n" +
-            "\t"*4 + ", ".join([FORMAT(v) for v in self.floats[0:3]]) + ",\n" +
-            "\t"*5 + ", ".join([FORMAT(v) for v in self.floats[4:6]]) + ",\n" +
-            "\t"*6 + FORMAT(self.floats[8]))
+            "\t"*4 + ", ".join([BPY.FORMAT(prop) for prop in self.floats[0:3]]) + ",\n" +
+            "\t"*5 + ", ".join([BPY.FORMAT(prop) for prop in self.floats[4:6]]) + ",\n" +
+            "\t"*6 + BPY.FORMAT(self.floats[8]))
         elif self.subtype == "skew":
-            ret = "\n\t\t\tskew, " + ", ".join([FORMAT(self.floats[i]) for i in [7, 2, 3]])
+            ret = "\n\t\t\tskew, " + ", ".join([BPY.FORMAT(self.floats[i]) for i in [7, 2, 3]])
         elif self.subtype == "diag":
-            ret = "\n\t\t\tdiag, " + ", ".join([FORMAT(self.floats[i]) for i in [0, 4, 8]])
+            ret = "\n\t\t\tdiag, " + ", ".join([BPY.FORMAT(self.floats[i]) for i in [0, 4, 8]])
         elif self.subtype == "eye":
             ret = "\n\t\t\teye"
         elif self.subtype == "null":
             ret = "\n\t\t\tnull"
-        if self.scale:
-            ret += ", scale, " + FORMAT(self.factor)
+        ret += (", scale, " + BPY.FORMAT(self.scale)) if self.scale is not None else ""
         return ret
 
 class Matrix3x3Operator(MatrixBase):
@@ -183,27 +175,27 @@ class Matrix3x3Operator(MatrixBase):
         ("diag", "Diagonal", "Diagonal matrix"),
         ("eye", "Identity", "Identity matrix"),
         ], name="Subtype", default="eye")
+    ordinals = {
+        "matr": [i for i in range(9)],
+        "null": [],
+        "sym": [0,1,2,4,5,8],
+        "skew": [2,3,7],
+        "diag": [0,4,8],
+        "eye": []}
     def draw(self, context):
-        self.basis = (self.subtype, self.scale)
         layout = self.layout
         layout.prop(self, "subtype")
         if self.subtype != "null":
-            row = layout.row()
-            rowrow = row.row()
-            rowrow.enabled = self.scale
-            rowrow.prop(self, "factor")
-            row.prop(self, "scale")
+            self.scale.draw(layout, "Scale")
             if self.subtype != "eye":
                 for i in range(3):
                     row = layout.row()
                     for j in range(3):
                         k = 3*i+j
-                        if ((self.subtype == "sym" and k in [3,6,7])
-                        or (self.subtype == "skew" and k not in [2,3,7])
-                        or (self.subtype == "diag" and k not in [0,4,8])):
-                            row.label("")
+                        if k in self.ordinals[self.subtype]:
+                            self.floats[k].draw(row, "")
                         else:
-                            row.prop(self.floats[k], "value", text="x" + str(k+1))
+                            row.label()
     def create_entity(self):
         return Matrix3x3(self.name)
 
@@ -213,28 +205,28 @@ class Matrix6x6(Entity):
     def string(self):
         if self.subtype == "matr":
             ret = ("\n\t\t\tmatr,\n" +
-            "\t"*4 + ", ".join([FORMAT(v) for v in self.floats[0:6]]) + ",\n" +
-            "\t"*4 + ", ".join([FORMAT(v) for v in self.floats[6:12]]) + ",\n" +
-            "\t"*4 + ", ".join([FORMAT(v) for v in self.floats[12:18]]) + ",\n" +
-            "\t"*4 + ", ".join([FORMAT(v) for v in self.floats[18:24]]) + ",\n" +
-            "\t"*4 + ", ".join([FORMAT(v) for v in self.floats[24:30]]) + ",\n" +
-            "\t"*4 + ", ".join([FORMAT(v) for v in self.floats[30:36]]))
+            "\t"*4 + ", ".join([BPY.FORMAT(prop) for prop in self.floats[0:6]]) + ",\n" +
+            "\t"*4 + ", ".join([BPY.FORMAT(prop) for prop in self.floats[6:12]]) + ",\n" +
+            "\t"*4 + ", ".join([BPY.FORMAT(prop) for prop in self.floats[12:18]]) + ",\n" +
+            "\t"*4 + ", ".join([BPY.FORMAT(prop) for prop in self.floats[18:24]]) + ",\n" +
+            "\t"*4 + ", ".join([BPY.FORMAT(prop) for prop in self.floats[24:30]]) + ",\n" +
+            "\t"*4 + ", ".join([BPY.FORMAT(prop) for prop in self.floats[30:36]]))
         elif self.subtype == "sym":
             ret = ("\n\t\t\tsym,\n" +
-            "\t"*4 + ", ".join([FORMAT(v) for v in self.floats[0:6]]) + ",\n" +
-            "\t"*5 + ", ".join([FORMAT(v) for v in self.floats[7:12]]) + ",\n" +
-            "\t"*6 + ", ".join([FORMAT(v) for v in self.floats[14:18]]) + ",\n" +
-            "\t"*7 + ", ".join([FORMAT(v) for v in self.floats[21:24]]) + ",\n" +
-            "\t"*8 + ", ".join([FORMAT(v) for v in self.floats[28:30]]) + ",\n" +
-            "\t"*9 + FORMAT(self.floats[35]))
+            "\t"*4 + ", ".join([BPY.FORMAT(prop) for prop in self.floats[0:6]]) + ",\n" +
+            "\t"*5 + ", ".join([BPY.FORMAT(prop) for prop in self.floats[7:12]]) + ",\n" +
+            "\t"*6 + ", ".join([BPY.FORMAT(prop) for prop in self.floats[14:18]]) + ",\n" +
+            "\t"*7 + ", ".join([BPY.FORMAT(prop) for prop in self.floats[21:24]]) + ",\n" +
+            "\t"*8 + ", ".join([BPY.FORMAT(prop) for prop in self.floats[28:30]]) + ",\n" +
+            "\t"*9 + BPY.FORMAT(self.floats[35]))
         elif self.subtype == "diag":
-            ret = "\n\t\t\tdiag, " + ", ".join([FORMAT(self.floats[i]) for i in [0,7,14,21,28,35]])
+            ret = "\n\t\t\tdiag, " + ", ".join([BPY.FORMAT(self.floats[i]) for i in [0,7,14,21,28,35]])
         elif self.subtype == "eye":
             ret = "\n\t\t\teye"
         elif self.subtype == "null":
             ret = "\n\t\t\tnull"
-        if self.scale:
-            ret += ", scale, " + FORMAT(self.factor)
+        if self.scale is not None:
+            ret += ", scale, " + BPY.FORMAT(self.scale)
         return ret
 
 class Matrix6x6Operator(MatrixBase):
@@ -247,29 +239,36 @@ class Matrix6x6Operator(MatrixBase):
         ("diag", "Diagonal", "Diagonal matrix"),
         ("eye", "Identity", "Identity matrix"),
         ], name="Subtype", default="eye")
-    @classmethod
-    def poll(cls, context):
-        return True
+    ordinals = {
+        "matr": [i for i in range(36)],
+        "null": [],
+        "sym": [0,1,2,3,4,5,7,8,9,10,11,14,15,16,17,21,22,23,28,29,35],
+        "diag": [0,7,14,21,28,35],
+        "eye": []}
+    show_column = bpy.props.IntProperty(min=1, max=4, name="Show column", default=1)
     def draw(self, context):
-        self.basis = (self.subtype, self.scale)
+        self.basis = self.show_column
         layout = self.layout
         layout.prop(self, "subtype")
         if self.subtype != "null":
-            row = layout.row()
-            rowrow = row.row()
-            rowrow.enabled = self.scale
-            rowrow.prop(self, "factor")
-            row.prop(self, "scale")
+            self.scale.draw(layout, "Scale")
             if self.subtype != "eye":
+                row = layout.row()
+                row.prop(self, "show_column")
+                row.label("to column: " + str(self.show_column +2))
+                row = layout.row()
+                for i in range(3):
+                    row.label(str(self.show_column + i))
                 for i in range(6):
                     row = layout.row()
-                    for j in range(6):
+                    for j in range(self.show_column - 1, self.show_column + 2):
                         k = 6*i+j
-                        if ((self.subtype == "sym" and k in [6,12,13,18,19,20,24,25,26,27,30,31,32,33,34])
-                        or (self.subtype == "diag" and k not in [0,7,14,21,28,35])):
-                            row.label("")
+                        if k in self.ordinals[self.subtype]:
+                            self.floats[k].draw(row, "")
                         else:
-                            row.prop(self.floats[k], "value", text="x" + str(k+1))
+                            row.label()
+    def check(self, context):
+        return (self.basis != self.show_column) or super().check(context)
     def create_entity(self):
         return Matrix6x6(self.name)
 

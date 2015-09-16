@@ -37,6 +37,8 @@ else:
     from tempfile import TemporaryFile
     from time import sleep, clock
     import os
+    #import gc
+
 
 types = ["Initial value"]
 
@@ -351,22 +353,26 @@ class Save(bpy.types.Operator, Base):
             options={'HIDDEN'},
             )
     filepath = bpy.props.StringProperty()
+    first_pass = bpy.props.BoolProperty(default=True)
     def invoke(self, context, event):
-        if not context.blend_data.filepath:
+        if self.first_pass or not context.blend_data.filepath:
+            self.first_pass = False
             self.filepath = "untitled.blend"
             context.window_manager.fileselect_add(self)
             return {'RUNNING_MODAL'}
         self.filepath = context.blend_data.filepath
         return self.execute(context)
     def execute(self, context):
+        self.first_pass = True
         directory = os.path.splitext(self.filepath)[0]
         if not os.path.exists(directory):
             os.mkdir(directory)
         database.simulator[context.scene.simulator_index].write_input_file(context, directory)
         bpy.ops.wm.save_mainfile(filepath=self.filepath)
+        #gc.collect()
         context.scene.dirty_simulator = False
         context.scene.clean_log = False
-        return{'PASS_THROUGH'}
+        return{'FINISHED'}
 BPY.klasses.append(Save)
 
 class Simulate(bpy.types.Operator, Base):

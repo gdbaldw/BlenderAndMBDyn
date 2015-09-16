@@ -27,14 +27,11 @@ if "bpy" in locals():
     imp.reload(bpy)
     imp.reload(Operator)
     imp.reload(Entity)
-    imp.reload(enum_matrix_3x1)
-    imp.reload(bmesh)
     imp.reload(subsurf)
 else:
-    from .base import bpy, root_dot, database, Operator, Entity, Bundle, enum_matrix_3x1, SelectedObjects
-    from .base import update_matrix
+    from .base import bpy, BPY, root_dot, database, Operator, Entity, Bundle, SelectedObjects, update_matrix
     from .common import RhombicPyramid
-    import bmesh
+    from mathutils import Vector
     from copy import copy
 
 types = ["c81 data", "Hydraulic fluid", "Include", "Module load", "Print symbol table", "Reference frame", "Remark", "Set", "Setenv"]
@@ -82,15 +79,33 @@ for t in types:
     klasses[t] = Tester
 
 class ReferenceFrame(Entity):
+    def write(self, f, parent):
+        parent_label = parent.safe_name() if parent else "global"
+        vectors = list()
+        for v in [self.linear_velocity, self.angular_velocity]:
+            if v.subtype in "null default".split():
+                vectors.append(Vector([0., 0., 0.]))
+            else:
+                vectors.append(Vector(v.floats) * (v.scale if v.scale is not None else 1))
+        location = self.objects[0].matrix_world.translation - (parent.objects[0].matrix_world.translation if parent else Vector([0., 0., 0.]))
+        rot = self.objects[0].matrix_world.to_quaternion().to_matrix()
+        rot_parent = parent.objects[0].matrix_world.to_quaternion().to_matrix() if parent else rot
+        orientation = rot_parent.transposed()*rot if parent else rot
+        f.write("reference: " + self.safe_name() + ",\n" + "\treference, " + parent_label + ", ")
+        self.write_vector(f, rot_parent.transposed()*location if parent else location, ",\n")
+        f.write("\treference, " + parent_label + ", matr,\n")
+        self.write_matrix(f, orientation, "\t\t")
+        f.write(",\n\treference, " + parent_label + ", ")
+        self.write_vector(f, orientation*vectors[0], ",\n")
+        f.write("\treference, " + parent_label + ", ")
+        self.write_vector(f, orientation*vectors[1], ";\n")
     def remesh(self):
         RhombicPyramid(self.objects[0])
 
 class ReferenceFrameOperator(Base):
     bl_label = "Reference frame"
-    linear_velocity_name = bpy.props.EnumProperty(items=enum_matrix_3x1, name="Linear velocity vector",
-        update=lambda self, context: update_matrix(self, context, self.linear_velocity_name, "3x1"))
-    angular_velocity_name = bpy.props.EnumProperty(items=enum_matrix_3x1, name="Angular velocity vector",
-        update=lambda self, context: update_matrix(self, context, self.angular_velocity_name, "3x1"))
+    linear_velocity = bpy.props.PointerProperty(type = BPY.Matrix)
+    angular_velocity = bpy.props.PointerProperty(type = BPY.Matrix)
     @classmethod
     def poll(self, context):
         frames = copy(database.input_card.filter("Reference frame"))
@@ -110,20 +125,66 @@ class ReferenceFrameOperator(Base):
                     head = objects[0]
                     frame_objects.remove(objects)
         return head not in selected[1:]
+    def prereqs(self, context):
+        self.linear_velocity.mandatory = True
+        self.angular_velocity.mandatory = True
+        self.linear_velocity.type = "3x1"
+        self.angular_velocity.type = "3x1"
     def assign(self, context):
-        self.linear_velocity_name = self.entity.links[0].name
-        self.angular_velocity_name = self.entity.links[1].name
+        self.linear_velocity.assign(self.entity.linear_velocity)
+        self.angular_velocity.assign(self.entity.angular_velocity)
     def store(self, context):
+        self.entity.linear_velocity = self.linear_velocity.store()
+        self.entity.angular_velocity = self.angular_velocity.store()
         self.entity.objects = SelectedObjects(context)
-        self.entity.links.append(database.matrix.get_by_name(self.linear_velocity_name))
-        self.entity.links.append(database.matrix.get_by_name(self.angular_velocity_name))
     def draw(self, context):
         layout = self.layout
-        layout.prop(self, "linear_velocity_name")
-        layout.prop(self, "angular_velocity_name")
+        self.linear_velocity.draw(layout, "Linear velocity")
+        self.angular_velocity.draw(layout, "Angular velocity")
     def create_entity(self):
         return ReferenceFrame(self.name)
 
 klasses[ReferenceFrameOperator.bl_label] = ReferenceFrameOperator
+
+class Set(Entity):
+    def write(self, f):
+        modifiers = list()
+        if self.ifndef:
+            modifiers.append("ifndef")
+        if self.const:
+            modifiers.append("const")
+        modifiers.append
+        f.write("set: " +
+            ("ifndef " if self.ifndef else "") +
+            ("const " if self.const else "") +
+            self.value_type + " " + self.safe_name() + ((" = " + self.value) if self.value else "") + ";\n")
+
+class SetOperator(Base):
+    bl_label = "Set"
+    ifndef = bpy.props.BoolProperty(name="If not defined", description="Define only if not already defined", default=False)
+    const = bpy.props.BoolProperty(name="Constant", description="Constant value", default=False)
+    value_type = bpy.props.EnumProperty(items=[("bool", "Boolean", ""), ("integer", "Integer", ""), ("real", "Real", ""), ("string", "String", "")], name="Type", default="real")
+    value = bpy.props.StringProperty(name="Value", description="Set value", default="")
+    def assign(self, context):
+        self.ifndef = self.entity.ifndef
+        self.const = self.entity.const
+        self.value_type = self.entity.value_type
+        self.value = self.entity.value
+    def store(self, context):
+        self.entity.ifndef = self.ifndef
+        self.entity.const = self.const
+        self.entity.value_type = self.value_type
+        self.entity.value = self.value
+    def draw(self, context):
+        layout = self.layout
+        layout.prop(self, "value")
+        row = layout.row()
+        row.prop(self, "value_type", text="")
+        row.prop(self, "const")
+        row.prop(self, "ifndef")
+    def create_entity(self):
+        return Set(self.name)
+
+klasses[SetOperator.bl_label] = SetOperator
 
 bundle = Bundle(tree, Base, klasses, database.input_card, "input_card")

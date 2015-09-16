@@ -28,9 +28,7 @@ if "bpy" in locals():
     imp.reload(Operator)
     imp.reload(Entity)
 else:
-    from .base import bpy, root_dot, database, Operator, Entity, Bundle, BPY, enum_drive, enum_function, enum_matrix_3x1, enum_matrix_6x1, enum_matrix_3x3, enum_matrix_6x6, enum_matrix_6xN
-    from .base import update_drive, update_function, update_matrix
-    from .common import FORMAT
+    from .base import bpy, root_dot, database, Operator, Entity, Bundle, BPY
 
 types = [
     "Linear elastic",
@@ -49,7 +47,7 @@ types = [
     "Linear viscoelastic",
     "Linear viscoelastic generic",
     "Linear time variant viscoelastic generic",
-    "Linear viscoelastic generic axial torsion coupling",
+    "Linear viscoelastic generic axial torsion couple",
     "Cubic viscoelastic generic",
     "Double linear viscoelastic",
     "Turbulent viscoelastic",
@@ -75,6 +73,8 @@ klasses = dict()
 class Base(Operator):
     bl_label = "Constitutives"
     bl_options = {'DEFAULT_CLOSED'}
+    dimension_items = [("1D", "1D", ""), ("3D", "3D", ""), ("6D", "6D", "")]
+    dimension = bpy.props.EnumProperty(items=dimension_items, name="Dimension")
     @classmethod
     def poll(cls, context):
         return True
@@ -95,13 +95,14 @@ class Base(Operator):
         if self.bl_idname.endswith("c_" + "_".join(self.name.lower().split())):
             layout.prop(self, "dimension")
         else:
-            layout.label(self.dimension)
+            row = layout.row()
+            row.label("Dimension:")
+            row.label(self.dimension)
+            row.label()
 
 for t in types:
     class Tester(Base):
         bl_label = t
-        dimension_items = [("1D", "1D", ""), ("3D", "3D", ""), ("6D", "6D", "")]
-        dimension = bpy.props.EnumProperty(items=dimension_items, name="Dimension")
         @classmethod
         def poll(cls, context):
             return False
@@ -109,28 +110,106 @@ for t in types:
             return Entity(self.name)
     klasses[t] = Tester
 
-class LinearElastic(Entity):
-    def string(self):
-        if self.dimension == "1D":
-            return "linear elastic, " + FORMAT(self.stiffness)
-        else:
-            return "linear elastic isotropic, " + FORMAT(self.stiffness)
-
-class LinearElasticOperator(Base):
-    bl_label = "Linear elastic"
-    dimension_items = [("1D", "1D", ""), ("3D", "3D", ""), ("6D", "6D", "")]
-    dimension = bpy.props.EnumProperty(items=dimension_items, name="Dimension")
-    stiffness = bpy.props.FloatProperty(name="Stiffness", description="", min=0.000001, max=9.9e10, precision=6, default=1.0)
+class Stiffness(Base):
+    stiffness = bpy.props.PointerProperty(type = BPY.MatrixFloat)
+    def prereqs(self, context):
+        self.stiffness.mandatory = True
     def assign(self, context):
-        self.stiffness = self.entity.stiffness
         self.dimension = self.entity.dimension
+        self.stiffness.assign(self.entity.stiffness)
     def store(self, context):
-        self.entity.stiffness = self.stiffness
         self.entity.dimension = self.dimension
+        self.entity.stiffness = self.stiffness.store()
     def draw(self, context):
+        self.basis = self.dimension
         layout = self.layout
         self.draw_dimension(layout)
-        layout.prop(self, "stiffness")
+        self.stiffness.draw(layout, "Stiffness")
+    def check(self, context):
+        return (self.basis != self.dimension) or self.stiffness.check(context)
+
+class StiffnessN(Base):
+    N = 3
+    stiffness = bpy.props.CollectionProperty(type = BPY.MatrixFloat)
+    def prereqs(self, context):
+        self.stiffness.clear()
+        for i in range(self.N):
+            s = self.stiffness.add()
+            s.mandatory = True
+    def assign(self, context):
+        self.dimension = self.entity.dimension
+        for i, s in enumerate(self.entity.stiffness):
+            self.stiffness[i].assign(s)
+    def store(self, context):
+        self.entity.dimension = self.dimension
+        self.entity.stiffness = [s.store() for s in self.stiffness]
+    def draw(self, context):
+        self.basis = self.dimension
+        layout = self.layout
+        self.draw_dimension(layout)
+        for i in range(self.N):
+            self.stiffness[i].draw(layout, "Stiffness " + str(i+1))
+    def check(self, context):
+        return (self.basis != self.dimension) or True in [s.check(context) for s in self.stiffness]
+
+class Viscosity(Base):
+    viscosity = bpy.props.PointerProperty(type = BPY.MatrixFloat)
+    def prereqs(self, context):
+        self.viscosity.mandatory = True
+    def assign(self, context):
+        self.dimension = self.entity.dimension
+        self.viscosity.assign(self.entity.viscosity)
+    def store(self, context):
+        self.entity.dimension = self.dimension
+        self.entity.viscosity = self.viscosity.store()
+    def draw(self, context):
+        self.basis = self.dimension
+        layout = self.layout
+        self.draw_dimension(layout)
+        self.viscosity.draw(layout, "Viscosity")
+    def check(self, context):
+        return (self.basis != self.dimension) or self.viscosity.check(context)
+
+class StiffnessViscosity(Base):
+    stiffness = bpy.props.PointerProperty(type = BPY.MatrixFloat)
+    proportional = bpy.props.PointerProperty(type = BPY.Float)
+    viscosity = bpy.props.PointerProperty(type = BPY.MatrixFloat)
+    def prereqs(self, context):
+        self.stiffness.mandatory = True
+        self.viscosity.mandatory = True
+    def assign(self, context):
+        self.dimension = self.entity.dimension
+        self.stiffness.assign(self.entity.stiffness)
+        self.proportional.assign(self.entity.proportional)
+        self.viscosity.assign(self.entity.viscosity)
+    def store(self, context):
+        self.entity.dimension = self.dimension
+        self.entity.stiffness = self.stiffness.store()
+        self.entity.proportional = self.proportional.store()
+        self.entity.viscosity = self.viscosity.store() if self.entity.proportional is None else None
+    def draw(self, context):
+        self.basis = self.dimension
+        layout = self.layout
+        self.draw_dimension(layout)
+        self.stiffness.draw(layout, "Stiffness")
+        self.proportional.draw(layout, "Proportional")
+        if not self.proportional.use:
+            self.viscosity.draw(layout, "Viscosity")
+    def check(self, context):
+        return (self.basis != self.dimension) or self.stiffness.check(context) or self.proportional.check(context) or self.viscosity.check(context)
+
+class LinearElastic(Entity):
+    def string(self, indent="\t"):
+        if self.dimension == "1D":
+            return "linear elastic, " + BPY.FORMAT(self.stiffness)
+        else:
+            return "linear elastic isotropic, " + BPY.FORMAT(self.stiffness)
+
+class LinearElasticOperator(Stiffness):
+    bl_label = "Linear elastic"
+    def draw(self, context):
+        self.stiffness.type = {"1D": "float", "3D": "float", "6D": "float"}[self.dimension]
+        super().draw(context)
     def create_entity(self):
         return LinearElastic(self.name)
 
@@ -139,48 +218,15 @@ klasses[LinearElasticOperator.bl_label] = LinearElasticOperator
 class LinearElasticGeneric(Entity):
     def string(self):
         if self.dimension == "1D":
-            return "linear elastic generic, " + FORMAT(self.stiffness)
+            return "linear elastic generic, " + BPY.FORMAT(self.stiffness)
         else:
-            return "linear elastic generic, " + self.links[0].string()
+            return "linear elastic generic, " + self.stiffness.string()
 
-class LinearElasticGenericOperator(Base):
+class LinearElasticGenericOperator(Stiffness):
     bl_label = "Linear elastic generic"
-    dimension_items = [("1D", "1D", ""), ("3D", "3D", ""), ("6D", "6D", "")]
-    dimension = bpy.props.EnumProperty(items=dimension_items, name="Dimension")
-    stiffness = bpy.props.FloatProperty(name="Stiffness", description="", min=0.000001, max=9.9e10, precision=6, default=1.0)
-    stiffness_matrix_3x3_name = bpy.props.EnumProperty(items=enum_matrix_3x3, name="Stiffness",
-        update=lambda self, context: update_matrix(self, context, self.stiffness_matrix_3x3_name, "3x3"))
-    stiffness_matrix_6x6_name = bpy.props.EnumProperty(items=enum_matrix_6x6, name="Stiffness",
-        update=lambda self, context: update_matrix(self, context, self.stiffness_matrix_6x6_name, "6x6"))
-    def assign(self, context):
-        self.dimension = self.entity.dimension
-        if self.dimension == "1D":
-            self.stiffness = self.entity.stiffness
-        elif self.dimension == "3D":
-            self.stiffness_matrix_3x3_name = self.entity.links[0].name
-        else:
-            self.stiffness_matrix_6x6_name = self.entity.links[0].name
-    def store(self, context):
-        self.entity.dimension = self.dimension
-        if self.dimension == "1D":
-            self.entity.stiffness = self.stiffness
-        else:
-            if self.dimension == "3D":
-                self.entity.links.append(database.matrix.get_by_name(self.stiffness_matrix_3x3_name))
-            else:
-                self.entity.links.append(database.matrix.get_by_name(self.stiffness_matrix_6x6_name))
     def draw(self, context):
-        self.basis = self.dimension
-        layout = self.layout
-        self.draw_dimension(layout)
-        if self.dimension == "1D":
-            layout.prop(self, "stiffness")
-        elif self.dimension == "3D":
-            layout.prop(self, "stiffness_matrix_3x3_name")
-        else:
-            layout.prop(self, "stiffness_matrix_6x6_name")
-    def check(self, context):
-        return self.basis != self.dimension
+        self.stiffness.type = {"1D": "float", "3D": "3x3", "6D": "6x6"}[self.dimension]
+        super().draw(context)
     def create_entity(self):
         return LinearElasticGeneric(self.name)
 
@@ -188,29 +234,29 @@ klasses[LinearElasticGenericOperator.bl_label] = LinearElasticGenericOperator
 
 class LinearElasticGenericAxialTorsionCoupling(Entity):
     def string(self):
-        return "linear elastic generic axial torsion coupling," + self.links[0].string() + ",\n\t\t\t" + FORMAT(self.coupling_coefficient)
+        return "linear elastic generic axial torsion coupling," + self.stiffness.string() + ",\n\t\t\t" + BPY.FORMAT(self.coupling_coefficient)
                 
-class LinearElasticGenericAxialTorsionCouplingOperator(Base):
+class LinearElasticGenericAxialTorsionCouplingOperator(Stiffness):
     bl_label = "Linear elastic generic axial torsion coupling"
     dimension_items = [("6D", "6D", "")]
     dimension = bpy.props.EnumProperty(items=dimension_items, name="Dimension")
-    coupling_coefficient = bpy.props.FloatProperty(name="Coupling coefficient", description="", min=0.000001, max=9.9e10, precision=6, default=1.0)
-    stiffness_matrix_6x1_name = bpy.props.EnumProperty(items=enum_matrix_6x1, name="Stiffness",
-        update=lambda self, context: update_matrix(self, context, self.stiffness_matrix_6x1_name, "6x1"))
+    coupling_coefficient = bpy.props.PointerProperty(type = BPY.Float)
+    def prereqs(self, context):
+        self.coupling_coefficient.mandatory = True
+        self.coupling_coefficient.assign(1.0)
+        super().prereqs(context)
     def assign(self, context):
-        self.dimension = self.entity.dimension
-        self.coupling_coefficient = self.entity.coupling_coefficient
-        self.stiffness_matrix_6x1_name = self.entity.links[0].name
+        self.coupling_coefficient.assign(self.entity.coupling_coefficient)
+        super().assign(context)
     def store(self, context):
-        self.entity.dimension = self.dimension
-        self.entity.coupling_coefficient = self.coupling_coefficient
-        self.entity.links.append(database.matrix.get_by_name(self.stiffness_matrix_6x1_name))
+        self.entity.coupling_coefficient = self.coupling_coefficient.store()
+        super().store(context)
     def draw(self, context):
-        self.basis = self.dimension
-        layout = self.layout
-        self.draw_dimension(layout)
-        layout.prop(self, "coupling_coefficient")
-        layout.prop(self, "stiffness_matrix_6x1_name")
+        self.stiffness.type = {"6D": "6x1"}[self.dimension]
+        super().draw(context)
+        self.coupling_coefficient.draw(self.layout, "Coupling Coefficient")
+    def check(self, context):
+        return self.coupling_coefficient.check(context) or super().check(context)
     def create_entity(self):
         return LinearElasticGenericAxialTorsionCoupling(self.name)
 
@@ -218,59 +264,21 @@ klasses[LinearElasticGenericAxialTorsionCouplingOperator.bl_label] = LinearElast
 
 class CubicElasticGeneric(Entity):
     def string(self):
-        ret = "cubic elastic generic"
+        ret = "cubic elastic generic, "
         if self.dimension == "1D":
-            for stiffness in [self.stiffness_1, self.stiffness_2, self.stiffness_3]:
-                ret += ", " + FORMAT(stiffness)
+            ret += ", ".join([BPY.FORMAT(s) for s in self.stiffness])
         else:
-            for link in self.links:
-                ret += "," + link.string()
+            ret += ", ".join([s.string() for s in self.stiffness])
         return ret
 
-class CubicElasticGenericOperator(Base):
+class CubicElasticGenericOperator(StiffnessN):
     bl_label = "Cubic elastic generic"
     dimension_items = [("1D", "1D", ""), ("3D", "3D", "")]
     dimension = bpy.props.EnumProperty(items=dimension_items, name="Dimension")
-    stiffness_1 = bpy.props.FloatProperty(name="Stiffness 1", description="", min=0.000001, max=9.9e10, precision=6, default=1.0)
-    stiffness_2 = bpy.props.FloatProperty(name="Stiffness 2", description="", min=0.000001, max=9.9e10, precision=6, default=1.0)
-    stiffness_3 = bpy.props.FloatProperty(name="Stiffness 3", description="", min=0.000001, max=9.9e10, precision=6, default=1.0)
-    stiffness_matrix_3x1_1_name = bpy.props.EnumProperty(items=enum_matrix_3x1, name="Stiffness 1",
-        update=lambda self, context: update_matrix(self, context, self.stiffness_matrix_3x1_1_name, "3x1"))
-    stiffness_matrix_3x1_2_name = bpy.props.EnumProperty(items=enum_matrix_3x1, name="Stiffness 2",
-        update=lambda self, context: update_matrix(self, context, self.stiffness_matrix_3x1_2_name, "3x1"))
-    stiffness_matrix_3x1_3_name = bpy.props.EnumProperty(items=enum_matrix_3x1, name="Stiffness 3",
-        update=lambda self, context: update_matrix(self, context, self.stiffness_matrix_3x1_3_name, "3x1"))
-    def assign(self, context):
-        self.dimension = self.entity.dimension
-        if self.dimension == "1D":
-            self.stiffness_1 = self.entity.stiffness_1
-            self.stiffness_2 = self.entity.stiffness_2
-            self.stiffness_3 = self.entity.stiffness_3
-        else:
-            self.stiffness_matrix_3x1_1_name = self.entity.links[0].name
-            self.stiffness_matrix_3x1_2_name = self.entity.links[1].name
-            self.stiffness_matrix_3x1_3_name = self.entity.links[2].name
-    def store(self, context):
-        self.entity.dimension = self.dimension
-        if self.dimension == "1D":
-            self.entity.stiffness_1 = self.stiffness_1
-            self.entity.stiffness_2 = self.stiffness_2
-            self.entity.stiffness_3 = self.stiffness_3
-        else:
-            for matrix_name in [self.stiffness_matrix_3x1_1_name, self.stiffness_matrix_3x1_2_name, self.stiffness_matrix_3x1_3_name]:
-                self.entity.links.append(database.matrix.get_by_name(matrix_name))
     def draw(self, context):
-        self.basis = self.dimension
-        layout = self.layout
-        self.draw_dimension(layout)
-        if self.dimension == "1D":
-            for c in "123":
-                layout.prop(self, "stiffness_" + c)
-        else:
-            for c in "123":
-                layout.prop(self, "stiffness_matrix_3x1_" + c + "_name")
-    def check(self, context):
-        return self.basis != self.dimension
+        for s in self.stiffness:
+            s.type = {"1D": "float", "3D": "3x1"}[self.dimension]
+        super().draw(context)
     def create_entity(self):
         return CubicElasticGeneric(self.name)
 
@@ -278,27 +286,28 @@ klasses[CubicElasticGenericOperator.bl_label] = CubicElasticGenericOperator
 
 class InverseSquareElastic(Entity):
     def string(self):
-        return "inverse square elastic, " + FORMAT(self.stiffness) + ", " + FORMAT(self.ref_length)
+        return "inverse square elastic, " + BPY.FORMAT(self.stiffness) + ", " + BPY.FORMAT(self.reference_length)
 
-class InverseSquareElasticOperator(Base):
+class InverseSquareElasticOperator(Stiffness):
     bl_label = "Inverse square elastic"
     dimension_items = [("1D", "1D", ""), ]
     dimension = bpy.props.EnumProperty(items=dimension_items, name="Dimension")
-    stiffness = bpy.props.FloatProperty(name="Stiffness", description="", min=0.000001, max=9.9e10, precision=6, default=1.0)
-    ref_length = bpy.props.FloatProperty(name="Reference length", description="", min=0.000001, max=9.9e10, precision=6, default=1.0)
+    reference_length = bpy.props.PointerProperty(type = BPY.Float)
+    def prereqs(self, context):
+        self.reference_length.mandatory = True
+        super().prereqs(context)
     def assign(self, context):
-        self.stiffness = self.entity.stiffness
-        self.ref_length = self.entity.ref_length
-        self.dimension = self.entity.dimension
+        self.reference_length.assign(self.entity.ref_length)
+        super().assign(context)
     def store(self, context):
-        self.entity.stiffness = self.stiffness
-        self.entity.ref_length = self.ref_length
-        self.entity.dimension = self.dimension
+        self.entity.reference_length = self.reference_length.store()
+        super().store(context)
     def draw(self, context):
-        layout = self.layout
-        self.draw_dimension(layout)
-        layout.prop(self, "stiffness")
-        layout.prop(self, "ref_length")
+        self.stiffness.type = {"1D": "float"}[self.dimension]
+        super().draw(context)
+        self.reference_length.draw(layout, "Reference lendth")
+    def check(self, context):
+        return self.reference_length.check(context) or super().check(context)
     def create_entity(self):
         return InverseSquareElastic(self.name)
 
@@ -306,23 +315,15 @@ klasses[InverseSquareElasticOperator.bl_label] = InverseSquareElasticOperator
 
 class LogElastic(Entity):
     def string(self):
-        return "log elastic, " + FORMAT(self.stiffness)
+        return "log elastic, " + BPY.FORMAT(self.stiffness)
 
-class LogElasticOperator(Base):
+class LogElasticOperator(Stiffness):
     bl_label = "Log elastic"
     dimension_items = [("1D", "1D", ""), ]
     dimension = bpy.props.EnumProperty(items=dimension_items, name="Dimension")
-    stiffness = bpy.props.FloatProperty(name="Stiffness", description="", min=0.000001, max=9.9e10, precision=6, default=1.0)
-    def assign(self, context):
-        self.stiffness = self.entity.stiffness
-        self.dimension = self.entity.dimension
-    def store(self, context):
-        self.entity.stiffness = self.stiffness
-        self.entity.dimension = self.dimension
     def draw(self, context):
-        layout = self.layout
-        self.draw_dimension(layout)
-        layout.prop(self, "stiffness")
+        self.stiffness.type = {"1D": "float"}[self.dimension]
+        super().draw(context)
     def create_entity(self):
         return LogElastic(self.name)
 
@@ -332,66 +333,42 @@ class LinearElasticBistop(Entity):
     def string(self):
         ret = "linear elastic bistop"
         if self.dimension == "1D":
-            ret += ",\n\t\t\t" + FORMAT(self.stiffness)
+            ret += ",\n\t\t\t" + BPY.FORMAT(self.stiffness)
         else:
-            ret += ", " + self.links[2].string()
+            ret += ", " + self.stiffness.string()
         ret += ",\n\t\t\tinitial status, " + self.initial_status
-        for link in self.links[:2]:
-            ret += ",\n\t\t\t" + link.string()
+        for drive in [self.activating_condition, self.activating_condition]:
+            ret += ",\n\t\t\treference, " + drive.safe_name()
         return ret
 
-class LinearElasticBistopOperator(Base):
+class LinearElasticBistopOperator(Stiffness):
     bl_label = "Linear elastic bistop"
-    dimension_items = [("1D", "1D", ""), ("3D", "3D", ""), ("6D", "6D", "")]
-    dimension = bpy.props.EnumProperty(items=dimension_items, name="Dimension")
-    stiffness = bpy.props.FloatProperty(name="Stiffness", description="", min=0.000001, max=9.9e10, precision=6, default=1.0)
-    stiffness_matrix_3x3_name = bpy.props.EnumProperty(items=enum_matrix_3x3, name="Stiffness",
-        update=lambda self, context: update_matrix(self, context, self.stiffness_matrix_3x3_name, "3x3"))
-    stiffness_matrix_6x6_name = bpy.props.EnumProperty(items=enum_matrix_6x6, name="Stiffness",
-        update=lambda self, context: update_matrix(self, context, self.stiffness_matrix_6x6_name, "6x6"))
     initial_status = bpy.props.EnumProperty(items=[("active", "Active", ""), ("inactive", "Inactive", "")], name="Initial status")
-    activating_condition_name = bpy.props.EnumProperty(items=enum_drive, name="Activating condition",
-        update=lambda self, context: update_drive(self, context, self.activating_condition_name))
-    deactivating_condition_name = bpy.props.EnumProperty(items=enum_drive, name="Deactivating condition",
-        update=lambda self, context: update_drive(self, context, self.deactivating_condition_name))
+    activating_condition = bpy.props.PointerProperty(type = BPY.Drive)
+    deactivating_condition = bpy.props.PointerProperty(type = BPY.Drive)
+    def prereqs(self, context):
+        self.activating_condition.mandatory = True
+        self.deactivating_condition.mandatory = True
+        super().prereqs(context)
     def assign(self, context):
-        self.dimension = self.entity.dimension
         self.initial_status = self.entity.initial_status
-        self.activating_condition_name = self.entity.links[0].name
-        self.deactivating_condition_name = self.entity.links[1].name
-        if self.dimension == "1D":
-            self.stiffness = self.entity.stiffness
-        elif self.dimension == "3D":
-            self.stiffness_matrix_3x3_name = self.entity.links[2].name
-        else:
-            self.stiffness_matrix_6x6_name = self.entity.links[2].name
+        self.activating_condition.assign(self.entity.activating_condition)
+        self.deactivating_condition.assign(self.entity.deactivating_condition)
+        super().assign(context)
     def store(self, context):
-        self.entity.dimension = self.dimension
         self.entity.initial_status = self.initial_status
-        self.entity.links.append(database.drive.get_by_name(self.activating_condition_name))
-        self.entity.links.append(database.drive.get_by_name(self.deactivating_condition_name))
-        if self.dimension == "1D":
-            self.entity.stiffness = self.stiffness
-        else:
-            if self.dimension == "3D":
-                self.entity.links.append(database.matrix.get_by_name(self.stiffness_matrix_3x3_name))
-            else:
-                self.entity.links.append(database.matrix.get_by_name(self.stiffness_matrix_6x6_name))
+        self.entity.activating_condition = self.activating_condition.store()
+        self.entity.deactivating_condition = self.deactivating_condition.store()
+        super().store(context)
     def draw(self, context):
-        self.basis = self.dimension
+        self.stiffness.type = {"1D": "float", "3D": "3x3", "6D": "6x6"}[self.dimension]
+        super().draw(context)
         layout = self.layout
-        self.draw_dimension(layout)
-        if self.dimension == "1D":
-            layout.prop(self, "stiffness")
-        elif self.dimension == "3D":
-            layout.prop(self, "stiffness_matrix_3x3_name")
-        else:
-            layout.prop(self, "stiffness_matrix_6x6_name")
         layout.prop(self, "initial_status")
-        for s in "activating deactivating".split():
-            layout.prop(self, s + "_condition_name")
+        self.activating_condition.draw(layout, "Activating condition")
+        self.deactivating_condition.draw(layout, "Deactivatating condition")
     def check(self, context):
-        return self.basis != self.dimension
+        return super().check(context) or self.activating_condition.check(context) or self.deactivating_condition.check(context)
     def create_entity(self):
         return LinearElasticBistop(self.name)
 
@@ -401,61 +378,43 @@ class DoubleLinearElastic(Entity):
     def string(self):
         ret = "double linear elastic"
         if self.dimension == "1D":
-            ret += ", " + FORMAT(self.stiffness_1)
-            ret += ", " + FORMAT(self.upper_strain) + ", " + FORMAT(self.lower_strain)
-            ret += ", " + FORMAT(self.stiffness_2)
+            ret += ", " + BPY.FORMAT(self.stiffness[0])
+            ret += ", " + BPY.FORMAT(self.upper_strain) + ", " + BPY.FORMAT(self.lower_strain)
+            ret += ", " + BPY.FORMAT(self.stiffness[1])
         else:
-            ret += "," + self.links[0].string()
-            ret += ",\n\t\t\t" + FORMAT(self.upper_strain) + ", " + FORMAT(self.lower_strain)
-            ret += "," + self.links[1].string()
+            ret += "," + self.stiffness[0].string()
+            ret += ",\n\t\t\t" + BPY.FORMAT(self.upper_strain) + ", " + BPY.FORMAT(self.lower_strain)
+            ret += "," + self.stiffness[1].string()
         return ret
 
-class DoubleLinearElasticOperator(Base):
+class DoubleLinearElasticOperator(StiffnessN):
+    N = 2
     bl_label = "Double linear elastic"
     dimension_items = [("1D", "1D", ""), ("3D", "3D", "")]
     dimension = bpy.props.EnumProperty(items=dimension_items, name="Dimension")
-    stiffness_1 = bpy.props.FloatProperty(name="Stiffness 1", description="", min=0.000001, max=9.9e10, precision=6, default=1.0)
-    stiffness_2 = bpy.props.FloatProperty(name="Stiffness 2", description="", min=0.000001, max=9.9e10, precision=6, default=1.0)
-    upper_strain = bpy.props.FloatProperty(name="Upper strain", description="", min=0.000001, max=9.9e10, precision=6)
-    lower_strain = bpy.props.FloatProperty(name="Lower strain", description="", min=0.000001, max=9.9e10, precision=6)
-    stiffness_matrix_3x1_1_name = bpy.props.EnumProperty(items=enum_matrix_3x1, name="Stiffness 1",
-        update=lambda self, context: update_matrix(self, context, self.stiffness_matrix_3x1_1_name, "3x1"))
-    stiffness_matrix_3x1_2_name = bpy.props.EnumProperty(items=enum_matrix_3x1, name="Stiffness 2",
-        update=lambda self, context: update_matrix(self, context, self.stiffness_matrix_3x1_2_name, "3x1"))
+    upper_strain = bpy.props.PointerProperty(type = BPY.Float)
+    lower_strain = bpy.props.PointerProperty(type = BPY.Float)
+    def prereqs(self, context):
+        self.upper_strain.mandatory = True
+        self.lower_strain.mandatory = True
+        super().prereqs(context)
     def assign(self, context):
-        self.dimension = self.entity.dimension
-        self.upper_strain = self.entity.upper_strain
-        self.lower_strain = self.entity.lower_strain
-        if self.dimension == "1D":
-            self.stiffness_1 = self.entity.stiffness_1
-            self.stiffness_2 = self.entity.stiffness_2
-        else:
-            self.stiffness_matrix_3x1_1_name = self.entity.links[0].name
-            self.stiffness_matrix_3x1_2_name = self.entity.links[1].name
+        self.upper_strain.assign(self.entity.upper_strain)
+        self.lower_strain.assign(self.entity.lower_strain)
+        super().assign(context)
     def store(self, context):
-        self.entity.dimension = self.dimension
-        self.entity.upper_strain = self.upper_strain
-        self.entity.lower_strain = self.lower_strain
-        if self.dimension == "1D":
-            self.entity.stiffness_1 = self.stiffness_1
-            self.entity.stiffness_2 = self.stiffness_2
-        else:
-            self.entity.links.append(database.matrix.get_by_name(self.stiffness_matrix_3x1_1_name))
-            self.entity.links.append(database.matrix.get_by_name(self.stiffness_matrix_3x1_2_name))
+        self.entity.upper_strain = self.upper_strain.store()
+        self.entity.lower_strain = self.lower_strain.store()
+        super().store(context)
     def draw(self, context):
-        self.basis = self.dimension
+        for s in self.stiffness:
+            s.type = {"1D": "float", "3D": "3x1"}[self.dimension]
+        super().draw(context)
         layout = self.layout
-        self.draw_dimension(layout)
-        if self.dimension == "1D":
-            for c in "12":
-                layout.prop(self, "stiffness_" + c)
-        else:
-            for c in "12":
-                layout.prop(self, "stiffness_matrix_3x1_" + c + "_name")
-        layout.prop(self, "upper_strain")
-        layout.prop(self, "lower_strain")
+        self.upper_strain.draw(layout, "Upper strain")
+        self.lower_strain.draw(layout, "Lower strain")
     def check(self, context):
-        return self.basis != self.dimension
+        return super().check(context) or self.upper_strain.check(context) or self.lower_strain.check(context)
     def create_entity(self):
         return DoubleLinearElastic(self.name)
 
@@ -465,65 +424,36 @@ class IsotropicHardeningElastic(Entity):
     def string(self):
         ret = "isotropic hardening elastic"
         if self.dimension == "1D":
-            ret += ",\n\t\t\t" + FORMAT(self.stiffness)
+            ret += ",\n\t\t\t" + BPY.FORMAT(self.stiffness)
         else:
-            ret += ", " + self.links[0].string()
-        ret += ",\n\t\t\t" + FORMAT(self.reference_strain)
-        if self.use_linear_stiffness:
-            ret += ", linear stiffness, " + FORMAT(self.linear_stiffness)
+            ret += ", " + self.stiffness.string()
+        ret += ",\n\t\t\t" + BPY.FORMAT(self.reference_strain)
+        if self.linear_stiffness is not None:
+            ret += ", linear stiffness, " + BPY.FORMAT(self.linear_stiffness)
         return ret
 
-class IsotropicHardeningElasticOperator(Base):
+class IsotropicHardeningElasticOperator(Stiffness):
     bl_label = "Isotropic hardening elastic"
-    dimension_items = [("1D", "1D", ""), ("3D", "3D", ""), ("6D", "6D", "")]
-    dimension = bpy.props.EnumProperty(items=dimension_items, name="Dimension")
-    stiffness = bpy.props.FloatProperty(name="Stiffness", description="", min=0.000001, max=9.9e10, precision=6, default=1.0)
-    stiffness_matrix_3x3_name = bpy.props.EnumProperty(items=enum_matrix_3x3, name="Stiffness",
-        update=lambda self, context: update_matrix(self, context, self.stiffness_matrix_3x3_name, "3x3"))
-    stiffness_matrix_6x6_name = bpy.props.EnumProperty(items=enum_matrix_6x6, name="Stiffness",
-        update=lambda self, context: update_matrix(self, context, self.stiffness_matrix_6x6_name, "3x3"))
-    reference_strain = bpy.props.FloatProperty(name="Reference strain", description="", min=0.000001, max=9.9e10, precision=6, default=1.0)
-    use_linear_stiffness = bpy.props.BoolProperty("Use linear stiffness", default=False)
-    linear_stiffness = bpy.props.FloatProperty(name="Reference strain", description="", min=0.000001, max=9.9e10, precision=6, default=1.0)
+    reference_strain = bpy.props.PointerProperty(type = BPY.Float)
+    linear_stiffness = bpy.props.PointerProperty(type = BPY.Float)
+    def prereqs(self, context):
+        self.reference_strain.mandatory = True
+        super().prereqs(context)
     def assign(self, context):
-        self.dimension = self.entity.dimension
-        self.reference_strain = self.entity.reference_strain
-        self.use_linear_stiffness = self.entity.use_linear_stiffness
-        self.linear_stiffness = self.entity.linear_stiffness
-        if self.dimension == "1D":
-            self.stiffness = self.entity.stiffness
-        elif self.dimension == "3D":
-            self.stiffness_matrix_3x3_name = self.entity.links[0].name
-        else:
-            self.stiffness_matrix_6x6_name = self.entity.links[0].name
+        self.reference_strain.assign(self.entity.reference_strain)
+        self.linear_stiffness.assign(self.entity.linear_stiffness)
+        super().assign(context)
     def store(self, context):
-        self.entity.dimension = self.dimension
-        self.entity.reference_strain = self.reference_strain
-        self.entity.use_linear_stiffness = self.use_linear_stiffness
-        self.entity.linear_stiffness = self.linear_stiffness
-        if self.dimension == "1D":
-            self.entity.stiffness = self.stiffness
-        else:
-            if self.dimension == "3D":
-                self.entity.links.append(database.matrix.get_by_name(self.stiffness_matrix_3x3_name))
-            else:
-                self.entity.links.append(database.matrix.get_by_name(self.stiffness_matrix_6x6_name))
+        self.entity.reference_strain = self.reference_strain.store()
+        self.entity.linear_stiffness = self.linear_stiffness.store()
+        super().store(context)
     def draw(self, context):
-        self.basis = (self.dimension, self.use_linear_stiffness)
-        layout = self.layout
-        self.draw_dimension(layout)
-        if self.dimension == "1D":
-            layout.prop(self, "stiffness")
-        elif self.dimension == "3D":
-            layout.prop(self, "stiffness_matrix_3x3_name")
-        else:
-            layout.prop(self, "stiffness_matrix_6x6_name")
-        layout.prop(self, "reference_strain")
-        layout.prop(self, "use_linear_stiffness")
-        if self.use_linear_stiffness:
-            layout.prop(self, "linear_stiffness")
+        self.stiffness.type = {"1D": "float", "3D": "3x3", "6D": "6x6"}[self.dimension]
+        super().draw(context)
+        self.reference_strain.draw(self.layout, "Reference strain")
+        self.linear_stiffness.draw(self.layout, "Linear stiffness")
     def check(self, context):
-        return self.basis != (self.dimension, self.use_linear_stiffness)
+        return self.reference_strain.check(context) or self.linear_stiffness.check(context) or super().check(context)
     def create_entity(self):
         return IsotropicHardeningElastic(self.name)
 
@@ -532,26 +462,28 @@ klasses[IsotropicHardeningElasticOperator.bl_label] = IsotropicHardeningElasticO
 class ScalarFunctionElasticIsotropic(Entity):
     def string(self):
         if self.dimension == "1D":
-            return "scalar function elastic, \"" + self.links[0].name + "\""
+            return "scalar function elastic, \"" + self.function.name + "\""
         else:
-            return "scalar function elastic isotropic, \"" + self.links[0].name + "\""
+            return "scalar function elastic isotropic, \"" + self.function.name + "\""
 
 class ScalarFunctionElasticIsotropicOperator(Base):
     bl_label = "Scalar function elastic isotropic"
-    dimension_items = [("1D", "1D", ""), ("3D", "3D", ""), ("6D", "6D", "")]
-    dimension = bpy.props.EnumProperty(items=dimension_items, name="Dimension")
-    function_name = bpy.props.EnumProperty(items=enum_function, name="Function",
-        update=lambda self, context: update_function(self, context, self.function_name))
+    function = bpy.props.PointerProperty(type = BPY.Function)
+    def prereqs(self, context):
+        self.function.mandatory = True
     def assign(self, context):
         self.dimension = self.entity.dimension
-        self.function_name = self.entity.links[0].name
+        self.function.assign(self.entity.function)
     def store(self, context):
         self.entity.dimension = self.dimension
-        self.entity.links.append(database.function.get_by_name(self.function_name))
+        self.entity.function = self.function.store()
     def draw(self, context):
+        self.basis = self.dimension
         layout = self.layout
         self.draw_dimension(layout)
-        layout.prop(self, "function_name")
+        self.function.draw(layout, "Function")
+    def check(self, context):
+        return (self.basis != self.dimension) or self.function.check(context)
     def create_entity(self):
         return ScalarFunctionElasticIsotropic(self.name)
 
@@ -563,72 +495,52 @@ class ScalarFunctionElasticOrthotropic(Entity):
         if self.dimension != "1D":
             ret += " orthotropic"
         for i in range(int(self.dimension[0])):
-            if self.is_null[i]:
+            if self.function[i] is None:
                 ret += ",\n\t\t\tnull"
             else:
-                ret += ",\n\t\t\t\"" + self.links[i].name + "\""
+                ret += ",\n\t\t\t\"" + self.function[i].name + "\""
         return ret
 
 class ScalarFunctionElasticOrthotropicOperator(Base):
     bl_label = "Scalar function elastic orthotropic"
-    dimension_items = [("1D", "1D", ""), ("3D", "3D", ""), ("6D", "6D", "")]
-    dimension = bpy.props.EnumProperty(items=dimension_items, name="Dimension")
-    is_null = bpy.props.BoolVectorProperty(size=6, name="Null")
-    function_names = bpy.props.CollectionProperty(type=BPY.FunctionNames, name="Functions")
+    N = 6
+    function = bpy.props.CollectionProperty(type = BPY.Function)
     def prereqs(self, context):
-        self.function_names.clear()
-        for i in range(6):
-            self.function_names.add()
+        self.function.clear()
+        for i in range(self.N):
+            s = self.function.add()
     def assign(self, context):
         self.dimension = self.entity.dimension
-        self.is_null = self.entity.is_null
-        for i, link in enumerate(self.entity.links):
-            self.function_names[i].enable_popups = False
-            self.function_names[i].value = link.name
-            self.function_names[i].enable_popups = True
+        for i, s in enumerate(self.entity.function):
+            self.function[i].assign(s)
     def store(self, context):
         self.entity.dimension = self.dimension
-        self.entity.is_null = [v for v in self.is_null]
-        for f in self.function_names[:int(self.dimension[0])]:
-            self.entity.links.append(database.function.get_by_name(f.value))
+        self.entity.function = [s.store() for s in self.function]
     def draw(self, context):
-        self.basis = (self.dimension, [v for v in self.is_null])
+        self.basis = self.dimension
         layout = self.layout
         self.draw_dimension(layout)
         for i in range(int(self.dimension[0])):
-            row = layout.row()
-            row.prop(self, "is_null", index=i)
-            if not self.is_null[i]:
-                row.prop(self.function_names[i], "value", text="")
+            self.function[i].draw(layout, "Function " + str(i+1))
     def check(self, context):
-        return self.basis[0] != self.dimension or [True for i, v in enumerate(self.basis[1]) if v != self.is_null[i]]
+        return (self.basis != self.dimension) or True in [s.check(context) for s in self.function]
     def create_entity(self):
         return ScalarFunctionElasticOrthotropic(self.name)
 
 klasses[ScalarFunctionElasticOrthotropicOperator.bl_label] = ScalarFunctionElasticOrthotropicOperator
 
 class LinearViscous(Entity):
-    def string(self):
+    def string(self, indent="\t"):
         if self.dimension == "1D":
-            return "linear viscous, " + FORMAT(self.viscosity)
+            return "linear viscous, " + BPY.FORMAT(self.viscosity)
         else:
-            return "linear viscous isotropic, " + FORMAT(self.viscosity)
+            return "linear viscous isotropic, " + BPY.FORMAT(self.viscosity)
 
-class LinearViscousOperator(Base):
+class LinearViscousOperator(Viscosity):
     bl_label = "Linear viscous"
-    dimension_items = [("1D", "1D", ""), ("3D", "3D", ""), ("6D", "6D", "")]
-    dimension = bpy.props.EnumProperty(items=dimension_items, name="Dimension")
-    viscosity = bpy.props.FloatProperty(name="Viscosity", description="", min=0.000001, max=9.9e10, precision=6, default=1.0)
-    def assign(self, context):
-        self.viscosity = self.entity.viscosity
-        self.dimension = self.entity.dimension
-    def store(self, context):
-        self.entity.viscosity = self.viscosity
-        self.entity.dimension = self.dimension
     def draw(self, context):
-        layout = self.layout
-        self.draw_dimension(layout)
-        layout.prop(self, "viscosity")
+        self.viscosity.type = {"1D": "float", "3D": "float", "6D": "float"}[self.dimension]
+        super().draw(context)
     def create_entity(self):
         return LinearViscous(self.name)
 
@@ -637,48 +549,15 @@ klasses[LinearViscousOperator.bl_label] = LinearViscousOperator
 class LinearViscousGeneric(Entity):
     def string(self):
         if self.dimension == "1D":
-            return "linear viscous generic, " + FORMAT(self.viscosity)
+            return "linear viscous generic, " + BPY.FORMAT(self.viscosity)
         else:
-            return "linear viscous generic, " + self.links[0].string()
+            return "linear viscous generic, " + self.viscosity.string()
 
-class LinearViscousGenericOperator(Base):
+class LinearViscousGenericOperator(Viscosity):
     bl_label = "Linear viscous generic"
-    dimension_items = [("1D", "1D", ""), ("3D", "3D", ""), ("6D", "6D", "")]
-    dimension = bpy.props.EnumProperty(items=dimension_items, name="Dimension")
-    viscosity = bpy.props.FloatProperty(name="Viscosity", description="", min=0.000001, max=9.9e10, precision=6, default=1.0)
-    viscosity_matrix_3x3_name = bpy.props.EnumProperty(items=enum_matrix_3x3, name="Viscosity",
-        update=lambda self, context: update_matrix(self, context, self.viscosity_matrix_3x3_name, "3x3"))
-    viscosity_matrix_6x6_name = bpy.props.EnumProperty(items=enum_matrix_6x6, name="Viscosity",
-        update=lambda self, context: update_matrix(self, context, self.viscosity_matrix_6x6_name, "6x6"))
-    def assign(self, context):
-        self.dimension = self.entity.dimension
-        if self.dimension == "1D":
-            self.viscosity = self.entity.viscosity
-        elif self.dimension == "3D":
-            self.viscosity_matrix_3x3_name = self.entity.links[0].name
-        else:
-            self.viscosity_matrix_6x6_name = self.entity.links[0].name
-    def store(self, context):
-        self.entity.dimension = self.dimension
-        if self.dimension == "1D":
-            self.entity.viscosity = self.viscosity
-        else:
-            if self.dimension == "3D":
-                self.entity.links.append(database.matrix.get_by_name(self.viscosity_matrix_3x3_name))
-            else:
-                self.entity.links.append(database.matrix.get_by_name(self.viscosity_matrix_6x6_name))
     def draw(self, context):
-        self.basis = self.dimension
-        layout = self.layout
-        self.draw_dimension(layout)
-        if self.dimension == "1D":
-            layout.prop(self, "viscosity")
-        elif self.dimension == "3D":
-            layout.prop(self, "viscosity_matrix_3x3_name")
-        else:
-            layout.prop(self, "viscosity_matrix_6x6_name")
-    def check(self, context):
-        return self.basis != self.dimension
+        self.viscosity.type = {"1D": "float", "3D": "3x3", "6D": "6x6"}[self.dimension]
+        super().draw(context)
     def create_entity(self):
         return LinearViscousGeneric(self.name)
 
@@ -688,48 +567,21 @@ class LinearViscoelastic(Entity):
     def string(self):
         ret = "linear viscoelastic"
         if self.dimension == "1D":
-            ret += ", " + FORMAT(self.stiffness)
+            ret += ", " + BPY.FORMAT(self.stiffness)
         else:
-            ret += " isotropic, " + FORMAT(self.stiffness)
-        if self.proportional:
-            ret += ", proportional, " + FORMAT(self.factor)
+            ret += " isotropic, " + BPY.FORMAT(self.stiffness)
+        if self.proportional is not None:
+            ret += ", proportional, " + BPY.FORMAT(self.proportional)
         else:
-            ret += ", " + FORMAT(self.viscosity)
+            ret += ", " + BPY.FORMAT(self.viscosity)
         return ret
 
-class LinearViscoelasticOperator(Base):
+class LinearViscoelasticOperator(StiffnessViscosity):
     bl_label = "Linear viscoelastic"
-    dimension_items = [("1D", "1D", ""), ("3D", "3D", ""), ("6D", "6D", "")]
-    dimension = bpy.props.EnumProperty(items=dimension_items, name="Dimension")
-    stiffness = bpy.props.FloatProperty(name="Stiffness", description="", min=0.000001, max=9.9e10, precision=6, default=1.0)
-    proportional = bpy.props.BoolProperty(name="Proportional", default=False)
-    factor = bpy.props.FloatProperty(name="Factor", description="", min=0.000001, max=9.9e10, precision=6, default=1.0)
-    viscosity = bpy.props.FloatProperty(name="Viscosity", description="", min=0.000001, max=9.9e10, precision=6, default=1.0)
-    def assign(self, context):
-        self.dimension = self.entity.dimension
-        self.stiffness = self.entity.stiffness
-        self.proportional = self.entity.proportional
-        self.factor = self.entity.factor
-        self.viscosity = self.entity.viscosity
-    def store(self, context):
-        self.entity.dimension = self.dimension
-        self.entity.stiffness = self.stiffness
-        self.entity.proportional = self.proportional
-        self.entity.factor = self.factor
-        self.entity.viscosity = self.viscosity
     def draw(self, context):
-        self.basis = self.proportional
-        layout = self.layout
-        self.draw_dimension(layout)
-        layout.prop(self, "stiffness")
-        row = layout.row()
-        row.prop(self, "proportional")
-        if self.proportional:
-            row.prop(self, "factor")
-        else:
-            layout.prop(self, "viscosity")
-    def check(self, context):
-        return self.basis != self.proportional
+        self.stiffness.type = {"1D": "float", "3D": "float", "6D": "float"}[self.dimension]
+        self.viscosity.type = {"1D": "float", "3D": "float", "6D": "float"}[self.dimension]
+        super().draw(context)
     def create_entity(self):
         return LinearViscoelastic(self.name)
 
@@ -739,90 +591,24 @@ class LinearViscoelasticGeneric(Entity):
     def string(self):
         ret = "linear viscoelastic generic"
         if self.dimension == "1D":
-            ret += ", " + FORMAT(self.stiffness)
+            ret += ", " + BPY.FORMAT(self.stiffness)
         else:
-            ret += ", " + self.links[0].string()
-        if self.proportional:
-            ret += ", proportional, " + FORMAT(self.factor)
+            ret += ", " + self.stiffness.string()
+        if self.proportional is not None:
+            ret += ", proportional, " + BPY.FORMAT(self.proportional)
         else:
             if self.dimension == "1D":
-                ret += ", " + FORMAT(self.viscosity)
+                ret += ", " + BPY.FORMAT(self.viscosity)
             else:
-                ret += ", " + self.links[1].string()
+                ret += ", " + self.viscosity.string()
         return ret
 
-class LinearViscoelasticGenericOperator(Base):
+class LinearViscoelasticGenericOperator(StiffnessViscosity):
     bl_label = "Linear viscoelastic generic"
-    dimension_items = [("1D", "1D", ""), ("3D", "3D", ""), ("6D", "6D", "")]
-    dimension = bpy.props.EnumProperty(items=dimension_items, name="Dimension")
-    stiffness = bpy.props.FloatProperty(name="Stiffness", description="", min=0.000001, max=9.9e10, precision=6, default=1.0)
-    stiffness_matrix_3x3_name = bpy.props.EnumProperty(items=enum_matrix_3x3, name="Stiffness",
-        update=lambda self, context: update_matrix(self, context, self.stiffness_matrix_3x3_name, "3x3"))
-    stiffness_matrix_6x6_name = bpy.props.EnumProperty(items=enum_matrix_6x6, name="Stiffness",
-        update=lambda self, context: update_matrix(self, context, self.stiffness_matrix_6x6_name, "3x3"))
-    proportional = bpy.props.BoolProperty(name="Proportional", default=False)
-    factor = bpy.props.FloatProperty(name="Factor", description="", min=0.000001, max=9.9e10, precision=6, default=1.0)
-    viscosity = bpy.props.FloatProperty(name="Viscosity", description="", min=0.000001, max=9.9e10, precision=6, default=1.0)
-    viscosity_matrix_3x3_name = bpy.props.EnumProperty(items=enum_matrix_3x3, name="Viscosity",
-        update=lambda self, context: update_matrix(self, context, self.viscosity_matrix_3x3_name, "6x6"))
-    viscosity_matrix_6x6_name = bpy.props.EnumProperty(items=enum_matrix_6x6, name="Viscosity",
-        update=lambda self, context: update_matrix(self, context, self.viscosity_matrix_6x6_name, "6x6"))
-    def assign(self, context):
-        self.dimension = self.entity.dimension
-        self.proportional = self.entity.proportional
-        self.factor = self.entity.factor
-        if self.dimension == "1D":
-            self.stiffness = self.entity.stiffness
-            if not self.proportional:
-                self.viscosity = self.entity.viscosity
-        elif self.dimension == "3D":
-            self.stiffness_matrix_3x3_name = self.entity.links[0].name
-            if not self.proportional:
-                self.viscosity_matrix_3x3_name = self.entity.links[1].name
-        else:
-            self.stiffness_matrix_6x6_name = self.entity.links[0].name
-            if not self.proportional:
-                self.viscosity_matrix_6x6_name = self.entity.links[1].name
-    def store(self, context):
-        self.entity.dimension = self.dimension
-        self.entity.proportional = self.proportional
-        self.entity.factor = self.factor
-        if self.dimension == "1D":
-            self.entity.stiffness = self.stiffness
-            if not self.proportional:
-                self.entity.viscosity = self.viscosity
-        else:
-            if self.dimension == "3D":
-                self.entity.links.append(database.matrix.get_by_name(self.stiffness_matrix_3x3_name))
-                if not self.proportional:
-                    self.entity.links.append(database.matrix.get_by_name(self.viscosity_matrix_3x3_name))
-            else:
-                self.entity.links.append(database.matrix.get_by_name(self.stiffness_matrix_6x6_name))
-                if not self.proportional:
-                    self.entity.links.append(database.matrix.get_by_name(self.viscosity_matrix_6x6_name))
     def draw(self, context):
-        self.basis = (self.dimension, self.proportional)
-        layout = self.layout
-        self.draw_dimension(layout)
-        if self.dimension == "1D":
-            layout.prop(self, "stiffness")
-        elif self.dimension == "3D":
-            layout.prop(self, "stiffness_matrix_3x3_name")
-        else:
-            layout.prop(self, "stiffness_matrix_6x6_name")
-        row = layout.row()
-        row.prop(self, "proportional")
-        if self.proportional:
-            row.prop(self, "factor")
-        else:
-            if self.dimension == "1D":
-                layout.prop(self, "viscosity")
-            elif self.dimension == "3D":
-                layout.prop(self, "viscosity_matrix_3x3_name")
-            else:
-                layout.prop(self, "viscosity_matrix_6x6_name")
-    def check(self, context):
-        return self.basis != (self.dimension, self.proportional)
+        self.stiffness.type = {"1D": "float", "3D": "3x3", "6D": "6x6"}[self.dimension]
+        self.viscosity.type = {"1D": "float", "3D": "3x3", "6D": "6x6"}[self.dimension]
+        super().draw(context)
     def create_entity(self):
         return LinearViscoelasticGeneric(self.name)
 
@@ -832,102 +618,50 @@ class LinearTimeVariantViscoelasticGeneric(Entity):
     def string(self):
         ret = "linear time variant viscoelastic generic"
         if self.dimension == "1D":
-            ret += ", " + FORMAT(self.stiffness)
+            ret += ", " + BPY.FORMAT(self.stiffness)
         else:
-            ret += ", " + self.links[2].string()
-        ret += ", " + self.links[0].string()
-        if self.proportional:
-            ret += ", proportional, " + FORMAT(self.factor)
+            ret += ", " + self.stiffness.string()
+        ret += ", " + self.stiffness_scale.safe_name()
+        if self.proportional is not None:
+            ret += ", proportional, " + BPY.FORMAT(self.proportional)
         else:
             if self.dimension == "1D":
-                ret += ", " + FORMAT(self.viscosity)
+                ret += ", " + BPY.FORMAT(self.viscosity)
             else:
-                ret += ", " + self.links[3].string()
-        ret += ", " + self.links[1].string()
+                ret += ", " + self.viscosity.string()
+        ret += ", " + self.viscosity_scale.safe_name()
         return ret
 
-class LinearTimeVariantViscoelasticGenericOperator(Base):
+class LinearTimeVariantViscoelasticGenericOperator(StiffnessViscosity):
     bl_label = "Linear time variant viscoelastic generic"
-    dimension_items = [("1D", "1D", ""), ("3D", "3D", ""), ("6D", "6D", "")]
-    dimension = bpy.props.EnumProperty(items=dimension_items, name="Dimension")
-    stiffness_scale_name = bpy.props.EnumProperty(items=enum_drive, name="Stiffness scale",
-        update=lambda self, context: update_drive(self, context, self.stiffness_scale_name))
-    viscosity_scale_name = bpy.props.EnumProperty(items=enum_drive, name="Viscosity scale",
-        update=lambda self, context: update_drive(self, context, self.viscosity_scale_name))
-    stiffness = bpy.props.FloatProperty(name="Stiffness", description="", min=0.000001, max=9.9e10, precision=6, default=1.0)
-    stiffness_matrix_3x3_name = bpy.props.EnumProperty(items=enum_matrix_3x3, name="Stiffness",
-        update=lambda self, context: update_matrix(self, context, self.stiffness_matrix_3x3_name, "3x3"))
-    stiffness_matrix_6x6_name = bpy.props.EnumProperty(items=enum_matrix_6x6, name="Stiffness",
-        update=lambda self, context: update_matrix(self, context, self.stiffness_matrix_6x6_name, "6x6"))
-    proportional = bpy.props.BoolProperty(name="Proportional", default=False)
-    factor = bpy.props.FloatProperty(name="Factor", description="", min=0.000001, max=9.9e10, precision=6, default=1.0)
-    viscosity = bpy.props.FloatProperty(name="Viscosity", description="", min=0.000001, max=9.9e10, precision=6, default=1.0)
-    viscosity_matrix_3x3_name = bpy.props.EnumProperty(items=enum_matrix_3x3, name="Viscosity",
-        update=lambda self, context: update_matrix(self, context, self.viscosity_matrix_3x3_name, "3x3"))
-    viscosity_matrix_6x6_name = bpy.props.EnumProperty(items=enum_matrix_6x6, name="Viscosity",
-        update=lambda self, context: update_matrix(self, context, viscosity_matrix_6x6_name, "6x6"))
+    stiffness_scale = bpy.props.PointerProperty(type = BPY.Drive)
+    viscosity_scale = bpy.props.PointerProperty(type = BPY.Drive)
+    def prereqs(self, context):
+        self.stiffness_scale.mandatory = True
+        self.viscosity_scale.mandatory = True
+        super().prereqs(context)
     def assign(self, context):
-        self.dimension = self.entity.dimension
-        self.proportional = self.entity.proportional
-        self.factor = self.entity.factor
-        self.stiffness_scale_name = self.entity.links[0].name
-        self.viscosity_scale_name = self.entity.links[1].name
-        if self.dimension == "1D":
-            self.stiffness = self.entity.stiffness
-            if not self.proportional:
-                self.viscosity = self.entity.viscosity
-        elif self.dimension == "3D":
-            self.stiffness_matrix_3x3_name = self.entity.links[2].name
-            if not self.proportional:
-                self.viscosity_matrix_3x3_name = self.entity.links[3].name
-        else:
-            self.stiffness_matrix_6x6_name = self.entity.links[2].name
-            if not self.proportional:
-                self.viscosity_matrix_6x6_name = self.entity.links[3].name
+        self.stiffness_scale.assign(self.entity.stiffness_scale)
+        self.viscosity_scale.assign(self.entity.viscosity_scale)
+        super().assign(context)
     def store(self, context):
-        self.entity.dimension = self.dimension
-        self.entity.proportional = self.proportional
-        self.entity.factor = self.factor
-        self.entity.links.append(database.drive.get_by_name(self.stiffness_scale_name))
-        self.entity.links.append(database.drive.get_by_name(self.viscosity_scale_name))
-        if self.dimension == "1D":
-            self.entity.stiffness = self.stiffness
-            if not self.proportional:
-                self.entity.viscosity = self.viscosity
-        else:
-            if self.dimension == "3D":
-                self.entity.links.append(database.matrix.get_by_name(self.stiffness_matrix_3x3_name))
-                if not self.proportional:
-                    self.entity.links.append(database.matrix.get_by_name(self.viscosity_matrix_3x3_name))
-            else:
-                self.entity.links.append(database.matrix.get_by_name(self.stiffness_matrix_6x6_name))
-                if not self.proportional:
-                    self.entity.links.append(database.matrix.get_by_name(self.viscosity_matrix_6x6_name))
+        super().store(context)
+        self.entity.stiffness_scale = self.stiffness_scale.store() if self.entity.proportional is None else None
+        self.entity.viscosity_scale = self.viscosity_scale.store() if self.entity.proportional is None else None
     def draw(self, context):
-        self.basis = (self.dimension, self.proportional)
+        self.basis = self.dimension
+        self.stiffness.type = {"1D": "float", "3D": "3x3", "6D": "6x6"}[self.dimension]
+        self.viscosity.type = {"1D": "float", "3D": "3x3", "6D": "6x6"}[self.dimension]
         layout = self.layout
         self.draw_dimension(layout)
-        if self.dimension == "1D":
-            layout.prop(self, "stiffness")
-        elif self.dimension == "3D":
-            layout.prop(self, "stiffness_matrix_3x3_name")
-        else:
-            layout.prop(self, "stiffness_matrix_6x6_name")
-        layout.prop(self, "stiffness_scale_name")
-        row = layout.row()
-        row.prop(self, "proportional")
-        if self.proportional:
-            row.prop(self, "factor")
-        else:
-            if self.dimension == "1D":
-                layout.prop(self, "viscosity")
-            elif self.dimension == "3D":
-                layout.prop(self, "viscosity_matrix_3x3_name")
-            else:
-                layout.prop(self, "viscosity_matrix_6x6_name")
-        layout.prop(self, "viscosity_scale_name")
+        self.stiffness.draw(layout, "Stiffness")
+        self.stiffness_scale.draw(layout, "Stiffness scale")
+        self.proportional.draw(layout, "Proportional")
+        if not self.proportional.use:
+            self.viscosity.draw(layout, "Viscosity")
+            self.viscosity_scale.draw(layout, "Viscosity scale")
     def check(self, context):
-        return self.basis != (self.dimension, self.proportional)
+        return super().check(context) or self.stiffness_scale.check(context) or self.viscosity_scale.check(context)
     def create_entity(self):
         return LinearTimeVariantViscoelasticGeneric(self.name)
 
@@ -936,54 +670,36 @@ klasses[LinearTimeVariantViscoelasticGenericOperator.bl_label] = LinearTimeVaria
 class LinearViscoelasticGenericAxialTorsionCoupling(Entity):
     def string(self):
         ret = "linear viscoelastic generic axial torsion coupling"
-        ret += "," + self.links[0].string()
-        if self.proportional:
-            ret += ",\n\t\t\tproportional, " + FORMAT(self.factor)
+        ret += "," + self.stiffness.string()
+        if self.proportional is not None:
+            ret += ",\n\t\t\tproportional, " + BPY.FORMAT(self.proportional)
         else:
-            ret += "," + self.links[1].string()
-        ret += ",\n\t\t\t" + FORMAT(self.coupling_coefficient)
+            ret += "," + self.viscosity.string()
+        ret += ",\n\t\t\t" + BPY.FORMAT(self.coupling_coefficient)
         return ret
 
-class LinearViscoelasticGenericAxialTorsionCouplingOperator(Base):
-    bl_label = "Linear viscoelastic generic axial torsion coupling"
-    dimension_items = [("6D", "6D", "")]
+class LinearViscoelasticGenericAxialTorsionCouplingOperator(StiffnessViscosity):
+    bl_label = "Linear viscoelastic generic axial torsion couple"
+    dimension_items = [("6D", "6D", ""),]
     dimension = bpy.props.EnumProperty(items=dimension_items, name="Dimension")
-    coupling_coefficient = bpy.props.FloatProperty(name="Coupling coefficient", description="", min=0.000001, max=9.9e10, precision=6, default=1.0)
-    stiffness_matrix_6x1_name = bpy.props.EnumProperty(items=enum_matrix_6x1, name="Stiffness",
-        update=lambda self, context: update_matrix(self, context, self.stiffness_matrix_6x1_name, "6x1"))
-    proportional = bpy.props.BoolProperty(name="Proportional", default=False)
-    factor = bpy.props.FloatProperty(name="Factor", description="", min=0.000001, max=9.9e10, precision=6, default=1.0)
-    viscosity_matrix_6x1_name = bpy.props.EnumProperty(items=enum_matrix_6x1, name="Viscosity",
-        update=lambda self, context: update_matrix(self, context, self.viscosity_matrix_6x1_name, "6x1"))
+    coupling_coefficient = bpy.props.PointerProperty(type = BPY.Float)
+    def prereqs(self, context):
+        self.coupling_coefficient.mandatory = True
+        self.coupling_coefficient.assign(1.0)
+        super().prereqs(context)
     def assign(self, context):
-        self.dimension = self.entity.dimension
-        self.coupling_coefficient = self.entity.coupling_coefficient
-        self.stiffness_matrix_6x1_name = self.entity.links[0].name
-        self.proportional = self.entity.proportional
-        self.factor = self.entity.factor
-        if not self.proportional:
-            self.stiffness_matrix_6x1_name = self.entity.links[1].name
+        self.coupling_coefficient.assign(self.entity.coupling_coefficient)
+        super().assign(context)
     def store(self, context):
-        self.entity.dimension = self.dimension
-        self.entity.coupling_coefficient = self.coupling_coefficient
-        self.entity.proportional = self.proportional
-        self.entity.links.append(database.matrix.get_by_name(self.stiffness_matrix_6x1_name))
-        self.entity.factor = self.factor
-        if not self.proportional:
-            self.entity.links.append(database.matrix.get_by_name(self.viscosity_matrix_6x1_name))
+        self.entity.coupling_coefficient = self.coupling_coefficient.store()
+        super().store(context)
     def draw(self, context):
-        self.basis = self.proportional
-        layout = self.layout
-        self.draw_dimension(layout)
-        layout.prop(self, "stiffness_matrix_6x1_name")
-        row = layout.row()
-        row.prop(self, "proportional")
-        if self.proportional:
-            row.prop(self, "factor")
-        else:
-            layout.prop(self, "viscosity_matrix_6x1_name")
+        self.stiffness.type = {"6D": "6x1"}[self.dimension]
+        self.viscosity.type = {"6D": "6x1"}[self.dimension]
+        super().draw(context)
+        self.coupling_coefficient.draw(self.layout, "Coupling Coefficient")
     def check(self, context):
-        return self.basis != self.proportional
+        return self.coupling_coefficient.check(context) or super().check(context)
     def create_entity(self):
         return LinearViscoelasticGenericAxialTorsionCoupling(self.name)
 
@@ -993,68 +709,37 @@ class CubicViscoelasticGeneric(Entity):
     def string(self):
         ret = "cubic viscoelastic generic"
         if self.dimension == "1D":
-            for stiffness in [self.stiffness_1, self.stiffness_2, self.stiffness_3]:
-                ret += ", " + FORMAT(stiffness)
-            ret += ", " + FORMAT(self.viscosity)
+            for s in self.stiffness:
+                ret += ", " + BPY.FORMAT(s)
+            ret += ", " + BPY.FORMAT(self.viscosity)
         else:
-            for link in self.links:
-                ret += "," + link.string()
+            for s in self.stiffness:
+                ret += ", " + s.string()
+            ret += ", " + self.viscosity.string()
         return ret
 
-class CubicViscoelasticGenericOperator(Base):
+class CubicViscoelasticGenericOperator(StiffnessN):
     bl_label = "Cubic viscoelastic generic"
     dimension_items = [("1D", "1D", ""), ("3D", "3D", "")]
     dimension = bpy.props.EnumProperty(items=dimension_items, name="Dimension")
-    stiffness_1 = bpy.props.FloatProperty(name="Stiffness 1", description="", min=0.000001, max=9.9e10, precision=6, default=1.0)
-    stiffness_2 = bpy.props.FloatProperty(name="Stiffness 2", description="", min=0.000001, max=9.9e10, precision=6, default=1.0)
-    stiffness_3 = bpy.props.FloatProperty(name="Stiffness 3", description="", min=0.000001, max=9.9e10, precision=6, default=1.0)
-    viscosity = bpy.props.FloatProperty(name="Viscosity", description="", min=0.000001, max=9.9e10, precision=6, default=1.0)
-    stiffness_matrix_3x1_1_name = bpy.props.EnumProperty(items=enum_matrix_3x1, name="Stiffness 1",
-        update=lambda self, context: update_matrix(self, context, self.stiffness_matrix_3x1_1_name, "3x1"))
-    stiffness_matrix_3x1_2_name = bpy.props.EnumProperty(items=enum_matrix_3x1, name="Stiffness 2",
-        update=lambda self, context: update_matrix(self, context, self.stiffness_matrix_3x1_2_name, "3x1"))
-    stiffness_matrix_3x1_3_name = bpy.props.EnumProperty(items=enum_matrix_3x1, name="Stiffness 3",
-        update=lambda self, context: update_matrix(self, context, self.stiffness_matrix_3x1_3_name, "3x1"))
-    viscosity_matrix_3x1_name = bpy.props.EnumProperty(items=enum_matrix_3x1, name="Viscosity",
-        update=lambda self, context: update_matrix(self, context, self.viscosity_matrix_3x1_name, "3x1"))
+    viscosity = bpy.props.PointerProperty(type = BPY.MatrixFloat)
+    def prereqs(self, context):
+        self.viscosity.mandatory = True
+        super().prereqs(context)
     def assign(self, context):
-        self.dimension = self.entity.dimension
-        if self.dimension == "1D":
-            self.stiffness_1 = self.entity.stiffness_1
-            self.stiffness_2 = self.entity.stiffness_2
-            self.stiffness_3 = self.entity.stiffness_3
-            self.viscosity = self.entity.viscosity
-        else:
-            self.stiffness_matrix_3x1_1_name = self.entity.links[0].name
-            self.stiffness_matrix_3x1_2_name = self.entity.links[1].name
-            self.stiffness_matrix_3x1_3_name = self.entity.links[2].name
-            self.viscosity_matrix_3x1_name = self.entity.links[3].name
+        self.viscosity.assign(self.entity.viscosity)
+        super().assign(context)
     def store(self, context):
-        self.entity.dimension = self.dimension
-        if self.dimension == "1D":
-            self.entity.stiffness_1 = self.stiffness_1
-            self.entity.stiffness_2 = self.stiffness_2
-            self.entity.stiffness_3 = self.stiffness_3
-            self.entity.viscosity = self.viscosity
-        else:
-            for matrix_name in [self.stiffness_matrix_3x1_1_name, self.stiffness_matrix_3x1_2_name,
-                self.stiffness_matrix_3x1_3_name, self.viscosity_matrix_3x1_name]:
-                    self.entity.links.append(database.matrix.get_by_name(matrix_name))
+        self.entity.viscosity = self.viscosity.store()
+        super().store(context)
     def draw(self, context):
-        self.basis = self.dimension
-        layout = self.layout
-        self.draw_dimension(layout)
-        if self.dimension == "1D":
-            layout.prop(self, "stiffness_1")
-            layout.prop(self, "stiffness_2")
-            layout.prop(self, "stiffness_3")
-            layout.prop(self, "viscosity")
-        else:
-            for c in "123":
-                layout.prop(self, "stiffness_matrix_3x1_" + c + "_name")
-            layout.prop(self, "viscosity_matrix_3x1_name")
+        for s in self.stiffness:
+            s.type = {"1D": "float", "3D": "3x1"}[self.dimension]
+        self.viscosity.type = {"1D": "float", "3D": "3x1"}[self.dimension]
+        super().draw(context)
+        self.viscosity.draw(self.layout, "Viscosity")
     def check(self, context):
-        return self.basis != self.dimension
+        return self.viscosity.check(context) or super().check(context)
     def create_entity(self):
         return CubicViscoelasticGeneric(self.name)
 
@@ -1064,95 +749,60 @@ class DoubleLinearViscoelastic(Entity):
     def string(self):
         ret = "double linear viscoelastic"
         if self.dimension == "1D":
-            ret += ", " + FORMAT(self.stiffness_1)
-            ret += ", " + FORMAT(self.upper_strain) + ", " + FORMAT(self.lower_strain)
-            ret += ", " + FORMAT(self.stiffness_2)
-            ret += ", " + FORMAT(self.viscosity_1)
-            if self.second_damping:
-                ret += ", second damping, " + FORMAT(self.viscosity_1)
+            ret += ", " + BPY.FORMAT(self.stiffness[0])
+            ret += ", " + BPY.FORMAT(self.upper_strain) + ", " + BPY.FORMAT(self.lower_strain)
+            ret += ", " + BPY.FORMAT(self.stiffness[1])
+            ret += ", " + BPY.FORMAT(self.viscosity_1)
+            if self.viscosity_2 is not None:
+                ret += ", second damping, " + BPY.FORMAT(self.viscosity_2)
         else:
-            ret += "," + self.links[0].string()
-            ret += ",\n\t\t\t" + FORMAT(self.upper_strain) + ", " + FORMAT(self.lower_strain)
-            ret += "," + self.links[1].string()
-            ret += "," + self.links[2].string()
-            if self.second_damping:
-                ret += ", second damping, " + self.links[3].string()
+            ret += "," + self.stiffness[0].string()
+            ret += ",\n\t\t\t" + BPY.FORMAT(self.upper_strain) + ", " + BPY.FORMAT(self.lower_strain)
+            ret += "," + self.stiffness[1].string()
+            ret += "," + self.viscosity_1.string()
+            if self.viscosity_2 is not None:
+                ret += ", second damping, " + self.viscosity_2.string()
         return ret
 
-class DoubleLinearViscoelasticOperator(Base):
+class DoubleLinearViscoelasticOperator(StiffnessN):
+    N = 2
     bl_label = "Double linear viscoelastic"
     dimension_items = [("1D", "1D", ""), ("3D", "3D", "")]
     dimension = bpy.props.EnumProperty(items=dimension_items, name="Dimension")
-    stiffness_1 = bpy.props.FloatProperty(name="Stiffness 1", description="", min=0.000001, max=9.9e10, precision=6, default=1.0)
-    stiffness_2 = bpy.props.FloatProperty(name="Stiffness 2", description="", min=0.000001, max=9.9e10, precision=6, default=1.0)
-    upper_strain = bpy.props.FloatProperty(name="Upper strain", description="", min=0.000001, max=9.9e10, precision=6)
-    lower_strain = bpy.props.FloatProperty(name="Lower strain", description="", min=0.000001, max=9.9e10, precision=6)
-    stiffness_matrix_3x1_1_name = bpy.props.EnumProperty(items=enum_matrix_3x1, name="Stiffness 1",
-        update=lambda self, context: update_matrix(self, context, self.stiffness_matrix_3x1_1_name, "3x1"))
-    stiffness_matrix_3x1_2_name = bpy.props.EnumProperty(items=enum_matrix_3x1, name="Stiffness 2",
-        update=lambda self, context: update_matrix(self, context, self.stiffness_matrix_3x1_2_name, "3x1"))
-    second_damping = bpy.props.BoolProperty("Second damping", default=False)
-    viscosity_1 = bpy.props.FloatProperty(name="Viscosity 1", description="", min=0.000001, max=9.9e10, precision=6, default=1.0)
-    viscosity_2 = bpy.props.FloatProperty(name="Viscosity 2", description="", min=0.000001, max=9.9e10, precision=6, default=1.0)
-    viscosity_matrix_3x1_1_name = bpy.props.EnumProperty(items=enum_matrix_3x1, name="Viscosity 1",
-        update=lambda self, context: update_matrix(self, context, self.viscosity_matrix_3x1_1_name, "3x1"))
-    viscosity_matrix_3x1_2_name = bpy.props.EnumProperty(items=enum_matrix_3x1, name="Viscosity 2",
-        update=lambda self, context: update_matrix(self, context, self.viscosity_matrix_3x1_2_name, "3x1"))
+    upper_strain = bpy.props.PointerProperty(type = BPY.Float)
+    lower_strain = bpy.props.PointerProperty(type = BPY.Float)
+    viscosity_1 = bpy.props.PointerProperty(type = BPY.MatrixFloat)
+    viscosity_2 = bpy.props.PointerProperty(type = BPY.MatrixFloat)
+    def prereqs(self, context):
+        self.upper_strain.mandatory = True
+        self.lower_strain.mandatory = True
+        self.viscosity_1.mandatory = True
+        super().prereqs(context)
     def assign(self, context):
-        self.dimension = self.entity.dimension
-        self.upper_strain = self.entity.upper_strain
-        self.lower_strain = self.entity.lower_strain
-        self.second_damping = self.entity.second_damping
-        if self.dimension == "1D":
-            self.stiffness_1 = self.entity.stiffness_1
-            self.stiffness_2 = self.entity.stiffness_2
-            self.viscosity_1 = self.entity.viscosity_1
-            self.viscosity_2 = self.entity.viscosity_2
-        else:
-            self.stiffness_matrix_3x1_1_name = self.entity.links[0].name
-            self.stiffness_matrix_3x1_2_name = self.entity.links[1].name
-            self.viscosity_matrix_3x1_1_name = self.entity.links[2].name
-            if self.second_damping:
-                self.viscosity_matrix_3x1_2_name = self.entity.links[3].name
+        self.upper_strain.assign(self.entity.upper_strain)
+        self.lower_strain.assign(self.entity.lower_strain)
+        self.viscosity_1.assign(self.entity.viscosity_1)
+        self.viscosity_2.assign(self.entity.viscosity_2)
+        super().assign(context)
     def store(self, context):
-        self.entity.dimension = self.dimension
-        self.entity.upper_strain = self.upper_strain
-        self.entity.lower_strain = self.lower_strain
-        self.entity.second_damping = self.second_damping
-        if self.dimension == "1D":
-            self.entity.stiffness_1 = self.stiffness_1
-            self.entity.stiffness_2 = self.stiffness_2
-            self.entity.viscosity_1 = self.viscosity_1
-            self.entity.viscosity_2 = self.viscosity_2
-        else:
-            for matrix_name in [self.stiffness_matrix_3x1_1_name, self.stiffness_matrix_3x1_2_name, self.viscosity_matrix_3x1_1_name]:
-                self.entity.links.append(database.matrix.get_by_name(matrix_name))
-            if self.second_damping:
-                self.entity.links.append(database.matrix.get_by_name(self.viscosity_matrix_3x1_2_name))
+        self.entity.upper_strain = self.upper_strain.store()
+        self.entity.lower_strain = self.lower_strain.store()
+        self.entity.viscosity_1 = self.viscosity_1.store()
+        self.entity.viscosity_2 = self.viscosity_2.store()
+        super().store(context)
     def draw(self, context):
-        self.basis = (self.dimension, self.second_damping)
-        layout = self.layout
-        self.draw_dimension(layout)
-        if self.dimension == "1D":
-            layout.prop(self, "stiffness_1")
-            layout.prop(self, "stiffness_2")
-            layout.prop(self, "viscosity_1")
-            row = layout.row()
-            row.prop(self, "second_damping")
-            if self.second_damping:
-                row.prop(self, "viscosity_2")
-        else:
-            for c in "12":
-                layout.prop(self, "stiffness_matrix_3x1_" + c + "_name")
-            layout.prop(self, "viscosity_matrix_3x1_1_name")
-            row = layout.row()
-            row.prop(self, "second_damping")
-            if self.second_damping:
-                row.prop(self, "viscosity_matrix_3x1_2_name")
-        layout.prop(self, "upper_strain")
-        layout.prop(self, "lower_strain")
+        for s in self.stiffness:
+            s.type = {"1D": "float", "3D": "3x1"}[self.dimension]
+        self.viscosity_1.type = {"1D": "float", "3D": "3x1"}[self.dimension]
+        self.viscosity_2.type = {"1D": "float", "3D": "3x1"}[self.dimension]
+        super().draw(context)
+        self.upper_strain.draw(self.layout, "Upper strain")
+        self.lower_strain.draw(self.layout, "Lower strain")
+        self.viscosity_1.draw(self.layout, "Viscosity 1")
+        self.viscosity_2.draw(self.layout, "Viscosity 2")
     def check(self, context):
-        return self.basis != (self.dimension, self.second_damping)
+        return (self.upper_strain.check(context) or self.lower_strain.check(context)
+            or self.viscosity_1.check(context) or self.viscosity_2.check(context) or super().check(context))
     def create_entity(self):
         return DoubleLinearViscoelastic(self.name)
 
@@ -1160,53 +810,48 @@ klasses[DoubleLinearViscoelasticOperator.bl_label] = DoubleLinearViscoelasticOpe
 
 class TurbulentViscoelastic(Entity):
     def string(self):
-        ret = "turbulent viscoelastic, " + FORMAT(self.stiffness) + ", " + FORMAT(self.parabolic_viscosity)
-        if self.use_threshold:
-            ret += ", " + FORMAT(self.threshold)
-            if self.use_linear_viscosity:
-                ret += ", " + FORMAT(self.linear_viscosity)
+        ret = "turbulent viscoelastic, " + BPY.FORMAT(self.stiffness) + ", " + BPY.FORMAT(self.parabolic_viscosity)
+        if self.threshold is not None:
+            ret += ", " + BPY.FORMAT(self.threshold)
+            if self.linear_viscosity is not None:
+                ret += ", " + BPY.FORMAT(self.linear_viscosity)
         return ret
 
 class TurbulentViscoelasticOperator(Base):
     bl_label = "Turbulent viscoelastic"
     dimension_items = [("1D", "1D", ""), ]
     dimension = bpy.props.EnumProperty(items=dimension_items, name="Dimension")
-    stiffness = bpy.props.FloatProperty(name="Stiffness", description="", min=0.000001, max=9.9e10, precision=6, default=1.0)
-    parabolic_viscosity = bpy.props.FloatProperty(name="Parabolic viscosity", description="", min=0.000001, max=9.9e10, precision=6, default=1.0)
-    use_threshold = bpy.props.BoolProperty("Use threshold", default=False)
-    threshold = bpy.props.FloatProperty(name="Threshold", description="", min=0.000001, max=9.9e10, precision=6, default=1.0)
-    use_linear_viscosity = bpy.props.BoolProperty("Use linear viscosity", default=False)
-    linear_viscosity = bpy.props.FloatProperty(name="Linear viscosity", description="", min=0.000001, max=9.9e10, precision=6, default=1.0)
+    stiffness = bpy.props.PointerProperty(type = BPY.Float)
+    parabolic_viscosity = bpy.props.PointerProperty(type = BPY.Float)
+    threshold = bpy.props.PointerProperty(type = BPY.Float)
+    linear_viscosity = bpy.props.PointerProperty(type = BPY.Float)
+    def prereqs(self, context):
+        self.stiffness.mandatory = True
+        self.parabolic_viscosity.mandatory = True
     def assign(self, context):
         self.dimension = self.entity.dimension
-        self.stiffness = self.entity.stiffness
-        self.parabolic_viscosity = self.entity.parabolic_viscosity
-        self.use_threshold = self.entity.use_threshold
-        self.threshold = self.entity.threshold
-        self.use_linear_viscosity = self.entity.use_linear_viscosity
-        self.linear_viscosity = self.entity.linear_viscosity
+        self.stiffness.assign(self.entity.stiffness)
+        self.parabolic_viscosity.assign(self.entity.parabolic_viscosity)
+        self.threshold.assign(self.entity.threshold)
+        self.linear_viscosity.assign(self.entity.linear_viscosity)
     def store(self, context):
         self.entity.dimension = self.dimension
-        self.entity.stiffness = self.stiffness
-        self.entity.parabolic_viscosity = self.parabolic_viscosity
-        self.entity.use_threshold = self.use_threshold
-        self.entity.threshold = self.threshold
-        self.entity.use_linear_viscosity = self.use_linear_viscosity
-        self.entity.linear_viscosity = self.linear_viscosity
+        self.entity.stiffness = self.stiffness.store()
+        self.entity.parabolic_viscosity = self.parabolic_viscosity.store()
+        self.entity.threshold = self.threshold.store()
+        self.entity.linear_viscosity = self.linear_viscosity.store() if self.entity.threshold is not None else None
     def draw(self, context):
-        self.basis = (self.dimension, self.use_threshold, self.use_linear_viscosity)
+        self.basis = self.dimension
         layout = self.layout
         self.draw_dimension(layout)
-        layout.prop(self, "stiffness")
-        layout.prop(self, "parabolic_viscosity")
-        layout.prop(self, "use_threshold")
-        if self.use_threshold:
-            layout.prop(self, "threshold")
-            layout.prop(self, "use_linear_viscosity")
-            if self.use_linear_viscosity:
-                layout.prop(self, "linear_viscosity")
+        self.stiffness.draw(layout, "Stiffness")
+        self.parabolic_viscosity.draw(layout, "Parabolic viscosity")
+        self.threshold.draw(layout, "Threshold")
+        if self.threshold.use:
+            self.linear_viscosity.draw(layout, "Linear viscosity")
     def check(self, context):
-        return self.basis != (self.dimension, self.use_threshold, self.use_linear_viscosity)
+        return ((self.basis != self.dimension) or self.stiffness.check(context) or self.parabolic_viscosity.check(context)
+            or self.threshold.check(context) or self.linear_viscosity.check(context))
     def create_entity(self):
         return TurbulentViscoelastic(self.name)
 
@@ -1216,80 +861,54 @@ class LinearViscoelasticBistop(Entity):
     def string(self):
         ret = "linear viscoelastic bistop"
         if self.dimension == "1D":
-            ret += ",\n\t\t\t" + FORMAT(self.stiffness) + ", " + FORMAT(self.viscosity)
+            ret += ",\n\t\t\t" + BPY.FORMAT(self.stiffness) + ", " + BPY.FORMAT(self.viscosity)
         else:
-            ret += ", " + self.links[2].string() + ", " + self.links[3].string()
+            ret += ", " + self.stiffness.string() + ", " + self.viscosity.string()
         ret += ",\n\t\t\tinitial status, " + self.initial_status
-        for link in self.links[:2]:
-            ret += ",\n\t\t\t" + link.string()
+        for drive in [self.activating_condition, self.deactivating_condition]:
+            ret += ",\n\t\t\t" + drive.safe_name()
         return ret
 
 class LinearViscoelasticBistopOperator(Base):
     bl_label = "Linear viscoelastic bistop"
-    dimension_items = [("1D", "1D", ""), ("3D", "3D", ""), ("6D", "6D", "")]
-    dimension = bpy.props.EnumProperty(items=dimension_items, name="Dimension")
-    stiffness = bpy.props.FloatProperty(name="Stiffness", description="", min=0.000001, max=9.9e10, precision=6, default=1.0)
-    stiffness_matrix_3x3_name = bpy.props.EnumProperty(items=enum_matrix_3x3, name="Stiffness",
-        update=lambda self, context: update_matrix(self, context, self.stiffness_matrix_3x3_name, "3x3"))
-    stiffness_matrix_6x6_name = bpy.props.EnumProperty(items=enum_matrix_6x6, name="Stiffness",
-        update=lambda self, context: update_matrix(self, context, self.stiffness_matrix_6x6_name, "6x6"))
-    viscosity = bpy.props.FloatProperty(name="Viscosity", description="", min=0.000001, max=9.9e10, precision=6, default=1.0)
-    viscosity_matrix_3x3_name = bpy.props.EnumProperty(items=enum_matrix_3x3, name="Viscosity",
-        update=lambda self, context: update_matrix(self, context, self.viscosity_matrix_3x3_name, "3x3"))
-    viscosity_matrix_6x6_name = bpy.props.EnumProperty(items=enum_matrix_6x6, name="Viscosity",
-        update=lambda self, context: update_matrix(self, context, self.viscosity_matrix_6x6_name, "6x6"))
+    stiffness = bpy.props.PointerProperty(type = BPY.MatrixFloat)
+    viscosity = bpy.props.PointerProperty(type = BPY.MatrixFloat)
     initial_status = bpy.props.EnumProperty(items=[("active", "Active", ""), ("inactive", "Inactive", "")], name="Initial status")
-    activating_condition_name = bpy.props.EnumProperty(items=enum_drive, name="Activating condition",
-        update=lambda self, context: update_drive(self, context, self.activating_condition_name))
-    deactivating_condition_name = bpy.props.EnumProperty(items=enum_drive, name="Deactivating condition",
-        update=lambda self, context: update_drive(self, context, self.deactivating_condition_name))
+    activating_condition = bpy.props.PointerProperty(type = BPY.Drive)
+    deactivating_condition = bpy.props.PointerProperty(type = BPY.Drive)
+    def prereqs(self, context):
+        self.stiffness.mandatory = True
+        self.viscosity.mandatory = True
+        self.activating_condition.mandatory = True
+        self.deactivating_condition.mandatory = True
     def assign(self, context):
         self.dimension = self.entity.dimension
+        self.stiffness.assign(self.entity.stiffness)
+        self.viscosity.assign(self.entity.viscosity)
         self.initial_status = self.entity.initial_status
-        self.activating_condition_name = self.entity.links[0].name
-        self.deactivating_condition_name = self.entity.links[1].name
-        if self.dimension == "1D":
-            self.stiffness = self.entity.stiffness
-            self.viscosity = self.entity.viscosity
-        elif self.dimension == "3D":
-            self.stiffness_matrix_3x3_name = self.entity.links[2].name
-            self.viscosity_matrix_3x3_name = self.entity.links[3].name
-        else:
-            self.stiffness_matrix_6x6_name = self.entity.links[2].name
-            self.viscosity_matrix_6x6_name = self.entity.links[3].name
+        self.activating_condition.assign(self.entity.activating_condition)
+        self.deactivating_condition.assign(self.entity.deactivating_condition)
     def store(self, context):
         self.entity.dimension = self.dimension
+        self.entity.stiffness = self.stiffness.store()
+        self.entity.viscosity = self.viscosity.store()
         self.entity.initial_status = self.initial_status
-        self.entity.links.append(database.drive.get_by_name(self.activating_condition_name))
-        self.entity.links.append(database.drive.get_by_name(self.deactivating_condition_name))
-        if self.dimension == "1D":
-            self.entity.stiffness = self.stiffness
-            self.entity.viscosity = self.viscosity
-        else:
-            if self.dimension == "3D":
-                self.entity.links.append(database.matrix.get_by_name(self.stiffness_matrix_3x3_name))
-                self.entity.links.append(database.matrix.get_by_name(self.viscosity_matrix_3x3_name))
-            else:
-                self.entity.links.append(database.matrix.get_by_name(self.stiffness_matrix_6x6_name))
-                self.entity.links.append(database.matrix.get_by_name(self.viscosity_matrix_6x6_name))
+        self.entity.activating_condition = self.activating_condition.store()
+        self.entity.deactivating_condition = self.deactivating_condition.store()
     def draw(self, context):
         self.basis = self.dimension
+        self.stiffness.type = {"1D": "float", "3D": "3x3", "6D": "6x6"}[self.dimension]
+        self.viscosity.type = {"1D": "float", "3D": "3x3", "6D": "6x6"}[self.dimension]
         layout = self.layout
         self.draw_dimension(layout)
-        if self.dimension == "1D":
-            layout.prop(self, "stiffness")
-            layout.prop(self, "viscosity")
-        elif self.dimension == "3D":
-            for s in "stiffness viscosity".split():
-                layout.prop(self, s + "_matrix_3x3_name")
-        else:
-            for s in "stiffness viscosity".split():
-                layout.prop(self, s + "_matrix_6x6_name")
+        self.stiffness.draw(layout, "Stiffness")
+        self.viscosity.draw(layout, "Viscosity")
         layout.prop(self, "initial_status")
-        for s in "activating deactivating".split():
-            layout.prop(self, s+ "_condition_name")
+        self.activating_condition.draw(layout, "Activating condition")
+        self.deactivating_condition.draw(layout, "Deactivating condition")
     def check(self, context):
-        return self.basis != self.dimension
+        return ((self.basis != self.dimension) or self.stiffness.check(context) or self.viscosity.check(context)
+            or self.activating_condition.check(context) or self.deactivating_condition.check(context))
     def create_entity(self):
         return LinearViscoelasticBistop(self.name)
 
@@ -1299,13 +918,14 @@ for dimension in "1D 3D 6D".split():
     class Menu(bpy.types.Menu):
         bl_label = tree[0] + " " + dimension
         bl_idname = root_dot + "_".join(tree[0].lower().split()) + dimension
+        dimension = dimension
         def draw(self, context):
             layout = self.layout
             layout.operator_context = 'INVOKE_DEFAULT'
             for key in types:
-                if [d for d in klasses[key].dimension_items if dimension in d[0]]:
+                if [d for d in klasses[key].dimension_items if self.dimension in d[0]]:
                     op = layout.operator(root_dot + "c_" + "_".join(key.lower().split()))
-                    op.dimension = dimension
+                    op.dimension = self.dimension
     BPY.klasses.append(Menu)
 
 bundle = Bundle(tree, Base, klasses, database.constitutive, "constitutive")

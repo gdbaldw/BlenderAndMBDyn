@@ -52,7 +52,7 @@ control_tree = ["Control", control_types]
 
 types = problem_types + control_types
 
-tree = ["Add definition", problem_tree + control_tree]
+tree = ["Definition", problem_tree + control_tree]
 
 klasses = dict()
 

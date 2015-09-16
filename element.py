@@ -27,12 +27,11 @@ if "bpy" in locals():
     imp.reload(root_dot)
     imp.reload(Operator)
     imp.reload(Entity)
-    imp.reload(enum_matrix_3x3)
 else:
-    from .common import (FORMAT, Type, aerodynamic_types, beam_types, force_types, genel_types, joint_types, environment_types, node_types,
+    from .common import (safe_name, Type, aerodynamic_types, beam_types, force_types, genel_types, joint_types, environment_types, node_types,
         structural_static_types, structural_dynamic_types, Ellipsoid, RhombicPyramid, Teardrop, Cylinder, Sphere, RectangularCuboid)
-    from .base import bpy, BPY, root_dot, database, Operator, Entity, Bundle, enum_scenes, enum_matrix_3x1, enum_matrix_3x3, enum_constitutive_1D, enum_constitutive_3D, enum_constitutive_6D, enum_drive, enum_element, enum_friction, SelectedObjects
-    from .base import update_constitutive, update_drive, update_element, update_friction, update_matrix, update_scene
+    from .base import bpy, BPY, root_dot, database, Operator, Entity, Bundle, SelectedObjects, SegmentList
+    from .base import update_element
     from mathutils import Vector
     from copy import copy
     import os
@@ -43,7 +42,7 @@ else:
 
 types = aerodynamic_types + beam_types + ["Body"] + force_types + genel_types + joint_types + environment_types + ["Driven"] + node_types
 
-tree = ["Add Element",
+tree = ["Element",
     ["Aerodynamic", aerodynamic_types,
     "Beam", beam_types,
     Type("Body", 1),
@@ -114,48 +113,86 @@ class Base(Operator):
                 layout.operator_context = 'EXEC_DEFAULT'
                 layout.operator("object.delete")
 
+class Constitutive(Base):
+    constitutive = bpy.props.PointerProperty(type = BPY.Constitutive)
+    def prereqs(self, context):
+        self.constitutive.mandatory = True
+        self.constitutive.dimension = "3D"
+    def assign(self, context):
+        self.constitutive.assign(self.entity.constitutive)
+    def store(self, context):
+        self.entity.constitutive = self.constitutive.store()
+        self.entity.objects = self.sufficient_objects(context)
+    def draw(self, context):
+        self.constitutive.draw(self.layout, text="Constitutive")
+    def check(self, context):
+        return self.constitutive.check(context)
+
+class Drive(Base):
+    drive = bpy.props.PointerProperty(type = BPY.Drive)
+    def prereqs(self, context):
+        self.drive.mandatory = True
+    def assign(self, context):
+        self.drive.assign(self.entity.drive)
+    def store(self, context):
+        self.entity.drive = self.drive.store()
+        self.entity.objects = self.sufficient_objects(context)
+    def draw(self, context):
+        self.drive.draw(self.layout, "Drive")
+    def check(self, context):
+        return self.drive.check(context)
+
+class Friction(Base):
+    friction = bpy.props.PointerProperty(type = BPY.Friction)
+    def assign(self, context):
+        self.friction.assign(self.entity.friction)
+    def store(self, context):
+        self.entity.friction = self.friction.store()
+        self.entity.objects = self.sufficient_objects(context)
+    def draw(self, context):
+        self.friction.draw(self.layout, text="Friction")
+    def check(self, context):
+        return self.friction.check(context)
+
 klasses = dict()
 
 class StructuralForce(Entity):
     elem_type = "force"
     file_ext = "frc"
     labels = "node Fx Fy Fz X Y Z".split()
-    def write(self, text):
+    def write(self, f):
         rot_0, globalV_0, Node_0 = self.rigid_offset(0)
         rotT_0 = self.objects[0].matrix_world.to_quaternion().to_matrix()
         relative_dir = rot_0*rotT_0*Vector((0., 0., 1.))
         relative_arm_0 = rot_0*globalV_0
-        string = "\tforce: " + FORMAT(database.element.index(self)) + ", " + self.orientation
+        string = "\tforce: " + self.safe_name() + ", " + self.orientation
         if self.orientation == "follower":
             relative_dir = rot_0*rotT_0*Vector((0., 0., 1.))
         else:
             relative_dir = rotT_0*Vector((0., 0., 1.))
-        text.write(string+
-        ",\n\t\t" + FORMAT(Node_0)+
+        f.write(string+
+        ",\n\t\t" + safe_name(Node_0.name) +
         ",\n\t\t\tposition, ")
-        self.write_vector(relative_arm_0, text, ",\n\t\t\t")
-        self.write_vector(relative_dir, text, ",\n\t\t")
-        text.write(self.links[0].string(self) + ";\n")
+        self.write_vector(f, relative_arm_0, ",\n\t\t\t")
+        self.write_vector(f, relative_dir, ",\n\t\t")
+        f.write("reference, " + self.drive.safe_name() + ";\n")
     def remesh(self):
         RhombicPyramid(self.objects[0])
 
-class ForceBase(Base):
+class Force(Drive):
     orientation = bpy.props.EnumProperty(items=[("follower", "Follower", ""), ("absolute", "Absolute", "")], name="Orientation", default="follower")
-    drive_name = bpy.props.EnumProperty(items=enum_drive, name="Drive",
-        update=lambda self, context: update_drive(self, context, self.drive_name))
     def assign(self, context):
         self.orientation = self.entity.orientation
-        self.drive_name = self.entity.links[0].name
+        super().assign(context)
     def store(self, context):
         self.entity.orientation = self.orientation
-        self.entity.links.append(database.drive.get_by_name(self.drive_name))
-        self.entity.objects = self.sufficient_objects(context)
+        super().store(context)
     def draw(self, context):
         layout = self.layout
         layout.prop(self, "orientation")
-        layout.prop(self, "drive_name")
+        self.drive.draw(layout, "Drive")
 
-class StructuralForceOperator(ForceBase):
+class StructuralForceOperator(Force):
     bl_label = "Structural force"
     N_objects = 1
     def create_entity(self):
@@ -167,30 +204,30 @@ class StructuralInternalForce(Entity):
     elem_type = "force"
     file_ext = "frc"
     labels = "node1 F1x F1y F1z X1 Y1 Z1 node2 F2x F2y F2z X2 Y2 Z2".split()
-    def write(self, text):
+    def write(self, f):
         rot_0, globalV_0, Node_0 = self.rigid_offset(0)
         rotT_0 = self.objects[0].matrix_world.to_quaternion().to_matrix()
         relative_arm_0 = rot_0*globalV_0
         rot_1, globalV_1, Node_1 = self.rigid_offset(1)
         relative_arm_1 = rot_1*globalV_1
-        string = "\tforce: " + FORMAT(database.element.index(self)) + ", "
+        string = "\tforce: " + self.safe_name() + ", "
         if self.orientation == "follower":
             string += "follower internal"
             relative_dir = rot_0*rotT_0*Vector((0., 0., 1.))
         else:
             string += "absolute internal"
             relative_dir = rotT_0*Vector((0., 0., 1.))
-        text.write(string+
-        ",\n\t\t" + FORMAT(Node_0) + ",\n\t\t\t")
-        self.write_vector(relative_dir, text, ",\n\t\t\t")
-        self.write_vector(relative_arm_0, text, ",\n\t\t")
-        text.write(FORMAT(Node_1) + ",\n\t\t\t")
-        self.write_vector(relative_arm_1, text, ",\n\t\t")
-        text.write(self.links[0].string(self) + ";\n")
+        f.write(string+
+        ",\n\t\t" + safe_name(Node_0.name) + ",\n\t\t\t")
+        self.write_vector(f, relative_dir, ",\n\t\t\t")
+        self.write_vector(f, relative_arm_0, ",\n\t\t")
+        f.write(safe_name(Node_1.name) + ",\n\t\t\t")
+        self.write_vector(f, relative_arm_1, ",\n\t\t")
+        f.write("reference, " + self.drive.safe_name() + ";\n")
     def remesh(self):
         RhombicPyramid(self.objects[0])
 
-class StructuralInternalForceOperator(ForceBase):
+class StructuralInternalForceOperator(Force):
     bl_label = "Structural internal force"
     def create_entity(self):
         return StructuralInternalForce(self.name)
@@ -201,24 +238,24 @@ class StructuralCouple(Entity):
     elem_type = "couple"
     file_ext = "frc"
     labels = "node Mx My Mz".split()
-    def write(self, text):
+    def write(self, f):
         rot_0, globalV_0, Node_0 = self.rigid_offset(0)
         rotT_0 = self.objects[0].matrix_world.to_quaternion().to_matrix()
-        string = "\tcouple: " + FORMAT(database.element.index(self)) + ", "
+        string = "\tcouple: " + self.safe_name() + ", "
         if self.orientation == "follower":
             string += "follower"
             relative_dir = rot_0*rotT_0*Vector((0., 0., 1.))
         else:
             string += "absolute"
             relative_dir = rotT_0*Vector((0., 0., 1.))
-        text.write(string+
-        ",\n\t\t" + FORMAT(Node_0) + ",\n\t\t\t")
-        self.write_vector(relative_dir, text, ",\n\t\t")
-        text.write(self.links[0].string(self) + ";\n")
+        f.write(string+
+        ",\n\t\t" + safe_name(Node_0.name) + ",\n\t\t\t")
+        self.write_vector(f, relative_dir, ",\n\t\t")
+        f.write("reference, " + self.drive.safe_name() + ";\n")
     def remesh(self):
         RhombicPyramid(self.objects[0])
 
-class StructuralCoupleOperator(ForceBase):
+class StructuralCoupleOperator(Force):
     bl_label = "Structural couple"
     N_objects = 1
     def create_entity(self):
@@ -230,25 +267,25 @@ class StructuralInternalCouple(Entity):
     elem_type = "couple"
     file_ext = "frc"
     labels = "node1 M1x M1y M1z node2 M2x M2y M2z".split()
-    def write(self, text):
+    def write(self, f):
         rot_0, globalV_0, Node_0 = self.rigid_offset(0)
         rotT_0 = self.objects[0].matrix_world.to_quaternion().to_matrix()
         rot_1, globalV_1, Node_1 = self.rigid_offset(1)
-        string = "\tcouple: " + FORMAT(database.element.index(self)) + ", "
+        string = "\tcouple: " + self.safe_name() + ", "
         if self.orientation == "follower":
             string += "follower internal"
             relative_dir = rot_0*rotT_0*Vector((0., 0., 1.))
         else:
             string += "absolute internal"
             relative_dir = rotT_0*Vector((0., 0., 1.))
-        text.write(string+
-        ",\n\t\t" + FORMAT(Node_0) + ",\n\t\t\t")
-        self.write_vector(relative_dir, text, ",\n\t\t")
-        text.write(FORMAT(Node_1) + ",\n" + self.links[0].string(True) + ";\n")
+        f.write(string+
+        ",\n\t\t" + safe_name(Node_0.name) + ",\n\t\t\t")
+        self.write_vector(f, relative_dir, ",\n\t\t")
+        f.write(safe_name(Node_1.name) + ",\n\t\treference, " + self.drive.safe_name() + ";\n")
     def remesh(self):
         RhombicPyramid(self.objects[0])
 
-class StructuralInternalCoupleOperator(ForceBase):
+class StructuralInternalCoupleOperator(Force):
     bl_label = "Structural internal couple"
     def create_entity(self):
         return StructuralInternalCouple(self.name)
@@ -261,58 +298,48 @@ class Joint(Entity):
     labels = "Fx Fy Fz Mx My Mz FX FY FZ MX MY MZ".split()
 
 class Hinge(Joint):
-    def write_hinge(self, text, name, V1=True, V2=True, M1=True, M2=True):
+    def write_hinge(self, f, name, V1=True, V2=True, M1=True, M2=True):
         rot_0, globalV_0, Node_0 = self.rigid_offset(0)
         localV_0 = rot_0*globalV_0
         rot_1, globalV_1, Node_1 = self.rigid_offset(1)
         to_hinge = rot_1*(globalV_1 + self.objects[0].matrix_world.translation - self.objects[1].matrix_world.translation)
         rotT = self.objects[0].matrix_world.to_quaternion().to_matrix()
-        text.write(
-        "\tjoint: " + FORMAT(database.element.index(self)) + ", " + name + ",\n" +
-        "\t\t" + FORMAT(Node_0))
+        f.write(
+        "\tjoint: " + self.safe_name() + ", " + name + ",\n" +
+        "\t\t" + safe_name(Node_0.name))
         if V1:
-            text.write(", ")
-            self.write_vector(localV_0, text)
+            f.write(", ")
+            self.write_vector(f, localV_0)
         if M1:
-            text.write(",\n\t\t\thinge, matr,\n")
-            self.write_matrix(rot_0*rotT, text, "\t\t\t\t")
-        text.write(", \n\t\t" + FORMAT(Node_1))
+            f.write(",\n\t\t\thinge, matr,\n")
+            self.write_matrix(f, rot_0*rotT, "\t\t\t\t")
+        f.write(", \n\t\t" + safe_name(Node_1.name))
         if V2:
-            text.write(", ")
-            self.write_vector(to_hinge, text)
+            f.write(", ")
+            self.write_vector(f, to_hinge)
         if M2:
-            text.write(",\n\t\t\thinge, matr,\n")
-            self.write_matrix(rot_1*rotT, text, "\t\t\t\t")
+            f.write(",\n\t\t\thinge, matr,\n")
+            self.write_matrix(f, rot_1*rotT, "\t\t\t\t")
 
 class AxialRotation(Hinge):
-    def write(self, text):
-        self.write_hinge(text, "axial rotation")
-        text.write(",\n" + self.links[0].string(True) + ";\n")
+    def write(self, f):
+        self.write_hinge(f, "axial rotation")
+        f.write(",\n\t\treference, " + self.drive.safe_name() + ";\n")
     def remesh(self):
         Cylinder(self.objects[0])
 
-class AxialRotationOperator(Base):
+class AxialRotationOperator(Drive):
     bl_label = "Axial rotation"
-    drive_name = bpy.props.EnumProperty(items=enum_drive, name="Drive",
-        update=lambda self, context: update_drive(self, context, self.drive_name))
-    def assign(self, context):
-        self.drive_name = self.entity.links[0].name
-    def store(self, context):
-        self.entity.links.append(database.drive.get_by_name(self.drive_name))
-        self.entity.objects = self.sufficient_objects(context)
-    def draw(self, context):
-        layout = self.layout
-        layout.prop(self, "drive_name")
     def create_entity(self):
         return AxialRotation(self.name)
 
 klasses[AxialRotationOperator.bl_label] = AxialRotationOperator
 
 class Clamp(Joint):
-    def write(self, text):
-        text.write(
-        "\tjoint: " + FORMAT(database.element.index(self)) + ", clamp,\n" +
-        "\t\t" + FORMAT(database.node.index(self.objects[0])) + ", node, node;\n")
+    def write(self, f):
+        f.write(
+        "\tjoint: " + self.safe_name() + ", clamp,\n" +
+        "\t\t" + safe_name(self.objects[0].name) + ", node, node;\n")
     def remesh(self):
         Teardrop(self.objects[0])
 
@@ -327,43 +354,28 @@ klasses[ClampOperator.bl_label] = ClampOperator
 
 class DeformableDisplacementJoint(Hinge):
     labels = "Fx Fy Fz Mx My Mz FX FY FZ MX MY MZ ex ey ez ex_dot ey_dot ez_dot".split()
-    def write(self, text):
-        self.write_hinge(text, "deformable displacement joint")
-        text.write(",\n\t\t" + self.links[0].string() + ";\n")
+    def write(self, f):
+        self.write_hinge(f, "deformable displacement joint")
+        f.write(",\n\t\treference, " + self.constitutive.safe_name() + ";\n")
     def remesh(self):
         Cylinder(self.objects[0])
 
-class ConstitutiveBase(Base):
-    dimension = "3D"
-    def assign(self, context):
-        self.constitutive_name = self.entity.links[0].name
-    def store(self, context):
-        self.entity.links.append(database.constitutive.get_by_name(self.constitutive_name))
-        self.entity.objects = self.sufficient_objects(context)
-    def draw(self, context):
-        layout = self.layout
-        layout.prop(self, "constitutive_name")
-
-class DeformableDisplacementJointOperator(ConstitutiveBase):
+class DeformableDisplacementJointOperator(Constitutive):
     bl_label = "Deformable displacement joint"
-    constitutive_name = bpy.props.EnumProperty(items=enum_constitutive_3D, name="Constitutive 3D",
-        update=lambda self, context: update_constitutive(self, context, self.constitutive_name))
     def create_entity(self):
         return DeformableDisplacementJoint(self.name)
 
 klasses[DeformableDisplacementJointOperator.bl_label] = DeformableDisplacementJointOperator
 
 class DeformableHinge(Hinge):
-    def write(self, text):
-        self.write_hinge(text, "deformable hinge", V1=False, V2=False)
-        text.write(",\n\t\t" + self.links[0].string() + ";\n")
+    def write(self, f):
+        self.write_hinge(f, "deformable hinge", V1=False, V2=False)
+        f.write(",\n\t\treference, " + self.constitutive.safe_name() + ";\n")
     def remesh(self):
         Sphere(self.objects[0])
 
-class DeformableHingeOperator(ConstitutiveBase):
+class DeformableHingeOperator(Constitutive):
     bl_label = "Deformable hinge"
-    constitutive_name = bpy.props.EnumProperty(items=enum_constitutive_3D, name="Constitutive 3D",
-        update=lambda self, context: update_constitutive(self, context, self.constitutive_name))
     def create_entity(self):
         return DeformableJoint(self.name)
 
@@ -371,72 +383,55 @@ klasses[DeformableHingeOperator.bl_label] = DeformableHingeOperator
 
 class DeformableJoint(Hinge):
     labels = "Fx Fy Fz Mx My Mz FX FY FZ MX MY MZ ex ey ez".split()
-    def write(self, text):
-        self.write_hinge(text, "deformable joint")
-        text.write(",\n\t\t" + self.links[0].string() + ";\n")
+    def write(self, f):
+        self.write_hinge(f, "deformable joint")
+        f.write(",\n\t\treference, " + self.constitutive.safe_name() + ";\n")
     def remesh(self):
         Sphere(self.objects[0])
 
-class DeformableJointOperator(ConstitutiveBase):
+class DeformableJointOperator(Constitutive):
     bl_label = "Deformable joint"
-    constitutive_name = bpy.props.EnumProperty(items=enum_constitutive_3D, name="Constitutive 3D",
-        update=lambda self, context: update_constitutive(self, context, self.constitutive_name))
+    def prereqs(self, context):
+        self.constitutive.mandatory = True
+        self.constitutive.dimension = "6D"
     def create_entity(self):
         return DeformableJoint(self.name)
 
 klasses[DeformableJointOperator.bl_label] = DeformableJointOperator
 
 class Distance(Joint):
-    def write(self, text):
-        text.write("\tjoint: " + FORMAT(database.element.index(self)) + ", distance,\n")
+    def write(self, f):
+        f.write("\tjoint: " + self.safe_name() + ", distance,\n")
         for i in range(2):
-            self.write_node(text, i, node=True, position=True, p_label="position")
-            text.write(",\n")
-        if self.from_nodes:
-            text.write("\t\tfrom nodes;\n")
+            self.write_node(f, i, node=True, position=True, p_label="position")
+            f.write(",\n")
+        if self.drive is None:
+            f.write("\t\tfrom nodes;\n")
         else:
-            text.write(self.links[0].string(True) + ";\n")
+            f.write("\t\treference, " + self.drive.safe_name() + ";\n")
 
-class DistanceOperator(Base):
+class DistanceOperator(Drive):
     bl_label = "Distance"
     exclusive = True
-    from_nodes = bpy.props.BoolProperty(name="From nodes", description="Constant distance from initial node positons", default=True)
-    drive_name = bpy.props.EnumProperty(items=enum_drive, name="Drive",
-        update=lambda self, context: update_drive(self, context, self.drive_name))
-    def assign(self, context):
-        self.from_nodes = self.entity.from_nodes
-        if self.entity.links:
-            self.drive_name = self.entity.links[0].name
-    def store(self, context):
-        self.entity.from_nodes = self.from_nodes
-        if not self.from_nodes:
-            self.entity.links.append(database.drive.get_by_name(self.drive_name))
-        self.entity.objects = self.sufficient_objects(context)
-    def draw(self, context):
-        self.basis = self.from_nodes
-        layout = self.layout
-        layout.prop(self, "from_nodes")
-        if not self.from_nodes:
-            layout.prop(self, "drive_name")
-    def check(self, context):
-        return self.basis != self.from_nodes
+    def prereqs(self, context):
+        self.drive.mandatory = False
     def create_entity(self):
         return Distance(self.name)
 
 klasses[DistanceOperator.bl_label] = DistanceOperator
 
 class InLine(Joint):
-    def write(self, text):
+    def write(self, f):
         rot0, globalV0, iNode0 = self.rigid_offset(0)
         localV0 = rot0*globalV0
         rot_1, globalV_1, Node_1 = self.rigid_offset(1)
         to_point = rot_1*(globalV_1 + self.objects[0].matrix_world.translation - self.objects[1].matrix_world.translation)
         rot = self.objects[0].matrix_world.to_quaternion().to_matrix()
-        text.write("\tjoint: " + FORMAT(database.element.index(self)) + ", inline,\n")
-        self.write_node(text, 0, node=True, position=True, orientation=True)
-        text.write(",\n\t\t" + FORMAT(Node_1))
-        text.write(",\n\t\t\toffset, ")
-        self.write_vector(to_point, text, ";\n")
+        f.write("\tjoint: " + self.safe_name() + ", inline,\n")
+        self.write_node(f, 0, node=True, position=True, orientation=True)
+        f.write(",\n\t\t" + safe_name(Node_1.name))
+        f.write(",\n\t\t\toffset, ")
+        self.write_vector(f, to_point, ";\n")
     def remesh(self):
         RhombicPyramid(self.objects[0])
 
@@ -448,19 +443,19 @@ class InLineOperator(Base):
 klasses[InLineOperator.bl_label] = InLineOperator
 
 class InPlane(Joint):
-    def write(self, text):
+    def write(self, f):
         rot0, globalV0, iNode0 = self.rigid_offset(0)
         localV0 = rot0*globalV0
         rot1, globalV1, iNode1 = self.rigid_offset(1)
         to_point = rot1*(globalV1 + self.objects[0].matrix_world.translation - self.objects[1].matrix_world.translation)
         rot = self.objects[0].matrix_world.to_quaternion().to_matrix()
         normal = rot*rot0*Vector((0., 0., 1.))
-        text.write(
-        "\tjoint: " + FORMAT(database.element.index(self)) + ", inplane,\n" +
-        "\t\t" + FORMAT(iNode0) + ",\n\t\t\t")
-        self.write_vector(localV0, text, ",\n\t\t\t")
-        self.write_vector(normal, text, ",\n\t\t")
-        text.write(FORMAT(iNode1) + ",\n\t\t\toffset, " + FORMAT(to_point[0]) + ", " + FORMAT(to_point[1]) + ", " + FORMAT(to_point[2]) + ";\n")
+        f.write(
+        "\tjoint: " + self.safe_name() + ", inplane,\n" +
+        "\t\t" + safe_name(iNode0.name) + ",\n\t\t\t")
+        self.write_vector(f, localV0, ",\n\t\t\t")
+        self.write_vector(f, normal, ",\n\t\t")
+        f.write(safe_name(iNode1.name) + ",\n\t\t\toffset, " + ", ".join([BPY.FORMAT(x) for x in to_point]) + ";\n")
     def remesh(self):
         RhombicPyramid(self.objects[0])
 
@@ -473,64 +468,42 @@ klasses[InPlaneOperator.bl_label] = InPlaneOperator
 
 class RevoluteHinge(Hinge):
     labels = "Fx Fy Fz Mx My Mz FX FY FZ MX MY MZ ex ey ez Ax Ay Az Ax_dot Ay_dot Az_dot".split()
-    def write(self, text):
-        self.write_hinge(text, "revolute hinge")
-        if self.enable_theta:
-            text.write(",\n\t\tinitial theta, " + FORMAT(self.theta))
-        if self.enable_friction:
-            text.write(",\n\t\tfriction, " + FORMAT(self.average_radius))
-            if self.enable_preload:
-                text.write(",\n\t\t\tpreload, " + FORMAT(self.preload))
-            text.write(",\n\t\t\t" + self.links[0].string())
-        text.write(";\n")
+    def write(self, f):
+        self.write_hinge(f, "revolute hinge")
+        if self.theta is not None:
+            f.write(",\n\t\tinitial theta, " + BPY.FORMAT(self.theta))
+        if self.average_radius is not None:
+            f.write(",\n\t\tfriction, " + BPY.FORMAT(self.average_radius))
+            if self.preload is not None:
+                f.write(",\n\t\t\tpreload, " + BPY.FORMAT(self.preload))
+            f.write(",\n\t\t\t" + self.friction.string())
+        f.write(";\n")
     def remesh(self):
         Cylinder(self.objects[0])
 
-class RevoluteHingeOperator(Base):
+class RevoluteHingeOperator(Friction):
     bl_label = "Revolute hinge"
-    enable_theta = bpy.props.BoolProperty(name="Enable theta", description="Enable use of initial theta", default=False)
-    theta = bpy.props.FloatProperty(name="Theta", description="Initial theta", min=-9.9e10, max=9.9e10, precision=6, default=0.0)
-    enable_friction = bpy.props.BoolProperty(name="Enable friction", description="Enable friction model", default=False)
-    average_radius = bpy.props.FloatProperty(name="Radius", description="Average radius used in friction model", min=0.0, max=9.9e10, precision=6, default=1.0)
-    enable_preload = bpy.props.BoolProperty(name="Enable preload", description="Enable preload", default=False)
-    preload = bpy.props.FloatProperty(name="Preload", description="Preload used in friction model", min=0.0, max=9.9e10, precision=6, default=1.0)
-    friction_name = bpy.props.EnumProperty(items=enum_friction, name="Friction",
-        update=lambda self, context: update_friction(self, context, self.friction_name))
+    theta = bpy.props.PointerProperty(type = BPY.Float)
+    average_radius = bpy.props.PointerProperty(type = BPY.Float)
+    preload = bpy.props.PointerProperty(type = BPY.Float)
     def assign(self, context):
-        self.enable_theta = self.entity.enable_theta
-        self.theta = self.entity.theta
-        self.enable_friction = self.entity.enable_friction
-        self.average_radius = self.entity.average_radius
-        self.enable_preload = self.entity.enable_preload
-        self.preload = self.entity.preload
+        self.theta.assign(self.entity.theta)
+        self.average_radius.assign(self.entity.average_radius)
+        self.preload.assign(self.entity.preload)
+        super().assign(context)
     def store(self, context):
-        self.entity.enable_theta = self.enable_theta
-        self.entity.theta = self.theta
-        self.entity.enable_friction = self.enable_friction
-        self.entity.average_radius = self.average_radius
-        self.entity.enable_preload = self.enable_preload
-        self.entity.preload = self.preload
-        if self.enable_friction:
-            self.entity.links.append(database.friction.get_by_name(self.friction_name))
-        self.entity.objects = self.sufficient_objects(context)
+        self.entity.theta = self.theta.store()
+        self.entity.average_radius = self.average_radius.store()
+        self.entity.preload = self.preload.store()
+        super().store(context)
     def draw(self, context):
-        self.basis = (self.enable_theta, self.enable_friction, self.enable_preload)
-        layout = self.layout
-        row = layout.row()
-        row.prop(self, "enable_theta")
-        if self.enable_theta:
-            row.prop(self, "theta")
-        row = layout.row()
-        row.prop(self, "enable_friction")
-        if self.enable_friction:
-            row.prop(self, "average_radius")
-            row = layout.row()
-            row.prop(self, "enable_preload")
-            if self.enable_preload:
-                row.prop(self, "preload")
-            layout.prop(self, "friction_name")
+        self.theta.draw(self.layout, text="Theta")
+        self.average_radius.draw(self.layout, text="Average radius")
+        if self.average_radius.use:
+            self.preload.draw(self.layout, text="Preload")
+            self.friction.draw(self.layout, text="Friction")
     def check(self, context):
-        return self.basis != (self.enable_theta, self.enable_friction, self.enable_preload)
+        return self.theta.check(context) or self.average_radius.check(context) or self.preload.check(context) or self.friction.check(context)
     def create_entity(self):
         return RevoluteHinge(self.name)
 
@@ -538,27 +511,27 @@ klasses[RevoluteHingeOperator.bl_label] = RevoluteHingeOperator
 
 class Rod(Joint):
     labels = "Fx Fy Fz Mx My Mz FX FY FZ MX MY MZ l ux uy uz l_dot".split()
-    def write(self, text):
-        text.write("\tjoint: " + FORMAT(database.element.index(self)) + ", rod,\n")
+    def write(self, f):
+        f.write("\tjoint: " + self.safe_name() + ", rod,\n")
         for i in range(2):
-            self.write_node(text, i, node=True, position=True, p_label="position")
-            text.write(",\n")
-        text.write("\t\tfrom nodes,\n\t\t" + self.links[0].string() + ";\n")
+            self.write_node(f, i, node=True, position=True, p_label="position")
+            f.write(",\n")
+        f.write("\t\tfrom nodes,\n\t\treference, " + self.constitutive.safe_name() + ";\n")
 
-class RodOperator(ConstitutiveBase):
+class RodOperator(Constitutive):
     bl_label = "Rod"
-    dimension = "1D"
-    constitutive_name = bpy.props.EnumProperty(items=enum_constitutive_1D, name="Constitutive 1D",
-        update=lambda self, context: update_constitutive(self, context, self.constitutive_name))
+    def prereqs(self, context):
+        self.constitutive.mandatory = True
+        self.constitutive.dimension = "1D"
     def create_entity(self):
         return Rod(self.name)
 
 klasses[RodOperator.bl_label] = RodOperator
 
 class SphericalHinge(Hinge):
-    def write(self, text):
-        self.write_hinge(text, "spherical hinge")
-        text.write(";\n")
+    def write(self, f):
+        self.write_hinge(f, "spherical hinge")
+        f.write(";\n")
     def remesh(self):
         Sphere(self.objects[0])
 
@@ -571,7 +544,7 @@ klasses[SphericalHingeOperator.bl_label] = SphericalHingeOperator
 
 class TotalJoint(Joint):
     labels = "Fx Fy Fz Mx My Mz FX FY FZ MX MY MZ dx dy dz dAx dAy dAz u v w dAx_dor dAy_dot dAz_dot".split()
-    def write(self, text):
+    def write(self, f):
         rot_0, globalV_0, Node_0 = self.rigid_offset(0)
         localV_0 = rot_0*globalV_0
         rot_1, globalV_1, Node_1 = self.rigid_offset(1)
@@ -581,139 +554,101 @@ class TotalJoint(Joint):
             rot_position = rot
         else:
             rot_position = self.objects[1].matrix_world.to_quaternion().to_matrix()
-        text.write("\tjoint: " + FORMAT(database.element.index(self)) + ", total joint")
+        f.write("\tjoint: " + self.safe_name() + ", total joint")
         if self.first == "rotate":
-            text.write(",\n\t\t" + FORMAT(Node_0) + ", position, ")
-            self.write_vector(localV_0, text, ",\n\t\t\tposition orientation, matr,\n")
-            self.write_matrix(rot_0*rot_position, text, "\t\t\t\t")
-            text.write(",\n\t\t\trotation orientation, matr,\n")
-            self.write_matrix(rot_0*rot, text, "\t\t\t\t")
-        text.write(",\n\t\t" + FORMAT(Node_1) + ", position, ")
-        self.write_vector(to_joint, text, ",\n\t\t\tposition orientation, matr,\n")
-        self.write_matrix(rot_1*rot_position, text, "\t\t\t\t")
-        text.write(",\n\t\t\trotation orientation, matr,\n")
-        self.write_matrix(rot_1*rot, text, "\t\t\t\t")
+            f.write(",\n\t\t" + safe_name(Node_0.name) + ", position, ")
+            self.write_vector(f, localV_0, ",\n\t\t\tposition orientation, matr,\n")
+            self.write_matrix(f, rot_0*rot_position, "\t\t\t\t")
+            f.write(",\n\t\t\trotation orientation, matr,\n")
+            self.write_matrix(f, rot_0*rot, "\t\t\t\t")
+        f.write(",\n\t\t" + safe_name(Node_1.name) + ", position, ")
+        self.write_vector(f, to_joint, ",\n\t\t\tposition orientation, matr,\n")
+        self.write_matrix(f, rot_1*rot_position, "\t\t\t\t")
+        f.write(",\n\t\t\trotation orientation, matr,\n")
+        self.write_matrix(f, rot_1*rot, "\t\t\t\t")
         if self.first == "displace":
-            text.write(",\n\t\t" + FORMAT(Node_0) + ", position, ")
-            self.write_vector(localV_0, text, ",\n\t\t\tposition orientation, matr,\n")
-            self.write_matrix(rot_0*rot_position, text, "\t\t\t\t")
-            text.write(",\n\t\t\trotation orientation, matr,\n")
-            self.write_matrix(rot_0*rot, text, "\t\t\t\t")
-        text.write(",\n\t\t\tposition constraint")
-        for b in [self.displacement_x, self.displacement_y, self.displacement_z]: 
-            if b:
-                text.write(", active")
+            f.write(",\n\t\t" + safe_name(Node_0.name) + ", position, ")
+            self.write_vector(f, localV_0, ",\n\t\t\tposition orientation, matr,\n")
+            self.write_matrix(f, rot_0*rot_position, "\t\t\t\t")
+            f.write(",\n\t\t\trotation orientation, matr,\n")
+            self.write_matrix(f, rot_0*rot, "\t\t\t\t")
+        f.write(",\n\t\t\tposition constraint")
+        for d in self.drives[:3]: 
+            if d:
+                f.write(", active")
             else:
-                text.write(", inactive")
-        text.write(", component")
+                f.write(", inactive")
+        f.write(", component")
         database.drive_indenture += 2
-        for i, b in enumerate([self.displacement_x, self.displacement_y, self.displacement_z]):
-            if b:
-                text.write(",\n" + self.links[i].string(True))
+        for d in self.drives[:3]:
+            if d:
+                f.write(",\n\t\treference, " + d.safe_name())
             else:
-                text.write(",\n\t\t\t\tinactive")
-        text.write(",\n\t\t\torientation constraint")
-        for b in [self.angular_displacement_x, self.angular_displacement_y, self.angular_displacement_z]: 
-            if b:
-                text.write(", active")
+                f.write(",\n\t\t\t\tinactive")
+        f.write(",\n\t\t\torientation constraint")
+        for d in self.drives[3:6]: 
+            if d:
+                f.write(", active")
             else:
-                text.write(", inactive")
-        text.write(", component")
-        for i, b in enumerate([self.angular_displacement_x, self.angular_displacement_y, self.angular_displacement_z]):
-            if b:
-                text.write(",\n" + self.links[3+i].string(True))
+                f.write(", inactive")
+        f.write(", component")
+        for d in self.drives[3:6]:
+            if d:
+                f.write(",\n\t\treference, " + d.safe_name())
             else:
-                text.write(",\n\t\t\t\tinactive")
+                f.write(",\n\t\t\t\tinactive")
         database.drive_indenture -= 2
-        text.write(";\n")
+        f.write(";\n")
     def remesh(self):
         Sphere(self.objects[0])
 
 class TotalJointOperator(Base):
     bl_label = "Total joint"
-    first = bpy.props.EnumProperty(items=[("displace", "Displace first", ""), ("rotate", "Rotate first", "")], default="displace")
-    displacement_x = bpy.props.BoolProperty(name="", description="Displacement-X drive is active", default=False)
-    displacement_x_drive_name = bpy.props.EnumProperty(items=enum_drive, name="Displacement-X Drive",
-        update=lambda self, context: update_drive(self, context, self.displacement_x_drive_name))
-    displacement_y = bpy.props.BoolProperty(name="", description="Displacement-Y drive is active", default=False)
-    displacement_y_drive_name = bpy.props.EnumProperty(items=enum_drive, name="Displacement-Y Drive",
-        update=lambda self, context: update_drive(self, context, self.displacement_y_drive_name))
-    displacement_z = bpy.props.BoolProperty(name="", description="Displacement-Z drive is active", default=False)
-    displacement_z_drive_name = bpy.props.EnumProperty(items=enum_drive, name="Displacement-Z Drive",
-        update=lambda self, context: update_drive(self, context, self.displacement_z_drive_name))
-    angular_displacement_x = bpy.props.BoolProperty(name="", description="Angular Displacement-X drive is active", default=False)
-    angular_displacement_x_drive_name = bpy.props.EnumProperty(items=enum_drive, name="Angular Displacement-X Drive",
-        update=lambda self, context: update_drive(self, context, self.angular_displacement_x_drive_name))
-    angular_displacement_y = bpy.props.BoolProperty(name="", description="Angular Displacement-Y drive is active", default=False)
-    angular_displacement_y_drive_name = bpy.props.EnumProperty(items=enum_drive, name="Angular Displacement-Y Drive",
-        update=lambda self, context: update_drive(self, context, self.angular_displacement_y_drive_name))
-    angular_displacement_z = bpy.props.BoolProperty(name="", description="Angular Displacement-Z drive is active", default=False)
-    angular_displacement_z_drive_name = bpy.props.EnumProperty(items=enum_drive, name="Angular Displacement-Z Drive",
-        update=lambda self, context: update_drive(self, context, self.angular_displacement_z_drive_name))
+    first = bpy.props.EnumProperty(items=[("displace", "Displacement", ""), ("rotate", "Angular Displacement", "")], default="displace")
+    drives = bpy.props.CollectionProperty(type = BPY.Drive)
+    def prereqs(self, context):
+        for i in range(6):
+            self.drives.add()
+        self.titles = list()
+        for t1 in ["Displacement-", "Angular Displacement-"]:
+            for t2 in "XYZ":
+                self.titles.append(t1 + t2)
     def assign(self, context):
         self.first = self.entity.first
-        self.displacement_x = self.entity.displacement_x
-        self.displacement_y = self.entity.displacement_y
-        self.displacement_z = self.entity.displacement_z
-        self.angular_displacement_x = self.entity.angular_displacement_x
-        self.angular_displacement_y = self.entity.angular_displacement_y
-        self.angular_displacement_z = self.entity.angular_displacement_z
-        self.displacement_x_drive_name = self.entity.links[0].name
-        self.displacement_y_drive_name = self.entity.links[1].name
-        self.displacement_z_drive_name = self.entity.links[2].name
-        self.angular_displacement_x_drive_name = self.entity.links[3].name
-        self.angular_displacement_y_drive_name = self.entity.links[4].name
-        self.angular_displacement_z_drive_name = self.entity.links[5].name
+        for i, d in enumerate(self.entity.drive):
+            self.drives[i].assign(d)
     def store(self, context):
         self.entity.first = self.first
-        self.entity.displacement_x = self.displacement_x
-        self.entity.displacement_y = self.displacement_y
-        self.entity.displacement_z = self.displacement_z
-        self.entity.angular_displacement_x = self.angular_displacement_x
-        self.entity.angular_displacement_y = self.angular_displacement_y
-        self.entity.angular_displacement_z = self.angular_displacement_z
-        for drive_name in [self.displacement_x_drive_name, self.displacement_y_drive_name,
-            self.displacement_z_drive_name, self.angular_displacement_x_drive_name,
-            self.angular_displacement_y_drive_name, self.angular_displacement_z_drive_name]:
-                self.entity.links.append(database.drive.get_by_name(drive_name))
+        self.entity.drives = [d.store() for d in self.drives]
         self.entity.objects = self.sufficient_objects(context)
     def draw(self, context):
-        self.basis = (self.displacement_x)
         layout = self.layout
-        for predicate in ["displacement_", "angular_displacement_"]:
-            for c in "xyz":
-                row = layout.row()
-                row.prop(self, predicate + c)
-                row.prop(self, predicate + c + "_drive_name")
+        layout.prop(self, "first", text="Driven first")
+        for d, t in zip(self.drives, self.titles):
+            d.draw(layout, text = t)
+    def check(self, context):
+        return True in [d.check(context) for d in self.drives]
     def create_entity(self):
         return TotalJoint(self.name)
 
 klasses[TotalJointOperator.bl_label] = TotalJointOperator
 
 class ViscousBody(Joint):
-    def write(self, text):
-        text.write(
-        "\tjoint: " + FORMAT(database.element.index(self)) + ", viscous body,\n\t\t" +
-        FORMAT(database.node.index(self.objects[0]))+
+    def write(self, f):
+        f.write(
+        "\tjoint: " + self.safe_name() + ", viscous body,\n\t\t" +
+        safe_name(self.objects[0].name) +
         ",\n\t\tposition, reference, node, null" +
-        ",\n\t\t" + self.links[0].string() + ";\n")
+        ",\n\t\treference, " + self.constitutive.safe_name() + ";\n")
     def remesh(self):
         Sphere(self.objects[0])
 
-class ViscousBodyOperator(Base):
+class ViscousBodyOperator(Constitutive):
     bl_label = "Viscous body"
     N_objects = 1
-    constitutive_name = bpy.props.EnumProperty(items=enum_constitutive_6D, name="Constitutive 6D",
-        update=lambda self, context: update_constitutive(self, context, self.constitutive_name))
-    def assign(self, context):
-        self.constitutive_name = self.entity.links[0].name
-        self.object = self.entity.objects[0]
-    def store(self, context):
-        self.entity.links.append(database.constitutive.get_by_name(self.constitutive_name))
-        self.entity.objects = self.sufficient_objects(context)
-    def draw(self, context):
-        layout = self.layout
-        layout.prop(self, "constitutive_name")
+    def prereqs(self, context):
+        self.constitutive.mandatory = True
+        self.constitutive.dimension = "6D"
     def create_entity(self):
         return ViscousBody(self.name)
 
@@ -721,34 +656,45 @@ klasses[ViscousBodyOperator.bl_label] = ViscousBodyOperator
 
 class Body(Entity):
     elem_type = "body"
-    def write(self, text):
-        text.write("\tbody: " + FORMAT(database.element.index(self)) + ",\n")
-        self.write_node(text, 0, node=True)
-        text.write("\t\t\t" + FORMAT(self.mass) + ",\n")
-        self.write_node(text, 0, position=True, p_label="")
-        text.write(", " + self.links[0].string())
-        self.write_node(text, 0, orientation=True, o_label="inertial")
-        text.write(";\n")
+    def write(self, f):
+        f.write("\tbody: " + self.safe_name() + ",\n")
+        self.write_node(f, 0, node=True)
+        f.write("\t\t\t" + BPY.FORMAT(self.mass) + ",\n")
+        self.write_node(f, 0, position=True, p_label="")
+        if self.inertial_matrix is not None:
+            f.write(", " + self.inertial_matrix.string())
+            self.write_node(f, 0, orientation=True, o_label="inertial")
+        f.write(";\n")
     def remesh(self):
-        Ellipsoid(self.objects[0], self.mass, self.links[0])
+        Ellipsoid(self.objects[0], self.mass, self.inertial_matrix)
+
+class BodyMass(bpy.types.PropertyGroup, BPY.ValueMode):
+    value = bpy.props.FloatProperty(min=-9.9e10, max=9.9e10, step=100, precision=6, description="Mass of the body")
+BPY.klasses.append(BodyMass)    
 
 class BodyOperator(Base):
     bl_label = "Body"
     N_objects = 1
-    mass = bpy.props.FloatProperty(name="Mass", description="Mass of the body", min=0.000001, max=9.9e10, precision=6, default=1.0)
-    matrix_name = bpy.props.EnumProperty(items=enum_matrix_3x3, name="Matrix", description="Matrix of inertia",
-        update=lambda self, context: update_matrix(self, context, self.matrix_name, "3x3"))
+    mass = bpy.props.PointerProperty(type = BodyMass)
+    inertial_matrix = bpy.props.PointerProperty(type = BPY.MatrixFloat)
+    def prereqs(self, context):
+        self.mass.mandatory = True
+        self.mass.assign(1.0)
+        self.inertial_matrix.mandatory = True
+        self.inertial_matrix.type = "3x3"
     def assign(self, context):
-        self.mass = self.entity.mass
-        self.matrix_name = self.entity.links[0].name
+        self.mass.assign(self.entity.mass)
+        self.inertial_matrix.assign(self.entity.inertial_matrix)
     def store(self, context):
-        self.entity.mass = self.mass
-        self.entity.links.append(database.matrix.get_by_name(self.matrix_name))
+        self.entity.mass = self.mass.store()
+        self.entity.inertial_matrix = self.inertial_matrix.store()
         self.entity.objects = self.sufficient_objects(context)
     def draw(self, context):
         layout = self.layout
-        layout.prop(self, "mass")
-        layout.prop(self, "matrix_name")
+        self.mass.draw(layout, "Mass")
+        self.inertial_matrix.draw(layout, "Inertial matrix")
+    def check(self, context):
+        return self.mass.check(context) or self.inertial_matrix.check(context)
     def create_entity(self):
         return Body(self.name)
 
@@ -786,115 +732,167 @@ class BeamSegment(Entity):
     elem_type = "beam2"
     file_ext = "act"
     labels = "Fx Fy Fz Mx My Mz".split()
-    def write(self, text):
-        if [e for e in database.element if e.type == "Three node beam" and self in e.links]:
+    def write(self, f):
+        if hasattr(self, "consumer"):
             return
-        text.write("\tbeam2: " + str(database.element.index(self)) + ",\n")
+        f.write("\tbeam2: " + self.safe_name() + ",\n")
         for i in range(len(self.objects)):
-            self.write_node(text, i, node=True, position=True, orientation=True, p_label="position", o_label="orientation")
-            text.write(",\n")
-        text.write("\t\tfrom nodes, " + self.links[0].string() + ";\n")
+            self.write_node(f, i, node=True, position=True, orientation=True, p_label="position", o_label="orientation")
+            f.write(",\n")
+        f.write("\t\tfrom nodes, reference, " + self.constitutive.safe_name() + ";\n")
     def remesh(self):
         for obj in self.objects:
             RectangularCuboid(obj)
 
-class BeamSegmentOperator(ConstitutiveBase):
+class BeamSegmentOperator(Constitutive):
     bl_label = "Beam segment"
-    dimension = "6D"
-    constitutive_name = bpy.props.EnumProperty(items=enum_constitutive_6D, name="Constitutive 6D",
-        update=lambda self, context: update_constitutive(self, context, self.constitutive_name, "6D"))
+    def prereqs(self, context):
+        self.constitutive.mandatory = True
+        self.constitutive.dimension = "6D"
     def create_entity(self):
         return BeamSegment(self.name)
 
 klasses[BeamSegmentOperator.bl_label] = BeamSegmentOperator
 
 class SegmentPair:
+    N_objects = 0
+    segments = bpy.props.CollectionProperty(type=BPY.Segment)
+    in_process = False
     @classmethod
-    def segments(cls, context, segment_type="Beam segment"):
-        segments = list()
-        for ob in SelectedObjects(context):
-            segments.extend(database.element.filter(segment_type, ob))
-        if len(segments) == 2 and not segments[0].objects[1] == segments[1].objects[0]:
-            segments.reverse()
-        if len(segments) != 2 or not segments[0].objects[1] == segments[1].objects[0]:
+    def begin_process(cls):
+        cls.in_process = True
+    @classmethod
+    def end_process(cls):
+        cls.in_process = False
+    @classmethod
+    def selected_pair(cls, context, segment_type="Beam segment"):
+        obs = SelectedObjects(context)
+        if len(obs) != 3:
             return list()
-        return segments
+        selected_pair = list()
+        for ob in obs:
+            selected_pair.extend(database.element.filter(segment_type, ob))
+        if len(selected_pair) == 2 and not selected_pair[0].objects[1] == selected_pair[1].objects[0]:
+            selected_pair.reverse()
+        if len(selected_pair) != 2 or not selected_pair[0].objects[1] == selected_pair[1].objects[0]:
+            return list()
+        for ob in obs:
+            if ob not in selected_pair[0].objects + selected_pair[1].objects:
+                return list()
+        return selected_pair
+    @classmethod
+    def poll(cls, context):
+        if cls.in_process:
+            return True
+        selected_pair = cls.selected_pair(context, cls.segment_type)
+        if not selected_pair:
+            return False
+        entity = database.element[context.scene.element_index]
+        for s in selected_pair:
+            if hasattr(s, "consumer") and (not hasattr(entity, "segments") or not s in entity.segments):
+                return False
+        return True
+    def prereqs(self, context):
+        self.begin_process()
+        self.segments.clear()
+        for segment in self.selected_pair(context, self.segment_type):
+            s = self.segments.add()
+            s.assign(segment)
+    def store(self, context):
+        if not hasattr(self.entity, "segments"):
+            self.entity.segments = SegmentList()
+        self.entity.segments.clear()
+        for segment in self.segments:
+            self.entity.segments.append(segment.store())
+        self.entity.objects = self.entity.segments[0].objects + self.entity.segments[1].objects[1:]
+        self.end_process()
+    def draw(self, context):
+        layout = self.layout
+        for i, s in enumerate(self.segments):
+            row = layout.row()
+            row.label("Segment-" + str(i + 1) + ":")
+            row.prop(s, "edit", toggle=True, text=s.name)
 
 class ThreeNodeBeam(Entity):
     elem_type = "beam3"
     file_ext = "act"
     labels = "F1x F1y F1z M1x M1y M1z F2x F2y F2z M2x M2y M2z".split()
-    def write(self, text):
-        text.write("\tbeam3: " + str(database.element.index(self)) + ",\n")
-        self.objects = self.links[0].objects + self.links[1].objects[1:]
+    def write(self, f):
+        f.write("\tbeam3: " + self.safe_name() + ",\n")
+        self.objects = self.segments[0].objects + self.segments[1].objects[1:]
         for i in range(3):
-            self.write_node(text, i, node=True, position=True, orientation=True, p_label="position", o_label="orientation")
-            text.write(",\n")
-        text.write("\t\tfrom nodes, " + self.links[0].links[0].string())
-        text.write(",\n\t\tfrom nodes, " + self.links[1].links[0].string() + ";\n")
+            self.write_node(f, i, node=True, position=True, orientation=True, p_label="position", o_label="orientation")
+            f.write(",\n")
+        f.write("\t\tfrom nodes, reference, " + self.segments[0].constitutive.safe_name())
+        f.write(",\n\t\tfrom nodes, reference, " + self.segments[1].constitutive.safe_name() + ";\n")
         del self.objects
     def remesh(self):
-        for link in self.links:
-            link.remesh()
+        for s in self.segments:
+            s.remesh()
 
-class ThreeNodeBeamOperator(Base, SegmentPair):
+class ThreeNodeBeamOperator(SegmentPair, Base):
     bl_label = "Three node beam"
-    N_objects = 0
-    edit = bpy.props.BoolVectorProperty(name="", size=2)
-    @classmethod
-    def poll(cls, context):
-        segments = cls.segments(context, "Beam segment")
-        ret = True if segments else False
-        for s in segments:
-            if hasattr(s, "consumer") and not database.element.index(s.consumer) == context.scene.element_index:
-                ret = False
-        return ret
-    def prereqs(self, context):
-        self.beam_segments = self.segments(context, "Beam segment")
-    def store(self, context):
-        for segment, edit in zip(self.beam_segments, self.edit):
-            self.entity.links.append(segment)
-            segment.consumer = self.entity
-            if edit:
-                update_element(self, context, segment.name)
-        self.entity.objects = self.beam_segments[0].objects + self.beam_segments[1].objects[1:]
-    def draw(self, context):
-        layout = self.layout
-        for i, element in enumerate(self.beam_segments):
-            row = layout.row()
-            row.prop(self, "edit", index=i, toggle=True)
-            row.label(element.name)
+    segment_type = "Beam segment"
     def create_entity(self):
         return ThreeNodeBeam(self.name)
 
 klasses[ThreeNodeBeamOperator.bl_label] = ThreeNodeBeamOperator
 
+"""class DrivenOperator(Drive):
+    bl_label = "Driven"
+    element = bpy.props.PointerProperty(type = BPY.Element)
+    @classmethod
+    def poll(cls, context):
+        return context.scene.element_uilist
+    def prereqs(self, context):
+        self.element.mandatory = True
+        self.element.assign(database.element[context.scene.element_index])
+        super().prereqs(context)
+    def assign(self, context):
+        self.element.assign(self.entity.element)
+        super().assign(context)
+    def store(self, context):
+        self.entity.element = self.element.store()
+        self.entity.drive = self.drive.store()
+    def draw(self, context):
+        layout = self.layout
+        self.drive.draw(layout, "Drive")
+        self.element.draw(layout, "Element")
+    def check(self, context):
+        return self.element.check(context) or super().check(context)
+    def create_entity(self):
+        return Driven(self.name)
+"""
+
 class Gravity(Entity):
     elem_type = "gravity"
     file_ext = "grv"
     labels = "X_dotdot Y_dotdot Z_dotdot".split()
-    def write(self, text):
-        text.write("\tgravity: " + self.links[0].string() + ", " + self.links[1].string() + ";\n")
+    def write(self, f):
+        f.write("\tgravity: " + self.matrix.string() + ", reference, " + self.drive.safe_name() + ";\n")
 
-class GravityOperator(Base):
+class GravityOperator(Drive):
     bl_label = "Gravity"
-    matrix_name = bpy.props.EnumProperty(items=enum_matrix_3x1, name="Vector",
-        update=lambda self, context: update_matrix(self, context, self.matrix_name, "3x1"))
-    drive_name = bpy.props.EnumProperty(items=enum_drive, name="Drive",
-        update=lambda self, context: update_drive(self, context, self.drive_name))
+    matrix = bpy.props.PointerProperty(type = BPY.Matrix)
     @classmethod
     def poll(cls, context):
         return cls.bl_idname.startswith(root_dot+"e_") or not database.element.filter("Gravity")
+    def prereqs(self, context):
+        self.matrix.mandatory = True
+        self.matrix.type = "3x1"
+        super().prereqs(context)
     def assign(self, context):
-        self.matrix_name = self.entity.links[0].name
-        self.drive_name = self.entity.links[1].name
+        self.matrix.assign(self.entity.matrix)
+        super().assign(context)
     def store(self, context):
-        self.entity.links.append(database.matrix.get_by_name(self.matrix_name))
-        self.entity.links.append(database.drive.get_by_name(self.drive_name))
+        self.entity.matrix = self.matrix.store()
+        self.entity.drive = self.drive.store()
     def draw(self, context):
         layout = self.layout
-        layout.prop(self, "matrix_name")
-        layout.prop(self, "drive_name")
+        self.matrix.draw(layout, "Vector")
+        self.drive.draw(layout, "Drive")
+    def check(self, context):
+        return self.matrix.check(context) or super().check(context)
     def create_entity(self):
         return Gravity(self.name)
 
@@ -902,32 +900,33 @@ klasses[GravityOperator.bl_label] = GravityOperator
 
 class Driven(Entity):
     elem_type = "driven"
-    def write(self, text):
-        text.write("\tdriven: " + FORMAT(database.element.index(self.links[1])) + ",\n" +
-        self.links[0].string(True) + ",\n" +
-        "\t\texisting: " + self.links[1].elem_type + ", " + FORMAT(database.element.index(self.links[1])) + ";\n")
+    def write(self, f):
+        f.write("\tdriven: " + self.safe_name() + ",\n" +
+        self.drive.safe_name() + ",\n" +
+        "\t\texisting: " + self.element.elem_type + ", " + self.element.safe_name() + ";\n")
 
-class DrivenOperator(Base):
+class DrivenOperator(Drive):
     bl_label = "Driven"
-    drive_name = bpy.props.EnumProperty(items=enum_drive, name="Drive",
-        update=lambda self, context: update_drive(self, context, self.drive_name))
-    element_name = bpy.props.EnumProperty(items=enum_element, name="Element",
-        update=lambda self, context: update_element(self, context, self.element_name))
+    element = bpy.props.PointerProperty(type = BPY.Element)
     @classmethod
     def poll(cls, context):
         return context.scene.element_uilist
     def prereqs(self, context):
-        self.element_name = context.scene.element_uilist[context.scene.element_index].name
+        self.element.mandatory = True
+        self.element.assign(database.element[context.scene.element_index])
+        super().prereqs(context)
     def assign(self, context):
-        self.drive_name = self.entity.links[0].name
-        self.element_name = self.entity.links[1].name
+        self.element.assign(self.entity.element)
+        super().assign(context)
     def store(self, context):
-        self.entity.links.append(database.drive.get_by_name(self.drive_name))
-        self.entity.links.append(database.element.get_by_name(self.element_name))
+        self.entity.element = self.element.store()
+        self.entity.drive = self.drive.store()
     def draw(self, context):
         layout = self.layout
-        layout.prop(self, "drive_name")
-        layout.prop(self, "element_name")
+        self.drive.draw(layout, "Drive")
+        self.element.draw(layout, "Element")
+    def check(self, context):
+        return self.element.check(context) or super().check(context)
     def create_entity(self):
         return Driven(self.name)
 
@@ -1030,19 +1029,16 @@ class PlotNode(bpy.types.Operator, Plot):
         return context.window_manager.invoke_props_dialog(self)
 BPY.klasses.append(PlotNode)
 
-class DuplicateObjects(bpy.types.Operator):
+class DuplicateFromObjects(bpy.types.Operator):
     bl_label = "Duplicate"
-    bl_idname = root_dot + "duplicate_objects"
+    bl_idname = root_dot + "duplicate_from_objects"
     bl_options = {'REGISTER', 'INTERNAL'}
-    full_copy = bpy.props.BoolProperty(default=False, name="Full copy")
-    to_scene = bpy.props.EnumProperty(items=enum_scenes, name="Scene",
-        update=lambda self, context: update_scene(self, context, self.to_scene))
+    to_scene = bpy.props.PointerProperty(type = BPY.Scene)
     entity_names = bpy.props.CollectionProperty(type=BPY.Names, name="Users")
     @classmethod
     def poll(cls, context):
         return SelectedObjects(context)
     def invoke(self, context, event):
-        self.full_copy = False
         self.entity_names.clear()
         self.users = database.entities_originating_from(SelectedObjects(context))
         for user in self.users:
@@ -1051,123 +1047,77 @@ class DuplicateObjects(bpy.types.Operator):
             name.select = True
         return context.window_manager.invoke_props_dialog(self)
     def execute(self, context):
-        obs = SelectedObjects(context)
-        elements, drives, frames = list(), list(), list()
-        for user in [u for u, n in zip(self.users, self.entity_names) if n.select]:
-            module = user.__module__.split(".")[-1]
-            if user.type == "Reference frame":
-                frames.append(user)
-            elif module == "drive":
-                drives.append(user)
-            else:
-                elements.append(user)
-        #elements = [element for element in database.element if hasattr(element, "objects") and
-        #    element.objects and element.objects[0] in obs]
-        #for element in database.element:
-        #    if element.type == 'Driven' and element.links[1] in elements:
-        #        elements.append(element)
-        len_element = len(database.element)
-        for element in elements:
-            context.scene.element_index = database.element.index(element)
-            exec("bpy.ops." + root_dot + "d_" + "_".join(element.type.lower().split()) + "()")
-        #drives = [drive for drive in database.drive if hasattr(drive, "objects") and
-        #    drive.objects and drive.objects[0] in obs]
-        len_drive = len(database.drive)
-        for drive in drives:
-            context.scene.drive_index = database.drive.index(drive)
-            exec("bpy.ops." + root_dot + "d_" + "_".join(drive.type.lower().split()) + "()")
-            for entity in database.element + database.constitutive + database.drive:
-                for i, link in enumerate(entity.links):
-                    if link == drive:
-                        entity.links[i] = database.drive[-1]
-                        drive.users -= 1
-                        database.drive[-1].users += 1
-        new_obs = dict()
-        for ob in obs:
-            bpy.ops.object.select_all(action='DESELECT')
-            ob.select = True
-            bpy.ops.object.duplicate()
-            new_obs[ob] = context.selected_objects[0]
-        #frames = [frame for frame in database.frame if frame.objects[0] in obs]
-        len_input_card = len(database.input_card)
-        for frame in frames:
-            context.scene.input_card_index = database.input_card.index(frame)
-            exec("bpy.ops." + root_dot + "d_" + "_".join(frame.type.lower().split()) + "()")
-        new_frames = database.input_card[len_input_card:]
-        for frame in new_frames:
-            old_objects = frame.objects
-            frame.objects = [new_obs[ob] for ob in old_objects if ob in obs]
-        entities = elements + drives
-        new_entities = database.element[len_element:] + database.drive[len_drive:]
-        for entity in new_entities:
-            if hasattr(entity, "objects"):
-                for i, ob in enumerate(entity.objects):
-                    if ob in obs:
-                        entity.objects[i] = new_obs[ob]
-            for i, link in enumerate(entity.links):
-                if link in entities:
-                    link.users -= 1
-                    entity.links[i] = new_entities[entities.index(link)]
-                    entity.links[i].users += 1
-                if hasattr(link, "consumer"):
-                    link.consumer = entity
-            if entity.type == "Rigid offset":
-                entity.objects[0].parent = entity.objects[1]
-                entity.objects[0].matrix_parent_inverse = entity.objects[1].matrix_basis.inverted()
-        if self.full_copy:
-            new_links = dict()
-            may_have_links = copy(new_entities + new_frames)
-            while may_have_links:
-                entity = may_have_links.pop()
-                for i, link in enumerate(entity.links):
-                    if link not in entities and not hasattr(link, "consumer"):
-                        link.users -= 1
-                        if link not in new_links:
-                            database.to_be_duplicated = link
-                            exec("bpy.ops." + root_dot + "d_" + "_".join(link.type.lower().split()) + "(attach_duplicate=True)")
-                            new_links[link] = database.dup
-                            del database.dup
-                        entity.links[i] = new_links[link]
-                        entity.links[i].users += 1
-                    may_have_links.extend(link.links)
-        bpy.ops.object.select_all(action='DESELECT')
-        for ob in new_obs.values():
-            ob.animation_data_clear()
-            ob.select = True
-        if self.to_scene != context.scene.name:
-            parent = dict()
-            for ob in new_obs.values():
-                parent[ob] = ob.parent
-            for ob in new_obs.values():
-                context.scene.objects.unlink(ob)
-            for entity in new_entities + new_frames + list(new_links.values()):
-                database.to_be_unlinked = entity
-                exec("bpy.ops." + root_dot + "u_" + "_".join(entity.type.lower().split()) + "()")
-            context.screen.scene = bpy.data.scenes[self.to_scene]
-            database.pickle()
-            for entity in new_entities + new_frames + list(new_links.values()):
-                database.to_be_linked = entity
-                exec("bpy.ops." + root_dot + "l_" + "_".join(entity.type.lower().split()) + "()")
-            for ob in new_obs.values():
-                context.scene.objects.link(ob)
-            for ob in new_obs.values():
-                ob.parent = parent[ob]
+        entities = [u for u, n in zip(self.users, self.entity_names) if n.select]
+        keys = [e for e in entities if e.type != "Reference frame"]
+        if self.to_scene.use:
+            old_entities = database.all_entities()
+            new_entities = dict()
+            def duplicate_if_singlet(x, initialize=False):
+                if x not in new_entities:
+                    database.to_be_duplicated = x
+                    exec("bpy.ops." + root_dot + "d_" + "_".join(x.type.lower().split()) + "()")
+                    new_entities[x] = database.dup
+                    del database.dup
+                    if not initialize:
+                        keys.append(x)
+            while keys:
+                key = keys.pop()
+                duplicate_if_singlet(key, initialize=True)
+                for k, v in vars(key).items():
+                    if isinstance(v, Entity):
+                        duplicate_if_singlet(v)
+                        new_entities[key].__dict__[k] = new_entities[v]
+                    elif isinstance(v, list):
+                        for i, x in enumerate(v):
+                            if isinstance(x, Entity):
+                                duplicate_if_singlet(x)
+                                new_entities[key].__dict__[k][i] = new_entities[x]
+            for frame in [e for e in entities if e.type == "Reference frame"]:
+                duplicate_if_singlet(frame, initialize=True)
+            new_obs = dict()
+            for v in new_entities.values():
+                if hasattr(v, "objects"):
+                    for i, ob in enumerate(v.objects):
+                        if ob not in new_obs:
+                            bpy.ops.object.select_all(action='DESELECT')
+                            ob.select = True
+                            bpy.ops.object.duplicate()
+                            new_obs[ob] = context.selected_objects[0]
+                        v.objects[i] = new_obs[ob]
+            if self.to_scene.name != context.scene.name:
+                parent = dict()
+                for v in new_obs.values():
+                    context.scene.objects.unlink(v)
+                for v in new_entities.values():
+                    database.to_be_unlinked = v
+                    exec("bpy.ops." + root_dot + "u_" + "_".join(v.type.lower().split()) + "()")
+                context.screen.scene = bpy.data.scenes[self.to_scene.name]
+                database.pickle()
+                for e in old_entities:
+                    if e in new_entities:
+                        new_entities[e].name = e.name
+                        database.to_be_linked = new_entities[e]
+                        exec("bpy.ops." + root_dot + "l_" + "_".join(new_entities[e].type.lower().split()) + "()")
+                for k, v in new_obs.items():
+                    context.scene.objects.link(v)
+                    v.parent = new_obs[v.parent] if v.parent in new_obs else None
+                    v.matrix_parent_inverse = k.matrix_parent_inverse
+        else:
+            for e in keys:
+                exec("bpy.ops." + root_dot + "d_" + "_".join(e.type.lower().split()) + "()")
+        del self.users
         context.scene.dirty_simulator = True
         return {'FINISHED'}
     def draw(self, context):
-        self.basis = self.full_copy
         layout = self.layout
-        row = layout.row()
-        row.prop(self, "full_copy")
-        if self.full_copy:
-            row.prop(self, "to_scene")
+        self.to_scene.draw(layout, "Full copy")
         for name in self.entity_names:
             row = layout.row()
             row.prop(name, "select", toggle=True)
             row.label(name.value)
     def check(self, context):
-        return self.basis != self.full_copy
-BPY.klasses.append(DuplicateObjects)
+        return self.to_scene.check(context)
+BPY.klasses.append(DuplicateFromObjects)
 
 class Users(bpy.types.Operator):
     bl_label = "Users"
@@ -1187,7 +1137,9 @@ class Users(bpy.types.Operator):
     def execute(self, context):
         for name, user in zip(self.entity_names, self.users):
             if name.select:
-                context.scene[user.__module__.split(".")[-1] + "_index"] = user.entity_list.index(user)
+                module = user.__module__.split(".")[-1]
+                entity_list = {"element": database.element, "drive": database.drive, "input_card": database.input_card}[module]
+                context.scene[module + "_index"] = entity_list.index(user)
                 exec("bpy.ops." + root_dot + "e_" + "_".join(user.type.lower().split()) + "('INVOKE_DEFAULT')")
         return {'FINISHED'}
     def draw(self, context):
@@ -1237,7 +1189,7 @@ class Menu(bpy.types.Menu):
         layout = self.layout
         layout.operator_context = 'INVOKE_DEFAULT'
         layout.operator(root_dot + "users")
-        layout.operator(root_dot + "duplicate_objects")
+        layout.operator(root_dot + "duplicate_from_objects")
         layout.operator(root_dot + "plot_node")
 BPY.klasses.append(Menu)
 
