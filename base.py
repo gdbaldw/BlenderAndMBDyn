@@ -35,6 +35,7 @@ else:
     from collections import OrderedDict
     from copy import copy
     from sys import getrefcount
+    import webbrowser, os
 
 category = "MBDyn"
 root_dot = "_".join(category.lower().split()) + "."
@@ -229,7 +230,7 @@ class BPY:
             update=lambda self, context: update_input_card(self, context, self.name, self.type, {bool: "bool", float: "real", int: "integer", str: "string"}[type(self.value)]))
         type = bpy.props.StringProperty(default="Set")
     class ValueMode(InputCardPrototype, Mode):
-        is_card = bpy.props.BoolProperty(update=lambda self, context: self.set_check_is_card())
+        is_card = bpy.props.BoolProperty(update=lambda self, context: self.set_check_is_card(), description="Toggle for variable name instead of value")
         check_is_card_value = bpy.props.BoolProperty(default=False)
         value_type = bpy.props.StringProperty()
         def set_check_is_card(self):
@@ -615,6 +616,16 @@ class Operators(list):
             name = item
             #klass.entity_list = entity_list
             klass.module = klass.__module__.split(".")[1]
+            class Help(bpy.types.Operator):
+                bl_idname = root_dot + "h_" + "_".join(name.lower().split())
+                bl_options = {'REGISTER', 'INTERNAL'}
+                bl_label = "Help"
+                bl_description = "Help for " + name
+                url = bpy.props.StringProperty(default="help.html#"+"_".join(name.lower().split()))
+                def execute(self, context):
+                    directory = os.path.dirname(os.path.realpath(__file__))
+                    webbrowser.open("/".join(["file:/", directory, self.url]))
+                    return {'FINISHED'}
             class Create(bpy.types.Operator, klass):
                 bl_idname = root_dot + "c_" + "_".join(name.lower().split())
                 bl_options = {'REGISTER', 'INTERNAL'}
@@ -651,7 +662,9 @@ class Operators(list):
                     del self.entity
                     return {'FINISHED'}
                 def draw(self, context):
-                    self.layout.prop(self, "entity_name")
+                    row = self.layout.row()
+                    row.prop(self, "entity_name")
+                    row.operator(root_dot + "h_" + self.bl_idname[len(root_dot)+5:], icon='QUESTION', text="")
                     super().draw(context)
             class Edit(bpy.types.Operator, klass):
                 bl_label = " ".join(["Edit:", name, "instance"])
@@ -677,7 +690,9 @@ class Operators(list):
                     del self.entity
                     return {'FINISHED'}
                 def draw(self, context):
-                    self.layout.prop(self, "entity_name")
+                    row = self.layout.row()
+                    row.prop(self, "entity_name")
+                    row.operator(root_dot + "h_" + self.bl_idname[len(root_dot)+5:], icon='QUESTION', text="")
                     super().draw(context)
             class Duplicate(bpy.types.Operator, klass):
                 bl_label = "Duplicate"
@@ -778,7 +793,7 @@ class Operators(list):
                     if self.module in "element".split():
                         layout.operator(root_dot + "object_specifications")
                         layout.operator(root_dot + "plot_element")
-            self.extend([Create, Edit, Duplicate, Users, Unlink, Link, Menu])
+            self.extend([Help, Create, Edit, Duplicate, Users, Unlink, Link, Menu])
     def register(self):
         for klass in self:
             bpy.utils.register_class(klass)
@@ -870,6 +885,16 @@ class UI(list):
                 align = row.column(True)
                 align.prop(self, "use_filter_sort_alpha", icon_only=True)
                 align.prop(self, "use_filter_sort_reverse", icon_only=True, icon='TRIA_DOWN')
+        class Help(bpy.types.Operator):
+            bl_idname = module_name + ".help"
+            bl_options = {'REGISTER', 'INTERNAL'}
+            bl_label = "Help"
+            bl_description = "Help for " + module_name
+            url = bpy.props.StringProperty(default="help.html#"+module_name)
+            def execute(self, context):
+                directory = os.path.dirname(os.path.realpath(__file__))
+                webbrowser.open("/".join(["file:/", directory, self.url]))
+                return {'FINISHED'}
         class Delete(bpy.types.Operator, klass):
             bl_idname = module_name + ".delete"
             bl_options = {'REGISTER', 'INTERNAL'}
@@ -947,6 +972,7 @@ class UI(list):
                 col = row.column(align=True)
                 col.menu(menu, icon='ZOOMIN', text="")
                 col.operator(module_name + ".delete", icon='ZOOMOUT', text="")
+                col.operator(module_name + ".help", icon='QUESTION', text="")
                 index, uilist = self.get_uilist(context)
                 if not entity_list.use_filter_sort_alpha:
                     col.operator(module_name + ".move_up", icon='MOVE_UP_VEC', text="")
@@ -955,7 +981,7 @@ class UI(list):
                     col.menu(root_dot + "m_" +
                         "_".join(entity_list[index].type.lower().split()), icon='DOWNARROW_HLT', text="")
                 self.draw_panel_post(context, layout)
-        self.extend([ListItem, UIList, Delete, MoveUp, MoveDown, Panel])
+        self.extend([ListItem, UIList, Help, Delete, MoveUp, MoveDown, Panel])
     def register(self):
         for klass in self:
             bpy.utils.register_class(klass)
