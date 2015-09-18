@@ -55,7 +55,7 @@ tree = ["Element",
     ]]
 
 class Base(Operator):
-    bl_label = "Element"
+    bl_label = "Elements"
     exclusive = False
     N_objects = 2
     @classmethod
@@ -499,7 +499,7 @@ class RevoluteHingeOperator(Friction):
     def draw(self, context):
         self.theta.draw(self.layout, text="Theta")
         self.average_radius.draw(self.layout, text="Average radius")
-        if self.average_radius.use:
+        if self.average_radius.select:
             self.preload.draw(self.layout, text="Preload")
             self.friction.draw(self.layout, text="Friction")
     def check(self, context):
@@ -838,32 +838,6 @@ class ThreeNodeBeamOperator(SegmentPair, Base):
 
 klasses[ThreeNodeBeamOperator.bl_label] = ThreeNodeBeamOperator
 
-"""class DrivenOperator(Drive):
-    bl_label = "Driven"
-    element = bpy.props.PointerProperty(type = BPY.Element)
-    @classmethod
-    def poll(cls, context):
-        return context.scene.element_uilist
-    def prereqs(self, context):
-        self.element.mandatory = True
-        self.element.assign(database.element[context.scene.element_index])
-        super().prereqs(context)
-    def assign(self, context):
-        self.element.assign(self.entity.element)
-        super().assign(context)
-    def store(self, context):
-        self.entity.element = self.element.store()
-        self.entity.drive = self.drive.store()
-    def draw(self, context):
-        layout = self.layout
-        self.drive.draw(layout, "Drive")
-        self.element.draw(layout, "Element")
-    def check(self, context):
-        return self.element.check(context) or super().check(context)
-    def create_entity(self):
-        return Driven(self.name)
-"""
-
 class Gravity(Entity):
     elem_type = "gravity"
     file_ext = "grv"
@@ -935,7 +909,7 @@ klasses[DrivenOperator.bl_label] = DrivenOperator
 class Plot:
     bl_options = {'REGISTER', 'INTERNAL'}
     prereqs_met = bpy.props.BoolProperty(default=False)
-    label_names = bpy.props.CollectionProperty(type=BPY.Names, name="Users")
+    label_names = bpy.props.CollectionProperty(type=BPY.Str)
     def load(self, context, exts, pd):
         if not self.prereqs_met:
             for prereq in "pandas matplotlib.pyplot".split():
@@ -979,11 +953,12 @@ class Plot:
         layout = self.layout
         for name in self.label_names:
             row = layout.row()
-            row.prop(name, "select")
+            row.prop(name, "select", text="")
             row.label(name.value)
 
 class PlotElement(bpy.types.Operator, Plot):
     bl_label = "Plot output"
+    bl_description = "Plot the simulated output for the selected element"
     bl_idname = root_dot + "plot_element"
     @classmethod
     def poll(cls, context):
@@ -1004,6 +979,7 @@ BPY.klasses.append(PlotElement)
 
 class PlotNode(bpy.types.Operator, Plot):
     bl_label = "Plot the node"
+    bl_description = "Plot the simulated trajectory of a selected node"
     bl_idname = root_dot + "plot_node"
     @classmethod
     def poll(cls, context):
@@ -1031,10 +1007,11 @@ BPY.klasses.append(PlotNode)
 
 class DuplicateFromObjects(bpy.types.Operator):
     bl_label = "Duplicate"
+    bl_description = "Duplicate the selected objects along with some or all of the entities using them"
     bl_idname = root_dot + "duplicate_from_objects"
     bl_options = {'REGISTER', 'INTERNAL'}
     to_scene = bpy.props.PointerProperty(type = BPY.Scene)
-    entity_names = bpy.props.CollectionProperty(type=BPY.Names, name="Users")
+    entity_names = bpy.props.CollectionProperty(type=BPY.Str)
     @classmethod
     def poll(cls, context):
         return SelectedObjects(context)
@@ -1049,7 +1026,7 @@ class DuplicateFromObjects(bpy.types.Operator):
     def execute(self, context):
         entities = [u for u, n in zip(self.users, self.entity_names) if n.select]
         keys = [e for e in entities if e.type != "Reference frame"]
-        if self.to_scene.use:
+        if self.to_scene.select:
             old_entities = database.all_entities()
             new_entities = dict()
             def duplicate_if_singlet(x, initialize=False):
@@ -1113,7 +1090,7 @@ class DuplicateFromObjects(bpy.types.Operator):
         self.to_scene.draw(layout, "Full copy")
         for name in self.entity_names:
             row = layout.row()
-            row.prop(name, "select", toggle=True)
+            row.prop(name, "select", text="", toggle=True)
             row.label(name.value)
     def check(self, context):
         return self.to_scene.check(context)
@@ -1121,9 +1098,10 @@ BPY.klasses.append(DuplicateFromObjects)
 
 class Users(bpy.types.Operator):
     bl_label = "Users"
+    bl_description = "Users of the selected objects"
     bl_idname = root_dot + "users"
     bl_options = {'REGISTER', 'INTERNAL'}
-    entity_names = bpy.props.CollectionProperty(type=BPY.Names, name="Users")
+    entity_names = bpy.props.CollectionProperty(type=BPY.Str)
     @classmethod
     def poll(cls, context):
         return SelectedObjects(context)
@@ -1146,7 +1124,7 @@ class Users(bpy.types.Operator):
         layout = self.layout
         for name in self.entity_names:
             row = layout.row()
-            row.prop(name, "select", toggle=True)
+            row.prop(name, "select", text="", toggle=True)
             row.label(name.value)
     def check(self, context):
         return False
@@ -1154,6 +1132,7 @@ BPY.klasses.append(Users)
 
 class ObjectSpecifications(bpy.types.Operator):
     bl_label = "Object specifications"
+    bl_description = "Name, location, and orientation of the selected objects"
     bl_idname = root_dot + "object_specifications"
     bl_options = {'REGISTER', 'INTERNAL'}
     @classmethod
@@ -1184,10 +1163,12 @@ BPY.klasses.append(ObjectSpecifications)
 
 class Menu(bpy.types.Menu):
     bl_label = "Selected Objects"
+    bl_description = "Actions for the selected object(s)"
     bl_idname = root_dot + "selected_objects"
     def draw(self, context):
         layout = self.layout
         layout.operator_context = 'INVOKE_DEFAULT'
+        layout.operator(root_dot + "object_specifications")
         layout.operator(root_dot + "users")
         layout.operator(root_dot + "duplicate_from_objects")
         layout.operator(root_dot + "plot_node")

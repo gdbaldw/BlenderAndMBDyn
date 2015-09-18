@@ -780,7 +780,7 @@ class Eigenanalysis(Entity):
 class EigenanalysisOperator(Base):
     bl_label = "Eigenanalysis"
     num_times = bpy.props.IntProperty(name="Number of times", default=1, min=1, max=50)
-    when = bpy.props.CollectionProperty(name="When", type = BPY.Floats)
+    when = bpy.props.CollectionProperty(name="When", type = BPY.Float)
     output_full_matrices = bpy.props.BoolProperty(name="Output full matrices")
     output_sparce_matrices = bpy.props.BoolProperty(name="Output sparce matrices")
     output_eigenvectors = bpy.props.BoolProperty(name="Output eigenvectors")
@@ -809,7 +809,7 @@ class EigenanalysisOperator(Base):
     def prereqs(self, context):
         self.when.clear()
         for i in range(50):
-            self.when.add()
+            self.when.add().mandatory = True
     def assign(self, context):
         self.num_times = self.entity.num_times
         for i, value in enumerate(self.entity.when):

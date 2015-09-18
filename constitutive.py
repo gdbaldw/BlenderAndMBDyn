@@ -193,7 +193,7 @@ class StiffnessViscosity(Base):
         self.draw_dimension(layout)
         self.stiffness.draw(layout, "Stiffness")
         self.proportional.draw(layout, "Proportional")
-        if not self.proportional.use:
+        if not self.proportional.select:
             self.viscosity.draw(layout, "Viscosity")
     def check(self, context):
         return (self.basis != self.dimension) or self.stiffness.check(context) or self.proportional.check(context) or self.viscosity.check(context)
@@ -657,7 +657,7 @@ class LinearTimeVariantViscoelasticGenericOperator(StiffnessViscosity):
         self.stiffness.draw(layout, "Stiffness")
         self.stiffness_scale.draw(layout, "Stiffness scale")
         self.proportional.draw(layout, "Proportional")
-        if not self.proportional.use:
+        if not self.proportional.select:
             self.viscosity.draw(layout, "Viscosity")
             self.viscosity_scale.draw(layout, "Viscosity scale")
     def check(self, context):
@@ -847,7 +847,7 @@ class TurbulentViscoelasticOperator(Base):
         self.stiffness.draw(layout, "Stiffness")
         self.parabolic_viscosity.draw(layout, "Parabolic viscosity")
         self.threshold.draw(layout, "Threshold")
-        if self.threshold.use:
+        if self.threshold.select:
             self.linear_viscosity.draw(layout, "Linear viscosity")
     def check(self, context):
         return ((self.basis != self.dimension) or self.stiffness.check(context) or self.parabolic_viscosity.check(context)

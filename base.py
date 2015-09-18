@@ -199,30 +199,30 @@ class BPY:
         return prop.safe_name() if isinstance(prop, Entity) else (prop if isinstance(prop, str) else FORMAT(prop))
     class Mode:
         mandatory = bpy.props.BoolProperty(default=False)
-        use = bpy.props.BoolProperty(default=False, update=lambda self, context: self.set_check_use())
-        check_use_value = bpy.props.BoolProperty(default=False)
-        def set_check_use(self):
-            self.check_use_value = True
+        select = bpy.props.BoolProperty(default=False, update=lambda self, context: self.set_check_select())
+        check_select_value = bpy.props.BoolProperty(default=False)
+        def set_check_select(self):
+            self.check_select_value = True
         def to_be_stored(self):
-            return self.mandatory or self.use
+            return self.mandatory or self.select
         def to_be_assigned(self, arg):
-            self.use = False if self.mandatory else arg is not None 
-            return self.use or self.mandatory
+            self.select = False if self.mandatory else arg is not None 
+            return self.select or self.mandatory
         def draw(self, layout, text=""):
             row = layout.row()
             if not self.mandatory:
-                row.prop(self, "use", text="")
-                if not self.use:
+                row.prop(self, "select", text="")
+                if not self.select:
                     row.label("Use " + text)
-            if self.mandatory or self.use:
+            if self.mandatory or self.select:
                 if 12 < len(text):
                     row.label(text + ":")
                     text=""
                     row = layout.row()
                 row.prop(self, "name", text)
         def check(self, context):
-            ret = self.check_use_value
-            self.check_use_value = False
+            ret = self.check_select_value
+            self.check_select_value = False
             return ret
     class InputCardPrototype:
         name = bpy.props.EnumProperty(items=lambda self, context: enum_input_card(self, context, self.type, {bool: "bool", float: "real", int: "integer", str: "string"}[type(self.value)]),
@@ -254,10 +254,10 @@ class BPY:
         def draw(self, layout, text=""):
             row = layout.row()
             if not self.mandatory:
-                row.prop(self, "use", text="")
-                if not self.use:
+                row.prop(self, "select", text="")
+                if not self.select:
                     row.label("Use " + text)
-            if self.mandatory or self.use:
+            if self.mandatory or self.select:
                 if 12 < len(text):
                     row.label(text + ":")
                     text=""
@@ -391,12 +391,7 @@ class BPY:
             ret = self.check_is_matrix_value
             self.check_is_matrix_value = False
             return ret or self.float.check(context) or self.matrix.check(context)
-    class Floats(bpy.types.PropertyGroup):
-        value = bpy.props.FloatProperty(min=-9.9e10, max=9.9e10, step=100, precision=6)
-    class Names(bpy.types.PropertyGroup):
-        value = bpy.props.StringProperty(name="")
-        select = bpy.props.BoolProperty(name="")
-    klasses = [InputCard, Constitutive, Drive, Element, Segment, Friction, Function, Matrix, Shape, Scene, Bool, Int, Float, Str, MatrixFloat, Floats, Names]
+    klasses = [InputCard, Constitutive, Drive, Element, Segment, Friction, Function, Matrix, Shape, Scene, Bool, Int, Float, Str, MatrixFloat]
     executable_path = "mbdyn"
     plot_data = dict()
     @classmethod
@@ -592,6 +587,7 @@ class TreeMenu(list):
                 is_a_leaf[branch[i]] = True
         class Menu(bpy.types.Menu):
             bl_label = base
+            bl_description = " ".join(["New", base, "Menu"])
             bl_idname = root_dot + "_".join(base.lower().split())
             def draw(self, context):
                 layout = self.layout
@@ -614,7 +610,6 @@ class Operators(list):
     def __init__(self, klasses, entity_list):
         for item, klass in klasses.items():
             name = item
-            #klass.entity_list = entity_list
             klass.module = klass.__module__.split(".")[1]
             class Help(bpy.types.Operator):
                 bl_idname = root_dot + "h_" + "_".join(name.lower().split())
@@ -628,6 +623,7 @@ class Operators(list):
                     return {'FINISHED'}
             class Create(bpy.types.Operator, klass):
                 bl_idname = root_dot + "c_" + "_".join(name.lower().split())
+                bl_description = " ".join(["Create:", name, "instance"])
                 bl_options = {'REGISTER', 'INTERNAL'}
                 entity_name = bpy.props.StringProperty(name="Name")
                 def invoke(self, context, event):
@@ -667,7 +663,8 @@ class Operators(list):
                     row.operator(root_dot + "h_" + self.bl_idname[len(root_dot)+5:], icon='QUESTION', text="")
                     super().draw(context)
             class Edit(bpy.types.Operator, klass):
-                bl_label = " ".join(["Edit:", name, "instance"])
+                bl_label = "Edit"
+                bl_description = " ".join(["Edit:", name, "instance"])
                 bl_idname = root_dot + "e_" + "_".join(name.lower().split())
                 bl_options = {'REGISTER', 'INTERNAL'}
                 entity_name = bpy.props.StringProperty(name="Name")
@@ -696,6 +693,7 @@ class Operators(list):
                     super().draw(context)
             class Duplicate(bpy.types.Operator, klass):
                 bl_label = "Duplicate"
+                bl_description = " ".join(["Duplicate:", name, "instance"])
                 bl_idname = root_dot + "d_" + "_".join(name.lower().split())
                 bl_options = {'REGISTER', 'INTERNAL'}
                 @classmethod
@@ -719,9 +717,10 @@ class Operators(list):
                     return {'FINISHED'}
             class Users(bpy.types.Operator, klass):
                 bl_label = "Users"
+                bl_description = " ".join(["Users of:", name, "instance"])
                 bl_idname = root_dot + "s_" + "_".join(name.lower().split())
                 bl_options = {'REGISTER', 'INTERNAL'}
-                entity_names = bpy.props.CollectionProperty(type=BPY.Names, name="Users")
+                entity_names = bpy.props.CollectionProperty(type=BPY.Str)
                 @classmethod
                 def poll(cls, context):
                     return True
@@ -743,7 +742,7 @@ class Operators(list):
                     layout = self.layout
                     for name in self.entity_names:
                         row = layout.row()
-                        row.prop(name, "select", toggle=True)
+                        row.prop(name, "select", text="", toggle=True)
                         row.label(name.value)
                 def check(self, context):
                     return False
@@ -783,6 +782,7 @@ class Operators(list):
             class Menu(bpy.types.Menu, klass):
                 bl_label = name
                 bl_idname = root_dot + "m_" + "_".join(name.lower().split())
+                bl_description = "Actions for the selected " + klass.module
                 def draw(self, context):
                     layout = self.layout
                     layout.operator_context = 'INVOKE_DEFAULT'
@@ -791,7 +791,6 @@ class Operators(list):
                     if self.module != "element" and self.bl_label != "Reference frame":
                         layout.operator(root_dot + "d_" + self.bl_idname[len(root_dot)+2:])
                     if self.module in "element".split():
-                        layout.operator(root_dot + "object_specifications")
                         layout.operator(root_dot + "plot_element")
             self.extend([Help, Create, Edit, Duplicate, Users, Unlink, Link, Menu])
     def register(self):
@@ -889,7 +888,7 @@ class UI(list):
             bl_idname = module_name + ".help"
             bl_options = {'REGISTER', 'INTERNAL'}
             bl_label = "Help"
-            bl_description = "Help for " + module_name
+            bl_description = "Help for " + klass.bl_label
             url = bpy.props.StringProperty(default="help.html#"+module_name)
             def execute(self, context):
                 directory = os.path.dirname(os.path.realpath(__file__))
