@@ -30,7 +30,7 @@ if "bpy" in locals():
     imp.reload(subsurf)
 else:
     from .base import bpy, BPY, root_dot, database, Operator, Entity, Bundle, SelectedObjects, update_matrix
-    from .common import RhombicPyramid
+    from .common import RhombicPyramid, write_vector, write_matrix
     from mathutils import Vector
     from copy import copy
 
@@ -92,13 +92,13 @@ class ReferenceFrame(Entity):
         rot_parent = parent.objects[0].matrix_world.to_quaternion().to_matrix() if parent else rot
         orientation = rot_parent.transposed()*rot if parent else rot
         f.write("reference: " + self.safe_name() + ",\n" + "\treference, " + parent_label + ", ")
-        self.write_vector(f, rot_parent.transposed()*location if parent else location, ",\n")
+        write_vector(f, rot_parent.transposed()*location if parent else location, ",\n")
         f.write("\treference, " + parent_label + ", matr,\n")
-        self.write_matrix(f, orientation, "\t\t")
+        write_matrix(f, orientation, "\t\t")
         f.write(",\n\treference, " + parent_label + ", ")
-        self.write_vector(f, orientation*vectors[0], ",\n")
+        write_vector(f, orientation*vectors[0], ",\n")
         f.write("\treference, " + parent_label + ", ")
-        self.write_vector(f, orientation*vectors[1], ";\n")
+        write_vector(f, orientation*vectors[1], ";\n")
     def remesh(self):
         RhombicPyramid(self.objects[0])
 
@@ -187,4 +187,4 @@ class SetOperator(Base):
 
 klasses[SetOperator.bl_label] = SetOperator
 
-bundle = Bundle(tree, Base, klasses, database.input_card, "input_card")
+bundle = Bundle(tree, Base, klasses, database.input_card)
