@@ -82,11 +82,8 @@ class ReferenceFrame(Entity):
     def write(self, f, parent):
         parent_label = parent.safe_name() if parent else "global"
         vectors = list()
-        for v in [self.linear_velocity, self.angular_velocity]:
-            if v.subtype in "null default".split():
-                vectors.append(Vector([0., 0., 0.]))
-            else:
-                vectors.append(Vector(v.floats) * (v.scale if v.scale is not None else 1))
+        for r in [self.linear_rate, self.angular_rate]:
+            vectors.append(Vector([0., 0., r if r is not None else 0.]))
         location = self.objects[0].matrix_world.translation - (parent.objects[0].matrix_world.translation if parent else Vector([0., 0., 0.]))
         rot = self.objects[0].matrix_world.to_quaternion().to_matrix()
         rot_parent = parent.objects[0].matrix_world.to_quaternion().to_matrix() if parent else rot
@@ -104,8 +101,8 @@ class ReferenceFrame(Entity):
 
 class ReferenceFrameOperator(Base):
     bl_label = "Reference frame"
-    linear_velocity = bpy.props.PointerProperty(type = BPY.Matrix)
-    angular_velocity = bpy.props.PointerProperty(type = BPY.Matrix)
+    linear_rate = bpy.props.PointerProperty(type = BPY.Float)
+    angular_rate = bpy.props.PointerProperty(type = BPY.Float)
     @classmethod
     def poll(self, context):
         frames = copy(database.input_card.filter("Reference frame"))
@@ -125,24 +122,19 @@ class ReferenceFrameOperator(Base):
                     head = objects[0]
                     frame_objects.remove(objects)
         return head not in selected[1:]
-    def prereqs(self, context):
-        self.linear_velocity.mandatory = True
-        self.angular_velocity.mandatory = True
-        self.linear_velocity.type = "3x1"
-        self.angular_velocity.type = "3x1"
     def assign(self, context):
-        self.linear_velocity.assign(self.entity.linear_velocity)
-        self.angular_velocity.assign(self.entity.angular_velocity)
+        self.linear_rate.assign(self.entity.linear_rate)
+        self.angular_rate.assign(self.entity.angular_rate)
     def store(self, context):
-        self.entity.linear_velocity = self.linear_velocity.store()
-        self.entity.angular_velocity = self.angular_velocity.store()
+        self.entity.linear_rate = self.linear_rate.store()
+        self.entity.angular_rate = self.angular_rate.store()
         self.entity.objects = SelectedObjects(context)
     def draw(self, context):
         layout = self.layout
-        self.linear_velocity.draw(layout, "Linear velocity")
-        self.angular_velocity.draw(layout, "Angular velocity")
+        self.linear_rate.draw(layout, "Linear rate", "Set")
+        self.angular_rate.draw(layout, "Angular rate", "Set")
     def check(self, context):
-        return True in [v.check(context) for v in [self.linear_velocity, self.angular_velocity]]
+        return True in [v.check(context) for v in [self.linear_rate, self.angular_rate]]
     def create_entity(self):
         return ReferenceFrame(self.name)
 
