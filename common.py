@@ -101,11 +101,11 @@ nonlinear_solver_types = [
     "Line search",
     "Matrix free"]
 
-class Common:
-    def write_vector(self, f, v, end=""):
-        f.write(", ".join([FORMAT(round(x, 6) if round(x, 6) != -0. else 0) for x in v]) + end)
-    def write_matrix(self, f, m, pad=""):
-        f.write(",\n".join([pad + ", ".join(FORMAT(round(x, 6) if round(x, 6) != -0. else 0) for x in r) for r in m]))
+def write_vector(f, v, end=""):
+    f.write(", ".join([FORMAT(round(x, 6) if round(x, 6) != -0. else 0) for x in v]) + end)
+
+def write_matrix(f, m, pad=""):
+    f.write(",\n".join([pad + ", ".join(FORMAT(round(x, 6) if round(x, 6) != -0. else 0) for x in r) for r in m]))
 
 def subsurf(obj):
     subsurf = [m for m in obj.modifiers if m.type == 'SUBSURF']
