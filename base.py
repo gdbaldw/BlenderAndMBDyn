@@ -554,7 +554,7 @@ class Operators(list):
                 bl_options = {'REGISTER', 'INTERNAL'}
                 bl_label = "Help"
                 bl_description = "Help for " + name
-                url = bpy.props.StringProperty(default="help.html#"+"_".join(name.lower().split()))
+                url = bpy.props.StringProperty(default="help/index.html#"+"_".join(name.lower().split()))
                 def execute(self, context):
                     directory = os.path.dirname(os.path.realpath(__file__))
                     webbrowser.open("/".join(["file:/", directory, self.url]))
@@ -824,7 +824,7 @@ class UI(list):
             bl_options = {'REGISTER', 'INTERNAL'}
             bl_label = "Help"
             bl_description = "Help for " + klass.bl_label
-            url = bpy.props.StringProperty(default="help.html#"+module)
+            url = bpy.props.StringProperty(default="help/index.html#"+module)
             def execute(self, context):
                 directory = os.path.dirname(os.path.realpath(__file__))
                 webbrowser.open("/".join(["file:/", directory, self.url]))
