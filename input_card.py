@@ -141,6 +141,8 @@ class ReferenceFrameOperator(Base):
         layout = self.layout
         self.linear_velocity.draw(layout, "Linear velocity")
         self.angular_velocity.draw(layout, "Angular velocity")
+    def check(self, context):
+        return True in [v.check(context) for v in [self.linear_velocity, self.angular_velocity]]
     def create_entity(self):
         return ReferenceFrame(self.name)
 

@@ -507,6 +507,8 @@ class Operator:
         pass
     def store(self, context):
         pass
+    def pre_finished(self, context):
+        pass
     def draw(self, context):
         pass
 
@@ -588,6 +590,7 @@ class Operators(list):
                     context.scene.dirty_simulator = True
                     self.set_index(context, index)
                     del self.entity
+                    self.pre_finished(context)
                     return {'FINISHED'}
                 def draw(self, context):
                     row = self.layout.row()
@@ -615,6 +618,7 @@ class Operators(list):
                     self.set_index(context, self.index)
                     self.uilist[self.index].name = self.entity_name
                     del self.entity
+                    self.pre_finished(context)
                     return {'FINISHED'}
                 def draw(self, context):
                     row = self.layout.row()

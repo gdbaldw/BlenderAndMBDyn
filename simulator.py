@@ -119,11 +119,11 @@ class InitialValue(Entity):
             structural_dynamic_nodes = set()
             structural_static_nodes = set()
             structural_dummy_nodes = set()
-            rigid_dict = {e.objects[0] : e.objects[1] for e in database.element.filter("Rigid offset")}
+            database.rigid_dict = {e.objects[0] : e.objects[1] for e in database.element.filter("Rigid offset")}
             nodes = set()
             names = [e.name for e in database.all_entities()]
             for e in (e for e in database.element + database.drive if hasattr(e, "objects")):
-                ob = rigid_dict[e.objects[0]] if e.objects[0] in rigid_dict else e.objects[0]
+                ob = database.rigid_dict[e.objects[0]] if e.objects[0] in database.rigid_dict else e.objects[0]
                 if ob.name in names:
                     ob.name = "Node"
                 nodes |= set([ob])
@@ -383,7 +383,7 @@ class InitialValueOperator(Base):
         self.entity.default_output = self.default_output.store()
         self.entity.default_aerodynamic_output = self.default_aerodynamic_output.store()
         self.entity.default_beam_output = self.default_beam_output.store()
-    def __del__(self):
+    def pre_finished(self, context):
         exec("bpy.ops." + root_dot + "save('INVOKE_DEFAULT')")
     def draw(self, context):
         layout = self.layout
