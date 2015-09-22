@@ -1,25 +1,39 @@
 <!DOCTYPE html>
 <html>
+
+<head>
+<style type="text/css">
+.title
+    {
+        font-weight: bold;
+    }
+</style>
+</head>
+
 <body>
 
 <i>Index</i>
 <a href="#element">Element</a>
 <a href="#constitutive">Constitutive</a>
 <p></p>
-<a name="element">Element</a>:
+<a class="title" name="element">Element</a>:
 <p></p>
 <i>Index</i>
 <a href="#body">Body</a>
 <a href="#structural_force">Structural force</a>:
 <p></p>
 <p>
-The elements section is the basis of the BAM software. You may create an element by clicking on the <img src="createElem.png" alt="+" height="22" /> button and choosing from the list. If you currently have a Blender mesh selected, it will become that element. Usually, one will start by creating a <a href="#body">Body</a>. Another common element which needs to be inserted is the <a href="#gravity">Gravity</a> element. The <img src="showFiltering.png" alt="+"  height="22" /> button will expand the menu to also show filtering options of the element list. The <img src="editElem.png" alt="inverse triangle"  height="22" /> button will allow one to edit an element or see a list of its users.
+The elements section is the basis of the BAM software. You may create an element by clicking on the <img src="createElem.png" alt="+" height="22" /> button and choosing from the list. If you currently have a Blender mesh selected, it will become that element. Usually, one will start by creating a <a href="#body">Body</a>. Another common element which needs to be inserted is the <a href="#gravity">Gravity</a> element. The <img src="showFiltering.png" alt="+"  height="22" /> button will expand the menu to also show filtering options of the element list. The <img src="editElem.png" alt="inverse triangle"  height="22" /> button will allow one to edit an element or see a list of its users. Double clicking on a name in the list allows to change the said name. In case of a name conflict when creating a new element, a number will be added to the end of the chosen name.
 <br><br>
 
 </p>
 
-<a name="body">Body</a>:
+<a class="title" name="body">Body</a>:
 <p>
+A body represents a mass in the multibody model. It requires a mass value, which can be set as a variable name by ticking the checkbox. It also requires a <a href="#3x3">3x3</a> matrix of inertia.
+
+If no Blender mesh is selected when creating a body, a new one will be created at the location of the cursor. Upon accepting the body creation dialog, the user is invited by the "Object specifications" dialog to modify numerically the position and orientation of the body. This is optional and, in any case, any modifications brough by the user to the associated Blender mesh will be also applied to the body.
+<!--
 The body element describes a lumped rigid body when connected to a regular, 6 degree of freedom
 structural node, or a point mass when connected to a rotationless, 3 degree of freedom structural node.
 If only one mass is defined, the first method should be used. Otherwise, many masses can be referred
@@ -30,14 +44,15 @@ The inertia_matrix is always referred to the center of mass of the mass that is 
 can be rotated locally by means of the extra orientation_matrix supplied after the (optional) keyword
 inertial. The keyword node corresponds to the default, i.e. the inertia matrix is assumed to be input
 in the node reference frame.
+-->
 </p>
 
-<a name="structural_force">Structural force</a>:
+<a class="title" name="structural_force">Structural force</a>:
 <p>
 The structural force element allows to apply a force to the selected element. It can be ither absolute or follower. And absolute force will always have the same position and orientation while the follower force will follow the object to which it is applied. The force value is defined by a <a href="#driver">driver</a>.
 </p>
 
-<a name="constitutive">Constitutive</a>
+<a class="title" name="constitutive">Constitutive</a>
 <p>
 Implements the type ConstitutiveLaw. Every time a “deformable”
 entity requires a constitutive law, a template constitutive law is read. This has been implemented by
@@ -58,9 +73,29 @@ order to understand what the input and the output parameters are supposed to be
 </p>
 
 
-<a name="gravity">Gravity</a>:
+<a class="title" name="gravity">Gravity</a>:
 <p>
-The Gravity element is used to add a gravity force to the simulation. Many times one will want to define it as a constant drive with a value of 9.81 m/s^2. The gravity element does not get linked with any Blender mesh.
+The Gravity element is used to add a gravity force to the simulation. Many times one will want to define it as a constant drive with a value of 9.81 m/s^2. The gravity element does not get linked with any Blender mesh. Any type of gravity may be defined by combining the required vector input with a chosen driver.
+</p>
+
+<a class="title" name="3x1">3x1 Matrix</a>:
+<p>
+	
+</p>
+	
+<a class="title" name="3x3">3x3 Matrix</a>:
+<p>
+	
+</p>
+
+<a class="title" name="simulator">Simulator</a>:
+<p>
+	This panel allows to run MBDyn. Only one simulation needs to be created. It can be ran multiple times. After after updated the multibody model, one can simply select the desired simulator and click the "Run simulation" button followed by the "Animated objects" button to see the new updated results.
+</p>
+
+<a class="title" name="constitutive">Constitutive law</a>:
+<p>
+This panel allows to define the laws used by the deformable joints.
 </p>
 
 </body>
