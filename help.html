@@ -13,45 +13,9 @@
 <a href="#structural_force">Structural force</a>:
 <p></p>
 <p>
-The elements section is enclosed in the cards:
-begin : elements ;
-end : elements ;
-where elem_type is one of the following:
-• structural elements:
-– automatic structural
-– beam
-– body
-– couple
-– gravity
-– joint
-– joint regularization
-– plate
-• aerodynamic elements:
-– aerodynamic beam2
-– aerodynamic beam3
-– aerodynamic body
-– aeromodal
-– aircraft instruments
-– air properties
-– induced velocity
-• electric elements:
-– electric
-• hydraulic elements:
-– hydraulic
-• thermal elements:
-– TODO . . .
-• output elements:
-– RTAI output
-– stream output
-– stream motion output
-• generic elements:
-– bind
-– bulk
-– force
-– genel
-– loadable
-– user defined
-• miscellaneous element cards
+The elements section is the basis of the BAM software. You may create an element by clicking on the <img src="createElem.png" alt="+" height="22" /> button and choosing from the list. If you currently have a Blender mesh selected, it will become that element. Usually, one will start by creating a <a href="#body">Body</a>. Another common element which needs to be inserted is the <a href="#gravity">Gravity</a> element. The <img src="showFiltering.png" alt="+"  height="22" /> button will expand the menu to also show filtering options of the element list. The <img src="editElem.png" alt="inverse triangle"  height="22" /> button will allow one to edit an element or see a list of its users.
+<br><br>
+
 </p>
 
 <a name="body">Body</a>:
@@ -70,12 +34,7 @@ in the node reference frame.
 
 <a name="structural_force">Structural force</a>:
 <p>
-The force element is a general means to introduce a right-hand side to the equations, i.e. an explicit
-contribution to the equations. There is a basic distinction between abstract and structural forces: abstract
-forces apply to arbitrary equations, while structural forces (and couples) are specific to structural
-nodes and have a spatial characterization. Essentially, structural forces have three components that may
-depend on arbitrary parameters (usually the simulated time), and a location in space. Structural couples
-have three parameter-dependent components.
+The structural force element allows to apply a force to the selected element. It can be ither absolute or follower. And absolute force will always have the same position and orientation while the follower force will follow the object to which it is applied. The force value is defined by a <a href="#driver">driver</a>.
 </p>
 
 <a name="constitutive">Constitutive</a>
@@ -96,6 +55,12 @@ The meaning of the input and output parameters of a constitutive law is dictated
 uses it. In general, the user should refer to the element the constitutive law is being instantiated for in
 order to understand what the input and the output parameters are supposed to be
 
+</p>
+
+
+<a name="gravity">Gravity</a>:
+<p>
+The Gravity element is used to add a gravity force to the simulation. Many times one will want to define it as a constant drive with a value of 9.81 m/s^2. The gravity element does not get linked with any Blender mesh.
 </p>
 
 </body>
