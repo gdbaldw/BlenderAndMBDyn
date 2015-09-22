@@ -7,7 +7,17 @@
     {
         font-weight: bold;
     }
+.elaborateHidden {border:1px solid black; display: none;}
+.elaborateShown {border:1px solid black; display: block;}
 </style>
+<script type="text/javascript">
+  function showhide(divID) {
+    var item = document.getElementById(divID);
+    if (item) {
+      item.className=(item.className=='elaborateHidden')?'elaborateShown':'elaborateHidden';
+    }
+  }
+</script> 
 </head>
 
 <body>
@@ -52,25 +62,7 @@ in the node reference frame.
 The structural force element allows to apply a force to the selected element. It can be ither absolute or follower. And absolute force will always have the same position and orientation while the follower force will follow the object to which it is applied. The force value is defined by a <a href="#driver">driver</a>.
 </p>
 
-<a class="title" name="constitutive">Constitutive</a>
-<p>
-Implements the type ConstitutiveLaw. Every time a “deformable”
-entity requires a constitutive law, a template constitutive law is read. This has been implemented by
-means of C++ templates in order to allow the definition of a general constitutive law when possible.
-The “deformable” elements at present are:
-• rod and genel spring and related elements (1D);
-• deformable hinge and deformable displacement joint elements (3D);
-• deformable joint and beam elements (6D).
-Constitutive laws are also used in non-structural components, to allow some degree of generality in
-defining input/output relationships. Some constitutive laws are meaningful only when related to some
-precise dimensionality. In some special cases, general purpose (genel) elements use 1D constitutive laws
-to express an arbitrary dependence of some value on a scalar state of the system. Table 2.7 shows the
-availability of each constitutive law.
-The meaning of the input and output parameters of a constitutive law is dictated by the entity that
-uses it. In general, the user should refer to the element the constitutive law is being instantiated for in
-order to understand what the input and the output parameters are supposed to be
 
-</p>
 
 
 <a class="title" name="gravity">Gravity</a>:
@@ -96,6 +88,31 @@ The Gravity element is used to add a gravity force to the simulation. Many times
 <a class="title" name="constitutive">Constitutive law</a>:
 <p>
 This panel allows to define the laws used by the deformable joints.
+<br><br>
+<a href="javascript:showhide('constitutiveDetails');">Click to show/hide elaborate explanation</a>
+<div class="elaborateHidden" id="constitutiveDetails">
+Every time a &quot;deformable&quot;
+entity requires a constitutive law, a template constitutive law is read.
+The &quot;deformable&quot; elements at present are:<br>
+- rod and genel spring and related elements (1D);<br>
+- deformable hinge and deformable displacement joint elements (3D);<br>
+- deformable joint and beam elements (6D).<br>
+Constitutive laws are also used in non-structural components, to allow some degree of generality in
+defining input/output relationships. Some constitutive laws are meaningful only when related to some
+precise dimensionality. In some special cases, general purpose (genel) elements use 1D constitutive laws
+to express an arbitrary dependence of some value on a scalar state of the system. Table 2.7 shows the
+availability of each constitutive law.<br>
+The meaning of the input and output parameters of a constitutive law is dictated by the entity that
+uses it. In general, the user should refer to the element the constitutive law is being instantiated for in
+order to understand what the input and the output parameters are supposed to be.
+</div>
+</p>
+<a class="title" name="constitutive">Constitutive</a>
+<p>
+
+
+
+
 </p>
 
 </body>
