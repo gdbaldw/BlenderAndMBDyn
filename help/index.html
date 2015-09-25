@@ -41,20 +41,14 @@ The elements section is the basis of the BAM software. You may create an element
 <a class="title" name="body">Body</a>:
 <p>
 A body represents a mass in the multibody model. It requires a mass value, which can be set as a variable name by ticking the checkbox. It also requires a <a href="#3x3">3x3</a> matrix of inertia.
-
+<br><br>
 If no Blender mesh is selected when creating a body, a new one will be created at the location of the cursor. Upon accepting the body creation dialog, the user is invited by the "Object specifications" dialog to modify numerically the position and orientation of the body. This is optional and, in any case, any modifications brough by the user to the associated Blender mesh will be also applied to the body.
-<!--
-The body element describes a lumped rigid body when connected to a regular, 6 degree of freedom
-structural node, or a point mass when connected to a rotationless, 3 degree of freedom structural node.
-If only one mass is defined, the first method should be used. Otherwise, many masses can be referred
-to the same element by means of the keyword condense, followed by the number of expected masses
-num_masses. The format of each sub-mass is the same as for the single mass input (actually, when
-condense is not supplied, num_masses is assumed to be 1).
-The inertia_matrix is always referred to the center of mass of the mass that is being added. It
-can be rotated locally by means of the extra orientation_matrix supplied after the (optional) keyword
-inertial. The keyword node corresponds to the default, i.e. the inertia matrix is assumed to be input
-in the node reference frame.
--->
+<br><br>
+<a href="javascript:showhide('constitutiveDetails');">Click to show/hide elaborate explanation</a>
+<div class="elaborateHidden" id="constitutiveDetails">
+The body element describes a lumped rigid body connected to a  6 degree of freedom
+structural node. The inertia matrix is always referred to the center of mass of the mass that is being added.
+</div>
 </p>
 
 <a class="title" name="structural_force">Structural force</a>:
@@ -62,7 +56,15 @@ in the node reference frame.
 The structural force element allows to apply a force to the selected element. It can be ither absolute or follower. And absolute force will always have the same position and orientation while the follower force will follow the object to which it is applied. The force value is defined by a <a href="#driver">driver</a>.
 </p>
 
-
+<a class="title" name="set">Set (XXX verif-name)</a>
+<p>
+This panel allows to create new variables by name. These may then be used throughout the model.
+<br><br>
+<a href="javascript:showhide('constitutiveDetails');">Click to show/hide elaborate explanation</a>
+<div class="elaborateHidden" id="constitutiveDetails">
+The user is encouraged to use such variables to simplify the creation of the model. A typical example would be to define variables of mass, length, height, and depth of a body to then be able to easily change later on the properties of that body. The values can be changed without having to manually edit all the matrices associated to that body. It becomes even more useful when one would want to scale a complete model by a factor. Mathematical operations can be done to create new variables from previously defined ones.
+</div>
+</p>
 
 
 <a class="title" name="gravity">Gravity</a>:
@@ -109,10 +111,12 @@ order to understand what the input and the output parameters are supposed to be.
 </p>
 <a class="title" name="constitutive">Constitutive</a>
 <p>
-
-
-
-
+Brief explanation
+<br><br>
+<a href="javascript:showhide('constitutiveDetails');">Click to show/hide elaborate explanation</a>
+<div class="elaborateHidden" id="constitutiveDetails">
+elaborating...
+</div>
 </p>
 
 </body>
