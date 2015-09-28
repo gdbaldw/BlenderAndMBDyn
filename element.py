@@ -71,6 +71,8 @@ class Base(Operator):
             if 1 < len(objects):
                 objects[0].location = objects[1].location
             exec("bpy.ops." + root_dot + "object_specifications('INVOKE_DEFAULT')")
+        elif hasattr(self.entity, "objects") and False in [self.entity.objects[i] == ob for i, ob in enumerate(objects)]:
+            exec("bpy.ops." + root_dot + "object_specifications('INVOKE_DEFAULT')")
         return objects
     def store(self, context):
         self.entity.objects = self.sufficient_objects(context)
