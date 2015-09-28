@@ -880,6 +880,9 @@ class UI(list):
                         attr.clear()
                 context.scene.dirty_simulator = True
                 self.set_index(context, 0 if index == 0 and 0 < len(uilist) else index-1)
+                index, uilist = self.get_uilist(context)
+                if -1 < index:
+                    entity_list[index].remesh()
                 return{'FINISHED'}
         class MoveUp(bpy.types.Operator, klass):
             bl_idname = module + ".move_up"
