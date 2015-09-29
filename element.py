@@ -421,16 +421,13 @@ klasses[DistanceOperator.bl_label] = DistanceOperator
 
 class InLine(Joint):
     def write(self, f):
-        rot0, globalV0, iNode0 = self.rigid_offset(0)
-        localV0 = rot0*globalV0
         rot_1, globalV_1, Node_1 = self.rigid_offset(1)
-        to_point = rot_1*(globalV_1 + self.objects[0].matrix_world.translation - self.objects[1].matrix_world.translation)
-        rot = self.objects[0].matrix_world.to_quaternion().to_matrix()
+        localV_1 = rot_1*globalV_1
         f.write("\tjoint: " + self.safe_name() + ", inline,\n")
         self.write_node(f, 0, node=True, position=True, orientation=True)
         f.write(",\n\t\t" + safe_name(Node_1.name))
         f.write(",\n\t\t\toffset, ")
-        write_vector(f, to_point, ";\n")
+        write_vector(f, localV_1, ";\n")
     def remesh(self):
         RhombicPyramid(self.objects[0])
 
