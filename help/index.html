@@ -84,8 +84,32 @@ The Gravity element is used to add a gravity force to the simulation. Many times
 
 <a class="title" name="simulator">Simulator</a>:
 <p>
-	This panel allows to run MBDyn. Only one simulation needs to be created. It can be ran multiple times. After after updated the multibody model, one can simply select the desired simulator and click the "Run simulation" button followed by the "Animated objects" button to see the new updated results.
+	This tab allows to create a new simulator/simulation. Only one simulation needs to be created. It can be ran multiple times. After having updated the multibody model, one can simply select the desired simulator and click the <i>Run simulation</i> button followed by the <i>Animated objects</i> button to see the new updated results.
+	
+TODO: add image: https://openclipart.org/download/3836/Selanit-info-lightbulb.svg	It is recommended to initially chose a high value of <i>steps between objects</i> when importing the animated results because MBDyn typically has a large number of timesteps and importing all of them in Blender may take a long time.
+	<br><br>
+<a href="javascript:showhide('simulatorDetails');">Click to show/hide elaborate explanation</a>
+<div class="elaborateHidden" id="simulatorDetails">
+In the panel which ...
+</div>
 </p>
+
+<a class="title" name="initial_value">Initial Value</a>:
+<p>
+	This panel allows to set the core preferences of MBDyn and the multibody simulation. By ticking the <i>MBDyn path</i> box, one will be able to give the path to the MBDyn executable to be used. 
+	
+	The <i>General_data</i>, <i>Output_data</i>, and <i>job_control</i> allow to impose settings in a similar fashion as explained in the MBDyn manual. <b>TODO: insert link to manual ?</b>
+	
+	The <i>default_output</i> drop-down menu selector allows to create a set of output values that ought to be printed to the output files when the simulation is ran.
+	<br><br>
+<a href="javascript:showhide('initial_valueDetails');">Click to show/hide elaborate explanation</a>
+<div class="elaborateHidden" id="initial_valueDetails">
+...
+</div>
+</p>
+
+
+
 
 <a class="title" name="constitutive">Constitutive law</a>:
 <p>
