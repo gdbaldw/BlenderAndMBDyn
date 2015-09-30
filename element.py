@@ -425,8 +425,7 @@ class InLine(Joint):
         localV_1 = rot_1*globalV_1
         f.write("\tjoint: " + self.safe_name() + ", inline,\n")
         self.write_node(f, 0, node=True, position=True, orientation=True)
-        f.write(",\n\t\t" + safe_name(Node_1.name))
-        f.write(",\n\t\t\toffset, ")
+        f.write(",\n\t\t" + safe_name(Node_1.name) + ",\n\t\t\toffset, ")
         write_vector(f, localV_1, ";\n")
     def remesh(self):
         RhombicPyramid(self.objects[0])
@@ -440,18 +439,20 @@ klasses[InLineOperator.bl_label] = InLineOperator
 
 class InPlane(Joint):
     def write(self, f):
-        rot0, globalV0, iNode0 = self.rigid_offset(0)
-        localV0 = rot0*globalV0
-        rot1, globalV1, iNode1 = self.rigid_offset(1)
-        to_point = rot1*(globalV1 + self.objects[0].matrix_world.translation - self.objects[1].matrix_world.translation)
+        rot_0, globalV_0, Node_0 = self.rigid_offset(0)
+        localV_0 = rot_0*globalV_0
+        rot_1, globalV_1, Node_1 = self.rigid_offset(1)
+        localV_1 = rot_1*globalV_1
+
         rot = self.objects[0].matrix_world.to_quaternion().to_matrix()
-        normal = rot*rot0*Vector((0., 0., 1.))
+        normal = rot*rot_0*Vector((0., 0., 1.))
         f.write(
         "\tjoint: " + self.safe_name() + ", inplane,\n" +
-        "\t\t" + safe_name(iNode0.name) + ",\n\t\t\t")
-        write_vector(f, localV0, ",\n\t\t\t")
+        "\t\t" + safe_name(Node_0.name) + ",\n\t\t\t")
+        write_vector(f, localV_0, ",\n\t\t\t")
         write_vector(f, normal, ",\n\t\t")
-        f.write(safe_name(iNode1.name) + ",\n\t\t\toffset, " + ", ".join([BPY.FORMAT(x) for x in to_point]) + ";\n")
+        f.write(safe_name(Node_1.name) + ",\n\t\t\toffset, ")
+        write_vector(f, localV_1, ";\n")
     def remesh(self):
         RhombicPyramid(self.objects[0])
 
