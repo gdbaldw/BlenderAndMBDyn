@@ -171,6 +171,8 @@ def Teardrop(obj):
     for q in [(2,3,1,0),(0,1,4),(1,3,4),(3,2,4),(2,0,4)]:
         bm.faces.new([bm.verts[i] for i in q])
     crease = bm.edges.layers.crease.new()
+    if hasattr(bm.edges, "ensure_lookup_table"):
+        bm.edges.ensure_lookup_table()
     for i in range(4,8):
         bm.edges[i][crease] = 1.0
     bm.to_mesh(obj.data)

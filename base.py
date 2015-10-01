@@ -35,6 +35,7 @@ else:
     from copy import copy
     from sys import getrefcount
     import webbrowser, os
+    from collections import defaultdict
 
 category = "MBDyn"
 root_dot = "_".join(category.lower().split()) + "."
@@ -158,10 +159,34 @@ def load_post(*args, **kwargs):
     for scene in bpy.data.scenes:
         scene.dirty_simulator = True
 
+entity_obs = defaultdict(list)
+
+@bpy.app.handlers.persistent
+def scene_update_pre(*args, **kwargs):
+    for entity in database.all_entities():
+        if hasattr(entity, "objects"):
+            for i, ob in enumerate(entity.objects):
+                entity_obs[ob.name].append((entity, i))
+
 @bpy.app.handlers.persistent
 def scene_update_post(*args, **kwargs):
-    if bpy.context.scene != database.scene:
+    scene = bpy.context.scene
+    if scene.hash != repr(hash(scene)):
+        scene.hash = repr(hash(scene))
+        if scene.mbdyn_name == scene.name:
+            database.scene = scene
+            for ob in scene.objects:
+                if ob.hash != repr(hash(ob)):
+                    ob.hash = repr(hash(ob))
+                    for entity, i in entity_obs[ob.name]:
+                        entity.objects[i] = ob
+        else:
+            database.replace()
+            bpy.ops.object.select_all(action='DESELECT')
+    elif database.scene != scene:
         database.replace()
+        bpy.ops.object.select_all(action='DESELECT')
+    entity_obs.clear()
 
 @bpy.app.handlers.persistent
 def save_pre(*args, **kwargs):
@@ -387,27 +412,33 @@ class BPY:
         for klass in cls.klasses:
             bpy.utils.register_class(klass)
         bpy.app.handlers.load_post.append(load_post)
+        bpy.app.handlers.scene_update_pre.append(scene_update_pre)
         bpy.app.handlers.scene_update_post.append(scene_update_post)
         bpy.app.handlers.save_pre.append(save_pre)
         bpy.types.Scene.pickled_database = bpy.props.StringProperty()
         bpy.types.Scene.dirty_simulator = bpy.props.BoolProperty(default=True)
+        bpy.types.Scene.hash = bpy.props.StringProperty()
         bpy.types.Scene.clean_log = bpy.props.BoolProperty(default=False)
         bpy.types.Scene.mbdyn_name = bpy.props.StringProperty()
         bpy.types.Scene.popups_enabled = bpy.props.BoolProperty(default=False)
         bpy.types.Object.mbdyn_name = bpy.props.StringProperty()
+        bpy.types.Object.hash = bpy.props.StringProperty()
     @classmethod
     def unregister(cls):
         for klass in cls.klasses:
             bpy.utils.unregister_class(klass)
         bpy.app.handlers.save_pre.append(save_pre)
+        bpy.app.handlers.scene_update_pre.remove(scene_update_pre)
         bpy.app.handlers.scene_update_post.remove(scene_update_post)
         bpy.app.handlers.load_post.remove(load_post)
         del bpy.types.Scene.pickled_database
         del bpy.types.Scene.dirty_simulator
+        del bpy.types.Scene.hash
         del bpy.types.Scene.clean_log
         del bpy.types.Scene.mbdyn_name
         del bpy.types.Scene.popups_enabled
         del bpy.types.Object.mbdyn_name
+        del bpy.types.Object.hash
 
 class Entity:
     def __init__(self, name):
@@ -849,6 +880,9 @@ class UI(list):
                         attr.clear()
                 context.scene.dirty_simulator = True
                 self.set_index(context, 0 if index == 0 and 0 < len(uilist) else index-1)
+                index, uilist = self.get_uilist(context)
+                if -1 < index:
+                    entity_list[index].remesh()
                 return{'FINISHED'}
         class MoveUp(bpy.types.Operator, klass):
             bl_idname = module + ".move_up"

@@ -302,6 +302,7 @@ class InitialValue(Entity):
                     print(e)
                     f.write(str(e) + "\n")
                 f.write("end: elements;\n")
+            del database.rigid_dict
 
 class InitialValueOperator(Base):
     bl_label = "Initial value"
