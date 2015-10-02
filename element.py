@@ -870,9 +870,8 @@ klasses[GravityOperator.bl_label] = GravityOperator
 class Driven(Entity):
     elem_type = "driven"
     def write(self, f):
-        f.write("\tdriven: " + self.safe_name() + ",\n" +
-        self.drive.safe_name() + ",\n" +
-        "\t\texisting: " + self.element.elem_type + ", " + self.element.safe_name() + ";\n")
+        f.write("\tdriven: " + self.element.safe_name() + ",\n\t\treference, " +
+        self.drive.safe_name() + ",\n\t\texisting: " + self.element.elem_type + ", " + self.element.safe_name() + ";\n")
 
 class DrivenOperator(Drive):
     bl_label = "Driven"
