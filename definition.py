@@ -89,7 +89,7 @@ class GeneralProblem(Entity):
     def write(self, f):
         f.write("\tstrategy: " + self.strategy)
         if self.strategy == "factor":
-            f.write(", " + ", ".join([FORMAT(v) for v in (self.reducion_factor, self.steps_before_reduction,
+            f.write(", " + ", ".join([BPY.FORMAT(v) for v in (self.reduction_factor, self.steps_before_reduction,
                 self.raise_factor, self.steps_before_raise, self.factor_min_iterations)])
                 + (", " + FORMAT(self.factor_max_iterations) if self.set_factor_max_iterations else ""))
         elif self.strategy == "change":
@@ -122,7 +122,7 @@ class GeneralProblemOperator(Base):
         ("factor", "Factor", ""),
         ("change", "Change", ""),
         ], name="Strategy", default="no change")
-    reducion_factor = bpy.props.FloatProperty(name="Reduction factor", default=0.0, min=0.0, precision=6)
+    reduction_factor = bpy.props.PointerProperty(type = BPY.Float)
     steps_before_reduction = bpy.props.IntProperty(name="Steps before reduction", default=0, min=0)
     raise_factor = bpy.props.FloatProperty(name="Raise factor", default=0.0, min=0.0, precision=6)
     steps_before_raise = bpy.props.IntProperty(name="Steps before raise", default=0, min=0)
@@ -168,9 +168,11 @@ class GeneralProblemOperator(Base):
     derivatives_tolerance = bpy.props.FloatProperty(name="Derivatives tolerance", default=2.0, min=0.0, precision=6)
     derivatives_max_iterations = bpy.props.IntProperty(name="Derivatives max iterations", default=1, min=0)
     derivatives_coefficient = bpy.props.FloatProperty(name="Derivatives coefficient", default=1e-3, min=0.0, precision=6)
+    def prereqs(self, context):
+        self.reduction_factor.mandatory = True
     def assign(self, context):
         self.strategy = self.entity.strategy
-        self.reducion_factor = self.entity.reducion_factor
+        self.reduction_factor.assign(self.entity.reduction_factor)
         self.steps_before_reduction = self.entity.steps_before_reduction
         self.raise_factor = self.entity.raise_factor
         self.steps_before_raise = self.entity.steps_before_raise
@@ -204,7 +206,7 @@ class GeneralProblemOperator(Base):
         self.time_step_pattern_drive.assign(self.entity.time_step_pattern_drive)
     def store(self, context):
         self.entity.strategy = self.strategy
-        self.entity.reducion_factor = self.reducion_factor
+        self.entity.reduction_factor = self.reduction_factor.store()
         self.entity.steps_before_reduction = self.steps_before_reduction
         self.entity.raise_factor = self.raise_factor
         self.entity.steps_before_raise = self.steps_before_raise
@@ -241,7 +243,7 @@ class GeneralProblemOperator(Base):
         layout = self.layout
         layout.prop(self, "strategy")
         if self.strategy == "factor":
-            layout.prop(self, "reducion_factor")
+            self.reduction_factor.draw(layout, "Reduction factor")
             layout.prop(self, "steps_before_reduction")
             layout.prop(self, "raise_factor")
             layout.prop(self, "steps_before_raise")
@@ -294,7 +296,7 @@ class GeneralProblemOperator(Base):
         layout.prop(self, "derivatives_coefficient")
     def check(self, context):
         self.time_step_pattern_drive.mandatory = self.strategy == "change"
-        return self.time_step_pattern_drive.check(context) or (self.basis != (self.strategy, self.set_factor_max_iterations, self.unlimited, self.set_residual_tolerance, self.set_residual_test, self.set_solution_tolerance, self.set_solution_test, self.set_threads, self.set_assembly_solver))
+        return (True in [x.check(context) for x in [self.reduction_factor]]) or self.time_step_pattern_drive.check(context) or (self.basis != (self.strategy, self.set_factor_max_iterations, self.unlimited, self.set_residual_tolerance, self.set_residual_test, self.set_solution_tolerance, self.set_solution_test, self.set_threads, self.set_assembly_solver))
     def create_entity(self):
         return GeneralProblem(self.name)
 

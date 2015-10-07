@@ -100,27 +100,33 @@ class InitialValue(Entity):
                 "\t\treference, " + frame_label + ", null,\n" +
                 "\t\treference, " + frame_label + ", null;\n")
         with open(os.path.join(directory, context.scene.name + ".mbd"), "w") as f:
-            f.write(
-                "begin: data" +
-                ";\n\tproblem: initial value" +
-                ";\nend: data" +
-                ";\n\nbegin: initial value" +
-                ";\n\tinitial time: " + (BPY.FORMAT(self.initial_time) if self.initial_time is not None else "0") +
-                ";\n\tfinal time: " + (BPY.FORMAT(self.final_time) if self.final_time is not None else "forever") +
-                ";\n")
-            for a in [self.general_data, self.method, self.nonlinear_solver, self.eigenanalysis, self.abort_after, self.linear_solver, self.dummy_steps, self.output_data, self.real_time]:
-                if a is not None:
-                    a.write(f)
-            f.write("end: initial value;\n" +
-                "\nbegin: control data;\n")
-            for a in [self.assembly, self.job_control, self.default_output, self.default_aerodynamic_output, self.default_beam_output]:
-                if a is not None:
-                    a.write(f)
+            f.write("# MBDyn v1.6 input file generated using BlenderAndMBDyn v2.0\n\n")
+            frame_for, frames, parent_of = dict(), list(), dict()
+            reference_frames = database.input_card.filter("Reference frame")
+            for frame in reference_frames:
+                frame_for.update({ob : frame for ob in frame.objects[1:]})
+                frames.append(frame)
+                parent_of.update({frame : parent for parent in reference_frames if frame.objects[0] in parent.objects[1:]})
+            frames_to_write = list()
+            while frames:
+                frame = frames.pop()
+                if frame in parent_of and parent_of[frame] in frames:
+                    frames.appendleft(frame)
+                else:
+                    frames_to_write.append(frame)
+            if frames_to_write:
+                f.write("# Frame names:\n")
+                for i, frame in enumerate(sorted(frames_to_write, key=lambda x: x.name)):
+                    f.write("set: const integer " + safe_name(frame.name) + " = " + str(i) + ";\n")
+                f.write("\n")
+            else:
+                f.write("# Frame names: None\n")
+            nodes = set()
+            dummy_dict = dict()
             structural_dynamic_nodes = set()
             structural_static_nodes = set()
             structural_dummy_nodes = set()
             database.rigid_dict = {e.objects[0] : e.objects[1] for e in database.element.filter("Rigid offset")}
-            nodes = set()
             names = [e.name for e in database.all_entities()]
             for e in (e for e in database.element + database.drive if hasattr(e, "objects")):
                 ob = database.rigid_dict[e.objects[0]] if e.objects[0] in database.rigid_dict else e.objects[0]
@@ -137,6 +143,42 @@ class InitialValue(Entity):
             structural_static_nodes -= structural_dynamic_nodes | structural_dummy_nodes
             database.node.clear()
             database.node.extend(sorted(nodes, key=lambda x: x.name))
+            if database.node:
+                f.write("# Node names:\n")
+                for i, node in enumerate(database.node):
+                    f.write("set: const integer " + safe_name(node.name) + " = " + str(i) + ";\n")
+                f.write("\n")
+            else:
+                f.write("# Node names: None\n\n")
+            if database.element:
+                f.write("# Element names:\n")
+                for i, element in enumerate(sorted(database.element, key=lambda x: x.name)):
+                    f.write("set: const integer " + element.safe_name() + " = " + str(i) + ";\n")
+                f.write("\n")
+            else:
+                f.write("# Element names: None\n\n")
+            if database.drive:
+                f.write("# Drive names:\n")
+                for i, drive in enumerate(sorted(database.drive, key=lambda x: x.name)):
+                    f.write("set: const integer " + drive.safe_name() + " = " + str(i) + ";\n")
+                f.write("\n")
+            else:
+                f.write("# Drive names: None\n\n")
+            if database.constitutive:
+                f.write("# Constitutive names:\n")
+                for i, constitutive in enumerate(sorted(database.constitutive, key=lambda x: x.name)):
+                    f.write("set: const integer " + constitutive.safe_name() + " = " + str(i) + ";\n")
+                f.write("\n")
+            else:
+                f.write("# Constitutive names: None\n\n")
+            set_cards = database.input_card.filter("Set")
+            if set_cards:
+                f.write("# Parameters:\n")
+                for set_card in set_cards:
+                    set_card.write(f)
+                f.write("\n")
+            else:
+                f.write("# Parameters: None\n\n")
             structural_node_count = len(structural_static_nodes | structural_dynamic_nodes | structural_dummy_nodes)
             joint_count = len([e for e in database.element if e.type in joint_types])
             force_count = len([e for e in database.element if e.type in force_types])
@@ -178,6 +220,22 @@ class InitialValue(Entity):
 #            abstract_node_count = len([e for e in database.ns_node if e.type in ["Abstract"]])
 #            hydraulic_node_count = len([e for e in database.ns_node if e.type in ["Hydraulic"]])
 #            parameter_node_count = len([e for e in database.ns_node if e.type in ["Parameter"]])
+            f.write(
+                "begin: data" +
+                ";\n\tproblem: initial value" +
+                ";\nend: data" +
+                ";\n\nbegin: initial value" +
+                ";\n\tinitial time: " + (BPY.FORMAT(self.initial_time) if self.initial_time is not None else "0") +
+                ";\n\tfinal time: " + (BPY.FORMAT(self.final_time) if self.final_time is not None else "forever") +
+                ";\n")
+            for a in [self.general_data, self.method, self.nonlinear_solver, self.eigenanalysis, self.abort_after, self.linear_solver, self.dummy_steps, self.output_data, self.real_time]:
+                if a is not None:
+                    a.write(f)
+            f.write("end: initial value;\n" +
+                "\nbegin: control data;\n")
+            for a in [self.assembly, self.job_control, self.default_output, self.default_aerodynamic_output, self.default_beam_output]:
+                if a is not None:
+                    a.write(f)
             if structural_node_count:
                 f.write("\tstructural nodes: " + str(structural_node_count) + ";\n")
             """
@@ -209,35 +267,12 @@ class InitialValue(Entity):
             if file_driver_count:
                 f.write("\tfile drivers: " + str(file_driver_count) + ";\n")
             f.write("end: control data;\n")
-            set_cards = database.input_card.filter("Set")
-            if set_cards:
-                f.write("\n")
-                for set_card in set_cards:
-                    set_card.write(f)
-            frame_for, frames, parent_of = dict(), list(), dict()
-            reference_frames = database.input_card.filter("Reference frame")
-            for frame in reference_frames:
-                frame_for.update({ob : frame for ob in frame.objects[1:]})
-                frames.append(frame)
-                parent_of.update({frame : parent for parent in reference_frames if frame.objects[0] in parent.objects[1:]})
-            frames_to_write = list()
-            while frames:
-                frame = frames.pop()
-                if frame in parent_of and parent_of[frame] in frames:
-                    frames.appendleft(frame)
-                else:
-                    frames_to_write.append(frame)
             if frames_to_write:
                 f.write("\n")
-                for i, frame in enumerate(sorted(frames_to_write, key=lambda x: x.name)):
-                    f.write("set: const integer " + safe_name(frame.name) + " = " + str(i) + ";\n")
                 for frame in frames_to_write:
                     frame.write(f, parent_of[frame] if frame in parent_of else None)
             if database.node:
-                f.write("\n")
-                for i, node in enumerate(database.node):
-                    f.write("set: const integer " + safe_name(node.name) + " = " + str(i) + ";\n")
-                f.write("begin: nodes;\n")
+                f.write("\nbegin: nodes;\n")
                 for node in structural_static_nodes:
                     write_structural_node(f, "static", node, frame_for[node] if node in frame_for else None)
                 for node in structural_dynamic_nodes:
@@ -273,26 +308,19 @@ class InitialValue(Entity):
                     driver.write(f)
                 f.write("end: drivers;\n")
             if database.function:
-                f.write("\n")
+                f.write("\n# Functions:\n")
                 for function in sorted(database.function, key=lambda x: x.name):
                     function.write(f)
             if database.drive:
-                f.write("\n")
-                for i, drive in enumerate(sorted(database.drive, key=lambda x: x.name)):
-                    f.write("set: const integer " + drive.safe_name() + " = " + str(i) + ";\n")
+                f.write("\n# Drives:\n")
                 for drive in database.drive:
                     f.write("drive caller: " + ", ".join([drive.safe_name(), drive.string()]) + ";\n")
             if database.constitutive:
-                f.write("\n")
-                for i, constitutive in enumerate(sorted(database.constitutive, key=lambda x: x.name)):
-                    f.write("set: const integer " + constitutive.safe_name() + " = " + str(i) + ";\n")
+                f.write("\n# Constitutives:\n")
                 for constitutive in database.constitutive:
                     f.write("constitutive law: " + ", ".join([constitutive.safe_name(), constitutive.dimension[0], constitutive.string()]) + ";\n")
             if database.element:
-                f.write("\n")
-                for i, element in enumerate(sorted(database.element, key=lambda x: x.name)):
-                    f.write("set: const integer " + element.safe_name() + " = " + str(i) + ";\n")
-                f.write("begin: elements;\n")
+                f.write("\nbegin: elements;\n")
                 try:
                     for element_type in aerodynamic_types + beam_types + ["Body"] + force_types + genel_types + joint_types + ["Rotor"] + environment_types + ["Driven"]:
                         for element in database.element:
@@ -303,6 +331,7 @@ class InitialValue(Entity):
                     f.write(str(e) + "\n")
                 f.write("end: elements;\n")
             del database.rigid_dict
+            del dummy_dict
 
 class InitialValueOperator(Base):
     bl_label = "Initial value"
@@ -389,8 +418,8 @@ class InitialValueOperator(Base):
     def draw(self, context):
         layout = self.layout
         self.mbdyn_path.draw(layout, "MBDyn path", "Set")
-        self.initial_time.draw(layout, "Initial time", "Set")
-        self.final_time.draw(layout, "Final time", "Set")
+        self.initial_time.draw(layout, "Initial time")
+        self.final_time.draw(layout, "Final time")
         self.general_data.draw(layout, "General data")
         self.method.draw(layout, "Method", "Set")
         self.nonlinear_solver.draw(layout, "Nonlinear solver", "Set")
@@ -488,8 +517,8 @@ class Animate(bpy.types.Operator, Base):
     bl_idname = root_dot + "animate"
     bl_options = {'REGISTER', 'INTERNAL'}
     bl_label = "Animate objects"
-    bl_description = "Import results into Blender animation starting at the next frame"
-    steps = bpy.props.IntProperty(name="Steps between animation", default=1, min=1)
+    bl_description = "Import each node's position and orientation into Blender keyframes starting at the next frame"
+    steps = bpy.props.IntProperty(name="MBDyn steps between Blender keyframes", default=1, min=1)
     def invoke(self, context, event):
         scene = context.scene
         directory = os.path.splitext(context.blend_data.filepath)[0]
