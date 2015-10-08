@@ -30,8 +30,15 @@
 		//~ $("#toc").append("<br><a id='link" + i + "' href='#title" + i + "' title='" + current.attr("tagName") + "'>" + current.html() + "</a>");
 	//~ });
 	//~ });
+	//
+	//
+	// // REGEXP from element search: class (.*)\(.*\):
+// replace: <h2><a class="title" name="\1">\1</a>:</h2>\n<p>\n\n</p>\n\n
 </script>
 </head>
+
+
+
 
 <body>
 <!--
@@ -46,6 +53,10 @@
 -->
 
 
+<h1><a class="title" name="disclaimer">Disclaimer</a>:</h1>
+<p>This manual was written with the intent of giving a quick reference to the suer who is using BAM v2. It does not pretend to be complete. The descriptions given here come from the MBDyn official input manual, the BAM v2 mailing lists, and the available video tutorials.</p>
+
+
 <h1><a class="title" name="installation">Installation</a>:</h1>
 To install BlenderAndMBDyn v2 (BAM) from the Blender interface go to menu <i>File->User Preferences</i> and at the bottom of the panel which appear click the <i>Install from file</i> button.
 The procedure is fairly straightfoward but a few details should be taken into consideration:
@@ -54,6 +65,16 @@ The procedure is fairly straightfoward but a few details should be taken into co
   <li>Before reinstalling BAM, it should first be uninstalled from Blender which should also be restarted;</li>
   <li>The software is still in development and any bug reports are welcomed on the <a href="https://github.com/gdbaldw/BlenderAndMBDyn";>Github page</a>.</li>
 </ul> 
+
+<h1><a class="title" name="tutorials">Video Tutorials</a>:</h1>
+The simplest way to learn the basics of the BAM v2 tool is to watch a few of the video tutorials.
+The important ones are listed here:
+ <ul style="list-style-type:disc">
+  <li><a href=https://www.youtube.com/watch?v=TnxtspuR4c0>Crank and slider</a>; construct, simulate, drive through the keyboard while simulating, animate while simulating, and analyze a Crank and Slider model in MBDyn. </li>
+  <li><a href=https://www.youtube.com/watch?v=RKprhyOqHZM>Double pendulum</a>; construct, simulate, and analyze a double pendulum. </li>
+  <li><a href=https://www.youtube.com/watch?v=EzoHrf-RoUE>Chain</a>; construct, simulate, and analyze a four link chain.</li>
+</ul> 
+
 
 <h1><a class="title" name="element">Elements</a>:</h1>
 <p>
@@ -75,20 +96,268 @@ structural node. The inertia matrix is always referred to the center of mass of 
 </div>
 </p>
 
+
+
+
+
+
+<h2><a class="title" name="Constitutive">Constitutive</a>:</h2>
+<p>
+
+</p>
+
+
+<h2><a class="title" name="Drive">Drive</a>:</h2>
+<p>
+
+</p>
+
+
+<h2><a class="title" name="Friction">Friction</a>:</h2>
+<p>
+
+</p>
+
+
+
+
+<!--
+<h2><a class="title" name="Force">Force</a>:</h2>
+<p>
+
+</p>
+-->
+
+
 <h2><a class="title" name="structural_force">Structural force</a>:</h2>
 <p>
 The structural force element allows to apply a force to the selected element. It can be ither absolute or follower. And absolute force will always have the same position and orientation while the follower force will follow the object to which it is applied. The force value is defined by a <a href="#driver">driver</a>.
 </p>
+
+
+<h2><a class="title" name="StructuralInternalForce">StructuralInternalForce</a>:</h2>
+<p>
+
+</p>
+
+
+
+
+
+<h2><a class="title" name="StructuralCouple">StructuralCouple</a>:</h2>
+<p>
+
+</p>
+
+
+
+
+
+<h2><a class="title" name="StructuralInternalCouple">StructuralInternalCouple</a>:</h2>
+<p>
+
+</p>
+
+
+
+
+
+<!--
+<h2><a class="title" name="Joint">Joint</a>:</h2>
+<p>
+
+</p>
+-->
+
+
+<h2><a class="title" name="Hinge">Hinge</a>:</h2>
+<p>
+
+</p>
+
+
+<h2><a class="title" name="AxialRotation">AxialRotation</a>:</h2>
+<p>
+
+</p>
+
+
+<h2><a class="title" name="clamp">Clamp</a>:</h2>
+<p>
+The clamp element is used to rigidly fixed a node in space. Use this element to create a solid ground to which moving ovjects may be attached later on.
+</p>
+
+
+
+<h2><a class="title" name="DeformableDisplacementJoint">DeformableDisplacementJoint</a>:</h2>
+<p>
+
+</p>
+
+
+
+
+
+<h2><a class="title" name="DeformableHinge">DeformableHinge</a>:</h2>
+<p>
+
+</p>
+
+
+
+
+
+<h2><a class="title" name="DeformableJoint">DeformableJoint</a>:</h2>
+<p>
+
+</p>
+
+
+
+
+
+<h2><a class="title" name="Distance">Distance</a>:</h2>
+<p>
+
+</p>
+
+
+
+
+
+<h2><a class="title" name="InLine">InLine</a>:</h2>
+<p>
+
+</p>
+
+
+
+
+
+<h2><a class="title" name="InPlane">InPlane</a>:</h2>
+<p>
+
+</p>
+
+
+
+
+
+<h2><a class="title" name="RevoluteHinge">RevoluteHinge</a>:</h2>
+<p>
+
+</p>
+
+
+
+
+
+<h2><a class="title" name="Rod">Rod</a>:</h2>
+<p>
+
+</p>
+
+
+
+
+
+<h2><a class="title" name="spherical_hinge">Spherical Hinge</a>:</h2>
+<p>
+This joint constrains the relative position of two nodes; the relative orientation is not constrained.
+</p>
+
+
+<!--
+<h2><a class="title" name="SphericalHingeOperator">Spherical Hinge Operator</a>:</h2>
+<p>
+</p>
+-->
+
+
+<h2><a class="title" name="total_joint">Total Joint</a>:</h2>
+<p>
+The total joint allows to arbitrarily impose constraints between two nodes in the form of user chosen drivers.
+</p>
+
+
+
+
+
+<h2><a class="title" name="ViscousBody">ViscousBody</a>:</h2>
+<p>
+
+</p>
+
+
+
+
+
+<h2><a class="title" name="StreamOutput">StreamOutput</a>:</h2>
+<p>
+
+</p>
+
+
+
+
+
+<h2><a class="title" name="StreamAnimation">StreamAnimation</a>:</h2>
+<p>
+
+</p>
+
+
+
+
 
 <h2><a class="title" name="gravity">Gravity</a>:</h2>
 <p>
 The Gravity element is used to add a gravity force to the simulation. Many times one will want to define it as a constant drive with a value of 9.81 m/s^2. The gravity element does not get linked with any Blender mesh object. Any type of gravity may be defined by combining the required vector input with a chosen driver.
 </p>
 
+
+
+<h2><a class="title" name="BodyMass">BodyMass</a>:</h2>
+<p>
+
+</p>
+
+
+
+
+
+<h2><a class="title" name="RigidOffset">RigidOffset</a>:</h2>
+<p>
+
+</p>
+
+
+
+
+
+<h2><a class="title" name="DummyNode">DummyNode</a>:</h2>
+<p>
+
+</p>
+
+
+
+
+
+<h2><a class="title" name="BeamSegment">BeamSegment</a>:</h2>
+<p>
+
+</p>
+
+
+
+
+
 <h1><a class="title" name="constitutive">Constitutives</a>:</h1>
 <p>
 </p>
 
+<!--
 <h1><a class="title" name="drive">Drives</a>:</h1>
 <p>
 </p>
@@ -96,6 +365,7 @@ The Gravity element is used to add a gravity force to the simulation. Many times
 <h1><a class="title" name="driver">Drivers</a>:</h1>
 <p>
 </p>
+-->
 
 <h1><a class="title" name="input_card">Input card</a></h1>
 <p>
