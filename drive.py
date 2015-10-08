@@ -42,6 +42,7 @@ types = [
     "Double step drive",
     "Drive drive",
     "Element drive",
+    "Event drive",
     "Exponential drive",
     "File drive",
     "Fourier series drive",
@@ -97,6 +98,76 @@ for t in types:
         def create_entity(self):
             return Entity(self.name)
     klasses[t] = Tester
+
+class FileDrive(Entity):
+    def string(self):
+        col = 1 + [d for d in database.drive if hasattr(d, "driver") and d.driver == self.driver].index(self)
+        return ("file, " + self.driver.safe_name() + ", " + str(col) +
+            (", amplitude, " + BPY.FORMAT(self.amplitude) if self.amplitude is not None else ""))
+
+class FileDriveOperator(Base):
+    bl_label = "File drive"
+    driver = bpy.props.PointerProperty(type = BPY.Driver)
+    amplitude = bpy.props.PointerProperty(type = BPY.Float)
+    def prereqs(self, context):
+        self.driver.mandatory = True
+    def assign(self, context):
+        self.driver.assign(self.entity.driver)
+        self.amplitude.assign(self.entity.amplitude)
+    def store(self, context):
+        self.entity.driver = self.driver.store()
+        self.entity.amplitude = self.amplitude.store()
+    def draw(self, context):
+        layout = self.layout
+        self.driver.draw(layout, "Driver")
+        self.amplitude.draw(layout, "Amplitude")
+    def check(self, context):
+        return self.driver.check(context) or self.amplitude.check(context)
+    def create_entity(self):
+        return FileDrive(self.name)
+
+klasses[FileDriveOperator.bl_label] = FileDriveOperator
+
+class EventDrive(FileDrive):
+    pass
+
+event_types = ['NONE', 'LEFTMOUSE', 'MIDDLEMOUSE', 'RIGHTMOUSE', 'BUTTON4MOUSE', 'BUTTON5MOUSE', 'BUTTON6MOUSE', 'BUTTON7MOUSE', 'ACTIONMOUSE', 'SELECTMOUSE', 'MOUSEMOVE', 'INBETWEEN_MOUSEMOVE', 'TRACKPADPAN', 'TRACKPADZOOM', 'MOUSEROTATE', 'WHEELUPMOUSE', 'WHEELDOWNMOUSE', 'WHEELINMOUSE', 'WHEELOUTMOUSE', 'EVT_TWEAK_L', 'EVT_TWEAK_M', 'EVT_TWEAK_R', 'EVT_TWEAK_A', 'EVT_TWEAK_S', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', 'ZERO', 'ONE', 'TWO', 'THREE', 'FOUR', 'FIVE', 'SIX', 'SEVEN', 'EIGHT', 'NINE', 'LEFT_CTRL', 'LEFT_ALT', 'LEFT_SHIFT', 'RIGHT_ALT', 'RIGHT_CTRL', 'RIGHT_SHIFT', 'OSKEY', 'GRLESS', 'ESC', 'TAB', 'RET', 'SPACE', 'LINE_FEED', 'BACK_SPACE', 'DEL', 'SEMI_COLON', 'PERIOD', 'COMMA', 'QUOTE', 'ACCENT_GRAVE', 'MINUS', 'SLASH', 'BACK_SLASH', 'EQUAL', 'LEFT_BRACKET', 'RIGHT_BRACKET', 'LEFT_ARROW', 'DOWN_ARROW', 'RIGHT_ARROW', 'UP_ARROW', 'NUMPAD_2', 'NUMPAD_4', 'NUMPAD_6', 'NUMPAD_8', 'NUMPAD_1', 'NUMPAD_3', 'NUMPAD_5', 'NUMPAD_7', 'NUMPAD_9', 'NUMPAD_PERIOD', 'NUMPAD_SLASH', 'NUMPAD_ASTERIX', 'NUMPAD_0', 'NUMPAD_MINUS', 'NUMPAD_ENTER', 'NUMPAD_PLUS', 'F1', 'F2', 'F3', 'F4', 'F5', 'F6', 'F7', 'F8', 'F9', 'F10', 'F11', 'F12', 'F13', 'F14', 'F15', 'F16', 'F17', 'F18', 'F19', 'PAUSE', 'INSERT', 'HOME', 'PAGE_UP', 'PAGE_DOWN', 'END', 'MEDIA_PLAY', 'MEDIA_STOP', 'MEDIA_FIRST', 'MEDIA_LAST', 'TEXTINPUT', 'WINDOW_DEACTIVATE', 'TIMER', 'TIMER0', 'TIMER1', 'TIMER2', 'TIMER_JOBS', 'TIMER_AUTOSAVE', 'TIMER_REPORT', 'TIMERREGION', 'NDOF_MOTION', 'NDOF_BUTTON_MENU', 'NDOF_BUTTON_FIT', 'NDOF_BUTTON_TOP', 'NDOF_BUTTON_BOTTOM', 'NDOF_BUTTON_LEFT', 'NDOF_BUTTON_RIGHT', 'NDOF_BUTTON_FRONT', 'NDOF_BUTTON_BACK', 'NDOF_BUTTON_ISO1', 'NDOF_BUTTON_ISO2', 'NDOF_BUTTON_ROLL_CW', 'NDOF_BUTTON_ROLL_CCW', 'NDOF_BUTTON_SPIN_CW', 'NDOF_BUTTON_SPIN_CCW', 'NDOF_BUTTON_TILT_CW', 'NDOF_BUTTON_TILT_CCW', 'NDOF_BUTTON_ROTATE', 'NDOF_BUTTON_PANZOOM', 'NDOF_BUTTON_DOMINANT', 'NDOF_BUTTON_PLUS', 'NDOF_BUTTON_MINUS', 'NDOF_BUTTON_ESC', 'NDOF_BUTTON_ALT', 'NDOF_BUTTON_SHIFT', 'NDOF_BUTTON_CTRL', 'NDOF_BUTTON_1', 'NDOF_BUTTON_2', 'NDOF_BUTTON_3', 'NDOF_BUTTON_4', 'NDOF_BUTTON_5', 'NDOF_BUTTON_6', 'NDOF_BUTTON_7', 'NDOF_BUTTON_8', 'NDOF_BUTTON_9', 'NDOF_BUTTON_10', 'NDOF_BUTTON_A', 'NDOF_BUTTON_B', 'NDOF_BUTTON_C']
+
+class EventDriveOperator(FileDriveOperator):
+    bl_label = "Event drive"
+    initial_value = bpy.props.IntProperty(name="Initial value")
+    increment = bpy.props.EnumProperty(items=[(e, e, "") for e in event_types], default='PAGE_UP', name="Increment event")
+    decrement = bpy.props.EnumProperty(items=[(e, e, "") for e in event_types], default='PAGE_DOWN', name="Decrement event")
+    @classmethod
+    def poll(cls, context):
+        return True
+    def prereqs(self, context):
+        self.driver.type = "Event stream"
+        event_streams = database.driver.filter("Event stream")
+        if event_streams:
+            self.driver.assign(event_streams[0])
+        super().prereqs(context)
+    def assign(self, context):
+        self.initial_value = self.entity.initial_value
+        self.increment = self.entity.increment
+        self.decrement = self.entity.decrement
+        super().assign(context)
+    def store(self, context):
+        self.entity.initial_value = self.initial_value
+        self.entity.increment = self.increment
+        self.entity.decrement = self.decrement
+        super().store(context)
+    def draw(self, context):
+        layout = self.layout
+        layout.prop(self, "initial_value")
+        self.amplitude.draw(layout, "Amplitude")
+        layout.prop(self, "increment")
+        layout.prop(self, "decrement")
+        self.driver.draw(layout, "Event stream")
+    def create_entity(self):
+        return EventDrive(self.name)
+
+klasses[EventDriveOperator.bl_label] = EventDriveOperator
 
 class NullDrive(Entity):
     def string(self):
@@ -399,7 +470,7 @@ class PiecewiseLinearDrive(Entity):
     def string(self):
         ret = "piecewise linear, " + BPY.FORMAT(self.N)
         for i in range(self.N):
-            ret += ",\n\t" + BPY.FORMAT(self.T[i]) + ", " + BPY.FORMAT(self.X[i])
+            ret += ",\n\t\t" + BPY.FORMAT(self.T[i]) + ", " + BPY.FORMAT(self.X[i])
         return ret
 
 class PiecewiseLinearDriveOperator(Base):
@@ -576,13 +647,13 @@ class FourierSeriesDrive(Entity):
         ret = "fourier series"
         for v in [self.initial_time, self.omega, self.N]:
             ret += ", " + BPY.FORMAT(v)
-        ret += ",\n\t" + BPY.FORMAT(self.A[0])
+        ret += ",\n\t\t" + BPY.FORMAT(self.A[0])
         for i in range(1, self.N):
-            ret += ",\n\t" + BPY.FORMAT(self.A[i]) + ", " + BPY.FORMAT(self.B[i])
+            ret += ",\n\t\t" + BPY.FORMAT(self.A[i]) + ", " + BPY.FORMAT(self.B[i])
         if self.duration == "cycles":
-            ret += ",\n\t" + BPY.FORMAT(self.cycles)
+            ret += ",\n\t\t" + BPY.FORMAT(self.cycles)
         else:
-            ret += ",\n\t" + self.duration
+            ret += ",\n\t\t" + self.duration
         ret += ", " + BPY.FORMAT(self.initial_value)
         return ret
 
@@ -639,9 +710,9 @@ class FourierSeriesDriveOperator(Periodic):
 class FrequencySweepDrive(Entity):
     def string(self):
         ret = "frequency sweep, " + BPY.FORMAT(self.initial_time)
-        ret += ",\n\treference, " + self.angular_velocity_drive.safe_name()
-        ret += ",\n\treference, " + self.amplitude_drive.safe_name()
-        ret += ",\n\t" + BPY.FORMAT(self.initial_value)
+        ret += ",\n\t\treference, " + self.angular_velocity_drive.safe_name()
+        ret += ",\n\t\treference, " + self.amplitude_drive.safe_name()
+        ret += ",\n\t\t" + BPY.FORMAT(self.initial_value)
         if self.final_time is None:
             ret += ", forever"
         else:
@@ -864,8 +935,8 @@ klasses[StringDriveOperator.bl_label] = StringDriveOperator
 class MultDrive(Entity):
     def string(self):
         ret = "mult"
-        ret += ",\n\treference, " + self.drive_1.safe_name()
-        ret += ",\n\treference, " + self.drive_2.safe_name()
+        ret += ",\n\t\treference, " + self.drive_1.safe_name()
+        ret += ",\n\t\treference, " + self.drive_2.safe_name()
         return ret
 
 class MultDriveOperator(Base):
@@ -909,7 +980,7 @@ class NodeDrive(Entity):
             ret += ", " + safe_name(ob.name) + ", structural"
         if self.symbolic_name:
             ret += ", string, \"" + BPY.FORMAT(self.symbolic_name) + "\""
-        ret += ",\n\treference, " + self.drive.safe_name()
+        ret += ",\n\t\treference, " + self.drive.safe_name()
         return ret
 
 class NodeDriveOperator(Base):
@@ -946,7 +1017,7 @@ class ElementDrive(Entity):
         ret = "element, " + self.element.safe_name() + ", " + self.element.type
         if self.symbolic_name:
             ret += ", string, \"" + self.symbolic_name + "\""
-        ret += ",\n\treference, " + self.drive.safe_name()
+        ret += ",\n\t\treference, " + self.drive.safe_name()
         return ret
 
 class ElementDriveOperator(Base):
@@ -981,8 +1052,8 @@ klasses[ElementDriveOperator.bl_label] = ElementDriveOperator
 class DriveDrive(Entity):
     def string(self):
         ret = "drive"
-        ret += ",\n\treference, " + self.drive_1.safe_name()
-        ret += ",\n\treference, " + self.drive_2.safe_name()
+        ret += ",\n\t\treference, " + self.drive_1.safe_name()
+        ret += ",\n\t\treference, " + self.drive_2.safe_name()
         return ret
 
 class DriveDriveOperator(MultDriveOperator):
@@ -996,7 +1067,7 @@ class ArrayDrive(Entity):
     def string(self):
         ret = "array, " + BPY.FORMAT(self.N)
         for i in range(self.N):
-            ret += ",\n\treference, " + self.drives[i].safe_name()
+            ret += ",\n\t\treference, " + self.drives[i].safe_name()
         return ret
 
 class ArrayDriveOperator(Base):

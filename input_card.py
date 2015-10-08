@@ -88,13 +88,13 @@ class ReferenceFrame(Entity):
         rot = self.objects[0].matrix_world.to_quaternion().to_matrix()
         rot_parent = parent.objects[0].matrix_world.to_quaternion().to_matrix() if parent else rot
         orientation = rot_parent.transposed()*rot if parent else rot
-        f.write("reference: " + self.safe_name() + ",\n" + "\treference, " + parent_label + ", ")
+        f.write("\treference: " + self.safe_name() + ",\n\t\treference, " + parent_label + ", ")
         write_vector(f, rot_parent.transposed()*location if parent else location, ",\n")
-        f.write("\treference, " + parent_label + ", matr,\n")
-        write_matrix(f, orientation, "\t\t")
-        f.write(",\n\treference, " + parent_label + ", ")
+        f.write("\t\treference, " + parent_label + ", matr,\n")
+        write_matrix(f, orientation, "\t\t\t")
+        f.write(",\n\t\treference, " + parent_label + ", ")
         write_vector(f, orientation*vectors[0], ",\n")
-        f.write("\treference, " + parent_label + ", ")
+        f.write("\t\treference, " + parent_label + ", ")
         write_vector(f, orientation*vectors[1], ";\n")
     def remesh(self):
         RhombicPyramid(self.objects[0])
@@ -142,16 +142,11 @@ klasses[ReferenceFrameOperator.bl_label] = ReferenceFrameOperator
 
 class Set(Entity):
     def write(self, f):
-        modifiers = list()
-        if self.ifndef:
-            modifiers.append("ifndef")
-        if self.const:
-            modifiers.append("const")
-        modifiers.append
-        f.write("set: " +
+        value = ("\"" + self.value + "\"") if self.value_type == "string" else self.value
+        f.write("\tset: " +
             ("ifndef " if self.ifndef else "") +
             ("const " if self.const else "") +
-            self.value_type + " " + self.safe_name() + ((" = " + self.value) if self.value else "") + ";\n")
+            self.value_type + " " + self.safe_name() + ((" = " + value) if self.value else "") + ";\n")
 
 class SetOperator(Base):
     bl_label = "Set"

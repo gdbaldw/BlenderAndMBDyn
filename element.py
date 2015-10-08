@@ -28,7 +28,7 @@ if "bpy" in locals():
     imp.reload(Operator)
     imp.reload(Entity)
 else:
-    from .common import (safe_name, Type, aerodynamic_types, beam_types, force_types, genel_types, joint_types, environment_types, node_types,
+    from .common import (safe_name, Type, aerodynamic_types, beam_types, force_types, genel_types, joint_types, output_types, environment_types, node_types,
         structural_static_types, structural_dynamic_types, Ellipsoid, RhombicPyramid, Teardrop, Cylinder, Sphere, RectangularCuboid, write_vector, write_matrix)
     from .base import bpy, BPY, root_dot, database, Operator, Entity, Bundle, SelectedObjects, SegmentList
     from mathutils import Vector
@@ -37,7 +37,7 @@ else:
     import subprocess
     from tempfile import TemporaryFile
 
-types = aerodynamic_types + beam_types + ["Body"] + force_types + genel_types + joint_types + environment_types + ["Driven"] + node_types
+types = aerodynamic_types + beam_types + ["Body"] + force_types + genel_types + joint_types + output_types + environment_types + ["Driven"] + node_types
 
 tree = ["Element",
     ["Aerodynamic", aerodynamic_types,
@@ -46,6 +46,7 @@ tree = ["Element",
     "Force", force_types,
     "GENEL", genel_types,
     "Joint", joint_types,
+    "Output", output_types,
     "Environment", environment_types,
     "Driven",
     "Node", node_types,
@@ -57,10 +58,12 @@ class Base(Operator):
     N_objects = 2
     @classmethod
     def poll(cls, context):
-        obs = SelectedObjects(context)
-        return ((cls.N_objects == 0 and not (cls.exclusive and database.element.filter(cls.bl_label)))
-            or len(obs) == cls.N_objects - 1
-            or (len(obs) == cls.N_objects and not (cls.exclusive and database.element.filter(cls.bl_label, obs[0]))))
+        if cls.N_objects == 0:
+            return not cls.exclusive or not database.element.filter(cls.bl_label)
+        else:
+            obs = SelectedObjects(context)
+            return (len(obs) == cls.N_objects - 1
+                or (len(obs) == cls.N_objects and not (cls.exclusive and database.element.filter(cls.bl_label, obs[0] if obs else None))))
     def sufficient_objects(self, context):
         objects = SelectedObjects(context)
         if len(objects) == self.N_objects - 1:
@@ -169,7 +172,7 @@ class StructuralForce(Entity):
             relative_dir = rot_0*rotT_0*Vector((0., 0., 1.))
         else:
             relative_dir = rotT_0*Vector((0., 0., 1.))
-        f.write(string+
+        f.write(string +
         ",\n\t\t" + safe_name(Node_0.name) +
         ",\n\t\t\tposition, ")
         write_vector(f, relative_arm_0, ",\n\t\t\t")
@@ -423,7 +426,7 @@ class InLine(Joint):
     def write(self, f):
         rot_1, globalV_1, Node_1 = self.rigid_offset(1)
         localV_1 = rot_1*globalV_1
-        f.write("\tjoint: " + self.safe_name() + ", inline,\n")
+        f.write("\tjoint: " + self.safe_name() + ", in line,\n")
         self.write_node(f, 0, node=True, position=True, orientation=True)
         f.write(",\n\t\t" + safe_name(Node_1.name) + ",\n\t\t\toffset, ")
         write_vector(f, localV_1, ";\n")
@@ -431,7 +434,7 @@ class InLine(Joint):
         RhombicPyramid(self.objects[0])
 
 class InLineOperator(Base):
-    bl_label = "Inline"
+    bl_label = "In line"
     def create_entity(self):
         return InLine(self.name)
 
@@ -447,7 +450,7 @@ class InPlane(Joint):
         rot = self.objects[0].matrix_world.to_quaternion().to_matrix()
         normal = rot*rot_0*Vector((0., 0., 1.))
         f.write(
-        "\tjoint: " + self.safe_name() + ", inplane,\n" +
+        "\tjoint: " + self.safe_name() + ", in plane,\n" +
         "\t\t" + safe_name(Node_0.name) + ",\n\t\t\t")
         write_vector(f, localV_0, ",\n\t\t\t")
         write_vector(f, normal, ",\n\t\t")
@@ -457,7 +460,7 @@ class InPlane(Joint):
         RhombicPyramid(self.objects[0])
 
 class InPlaneOperator(Base):
-    bl_label = "Inplane"
+    bl_label = "In plane"
     def create_entity(self):
         return InPlane(self.name)
 
@@ -648,6 +651,208 @@ class ViscousBodyOperator(Constitutive):
         return ViscousBody(self.name)
 
 klasses[ViscousBodyOperator.bl_label] = ViscousBodyOperator
+
+class StreamOutput(Entity):
+    elem_type = "stream output"
+    def write(self, f):
+        f.write("\tstream output: " + self.safe_name() +
+            ",\n\t\tstream name, " + BPY.FORMAT(self.stream_name) +
+            ",\n\t\tcreate, " + ("yes" if self.create else "no"))
+        if self.socket_name is not None:
+            f.write(",\n\t\tlocal, ", BPY.FORMAT(self.socket_name))
+        else:
+            f.write((",\n\t\tport, " + BPY.FORMAT(self.port_number) if self.port_number is not None else "") +
+                (",\n\t\thost, " + BPY.FORMAT(self.host_name) if self.host_name is not None else ""))
+        f.write(",\n\t\t" + ("" if self.signal else "no ") + "signal"
+            + ",\n\t\t" + ("" if self.blocking else "non ") + "blocking"
+            + ",\n\t\t" + ("" if self.send_first else "no ") + "send first"
+            + ",\n\t\t" + ("" if self.abort_if_broken else "do not ") + "abort if broken")
+        f.write(",\n\t\toutput every, " + BPY.FORMAT(self.steps) if self.steps is not None else "")
+        if self.file_name is not None:
+            f.write(",\n\t\techo, " + BPY.FORMAT(self.file_name) +
+                (",\n\t\tprecision, " + BPY.FORMAT(self.precision) if self.precision is not None else "") +
+                (",\n\t\tshift, " + BPY.FORMAT(self.shift) if self.shift is not None else ""))
+        if self.values_motion == "values":
+            f.write(",\n\t\tvalues, " + str(len(self.nodedofs) + len(self.drives)))
+            for nodedof in self.nodedofs:
+                f.write(",\n\t\t\tnodedof, " + BPY.FORMAT(nodedof))
+            for drive in self.drives:
+                f.write(",\n\t\t\tdrive, reference, " + drive.safe_name())
+        else:
+            f.write(",\n\t\tmotion")
+            if self.position or self.orientation_matrix or self.orientation_matrix_transpose or self.velocity or self.angular_velocity:
+                f.write(", output flags")
+                f.write((", position" if self.position else "") +
+                    (", orientation matrix" if self.orientation_matrix else "") +
+                    (", orientation matrix transpose" if self.orientation_matrix_transpose else "") +
+                    (", velocity" if self.velocity else "") +
+                    (", angular velocity" if self.angular_velocity else ""))
+                if hasattr(self, "objects"):
+                    for ob in self.objects:
+                        assert ob in database.node, repr(ob) + "is not a node"
+                        f.write(",\n\t\t\t" + safe_name(ob.name))
+                else:
+                    for ob in database.node:
+                        f.write(",\n\t\t\t" + safe_name(ob.name))
+        f.write(";\n")
+
+class StreamOutputOperator(Base):
+    bl_label = "Stream output"
+    N_objects = 0
+    stream_name = bpy.props.PointerProperty(type = BPY.Str)
+    create = bpy.props.BoolProperty(name="Create")
+    socket_name = bpy.props.PointerProperty(type = BPY.Str)
+    port_number = bpy.props.PointerProperty(type = BPY.Int)
+    host_name = bpy.props.PointerProperty(type = BPY.Str)
+    signal = bpy.props.BoolProperty(name="Signal")
+    blocking = bpy.props.BoolProperty(name="Blocking")
+    send_first = bpy.props.BoolProperty(name="Send first")
+    abort_if_broken = bpy.props.BoolProperty(name="Abort if broken")
+    steps = bpy.props.PointerProperty(type = BPY.Int)
+    file_name = bpy.props.PointerProperty(type = BPY.Str)
+    precision = bpy.props.PointerProperty(type = BPY.Int)
+    shift = bpy.props.PointerProperty(type = BPY.Float)
+    values_motion = bpy.props.EnumProperty(items=[("values", "Values", ""), ("motion", "Motion", "")], default="motion")
+    N_nodedofs = bpy.props.IntProperty(name="Number of nodedofs", min=0)
+    nodedofs = bpy.props.CollectionProperty(type=BPY.Str)
+    N_drives = bpy.props.IntProperty(name="Number of drives", min=0)
+    drives = bpy.props.CollectionProperty(type=BPY.Drive)
+    position = bpy.props.BoolProperty(name="Position", default=True)
+    orientation_matrix = bpy.props.BoolProperty(name="Orientation matrix")
+    orientation_matrix_transpose = bpy.props.BoolProperty(name="Orientation matrix transpose")
+    velocity = bpy.props.BoolProperty(name="Velocity")
+    angular_velocity = bpy.props.BoolProperty(name="Angular velocity")
+    def prereqs(self, context):
+        self.stream_name.mandatory = True
+        self.stream_name.value = "MAILBX"
+        self.port_number.value = 9011
+        self.port_number.select = True
+        self.host_name.value = "127.0.0.1"
+        self.host_name.select = True
+        self.signal = True
+        self.blocking = True
+        self.send_first = True
+        self.abort_if_broken = False
+        self.steps.value = 1
+        for i in range(20):
+            n = self.nodedofs.add()
+            n.mandatory = True
+            d = self.drives.add()
+            d.mandatory = True
+    def assign(self, context):
+        self.stream_name.assign(self.entity.stream_name)
+        self.create = self.entity.create
+        self.socket_name.assign(self.entity.socket_name)
+        self.port_number.assign(self.entity.port_number)
+        self.host_name.assign(self.entity.host_name)
+        self.signal = self.entity.signal
+        self.blocking = self.entity.blocking
+        self.send_first = self.entity.send_first
+        self.abort_if_broken = self.entity.abort_if_broken
+        self.steps.assign(self.entity.steps)
+        self.file_name.assign(self.entity.file_name)
+        self.precision.assign(self.entity.precision)
+        self.shift.assign(self.entity.shift)
+        self.values_motion = self.entity.values_motion
+        self.N_nodedofs = self.entity.N_nodedofs
+        for i, v in enumerate(self.entity.nodedofs):
+            self.nodedofs[i].assign(v)
+        self.N_drives = self.entity.N_drives
+        for i, d in enumerate(self.entity.drives):
+            self.drives[i].assign(d)
+        self.position = self.entity.position
+        self.orientation_matrix = self.entity.orientation_matrix
+        self.orientation_matrix_transpose = self.entity.orientation_matrix_transpose
+        self.velocity = self.entity.velocity
+        self.angular_velocity = self.entity.angular_velocity
+    def store(self, context):
+        self.entity.stream_name = self.stream_name.store()
+        self.entity.create = self.create
+        self.entity.socket_name = self.socket_name.store() if not (self.port_number.select or self.host_name.select) else None
+        self.entity.port_number = self.port_number.store() if not self.socket_name.select else None
+        self.entity.host_name = self.host_name.store() if not self.socket_name.select else None
+        self.entity.signal = self.signal
+        self.entity.blocking = self.blocking
+        self.entity.send_first = self.send_first
+        self.entity.abort_if_broken = self.abort_if_broken
+        self.entity.steps = self.steps.store()
+        self.entity.file_name = self.file_name.store()
+        self.entity.precision = self.precision.store() if self.file_name.select else None
+        self.entity.shift = self.shift.store() if self.file_name.select else None
+        self.entity.values_motion = self.values_motion
+        self.entity.N_nodedofs = self.N_nodedofs if self.values_motion == "values" else 0
+        self.entity.nodedofs = [v.store() for v in self.nodedofs][:self.entity.N_nodedofs] if self.values_motion == "values" else list()
+        self.entity.N_drives = self.N_drives if self.values_motion == "values" else 0
+        self.entity.drives = [d.store() for d in self.drives][:self.entity.N_drives] if self.values_motion == "values" else list()
+        self.entity.position = self.position
+        self.entity.orientation_matrix = self.orientation_matrix
+        self.entity.orientation_matrix_transpose = self.orientation_matrix_transpose
+        self.entity.velocity = self.velocity
+        self.entity.angular_velocity = self.angular_velocity
+        self.entity.objects = self.sufficient_objects(context) if self.values_motion == "motion" else list()
+        if not self.entity.objects:
+            del self.entity.objects
+    def draw(self, context):
+        self.basis = (self.values_motion, self.N_nodedofs, self.N_drives)
+        layout = self.layout
+        self.stream_name.draw(layout, "Stream name")
+        layout.prop(self, "create")
+        if not (self.port_number.select or self.host_name.select):
+            self.socket_name.draw(layout, "Socket name")
+        if not self.socket_name.select:
+            self.port_number.draw(layout, "Port number")
+            self.host_name.draw(layout, "Host name")
+        layout.prop(self, "signal")
+        layout.prop(self, "blocking")
+        layout.prop(self, "send_first")
+        layout.prop(self, "abort_if_broken")
+        self.steps.draw(layout, "Steps")
+        self.file_name.draw(layout, "File name")
+        if self.file_name.select:
+            self.precision.draw(layout, "Precision")
+            self.shift.draw(layout, "Shift")
+        layout.prop(self, "values_motion")
+        if self.values_motion == "values":
+            row = layout.row()
+            row.prop(self, "N_nodedofs")
+            row.prop(self, "N_drives")
+            for i in range(self.N_nodedofs):
+                self.nodedofs[i].draw(layout, "Nodedof-" + str(i+1))
+            for i in range(self.N_drives):
+                self.drives[i].draw(layout, "Drive-" + str(i+1))
+        else:
+            layout.prop(self, "position")
+            layout.prop(self, "orientation_matrix")
+            layout.prop(self, "orientation_matrix_transpose")
+            layout.prop(self, "velocity")
+            layout.prop(self, "angular_velocity")
+    def check(self, context):
+        return True in [x.check(context) for x in (self.stream_name, self.socket_name, self.port_number, self.host_name, self.steps, self.file_name, self.precision, self.shift)] + [v.check(context) for v in self.nodedofs] + [d.check(context) for d in self.drives] or self.basis != (self.values_motion, self.N_nodedofs, self.N_drives)
+    def create_entity(self):
+        return StreamOutput(self.name)
+
+klasses[StreamOutputOperator.bl_label] = StreamOutputOperator
+
+class StreamAnimation(StreamOutput):
+    pass
+
+class StreamAnimationOperator(StreamOutputOperator):
+    bl_label = "Stream animation"
+    exclusive = True
+    def prereqs(self, context):
+        self.abort_if_broken = True
+        self.position = True
+        self.orientation_matrix = True
+        super().prereqs(context)
+    def draw(self, context):
+        layout = self.layout
+        self.stream_name.draw(layout, "Stream name")
+        self.port_number.draw(layout, "Port number")
+        self.host_name.draw(layout, "Host name")
+    def create_entity(self):
+        return StreamAnimation(self.name)
+
+klasses[StreamAnimationOperator.bl_label] = StreamAnimationOperator
 
 class Body(Entity):
     elem_type = "body"
@@ -962,7 +1167,7 @@ class PlotElement(bpy.types.Operator, Plot):
         import pandas as pd
         self.load(context, [self.entity.file_ext], pd)
         self.label_names.clear()
-        key = "1" if self.entity.file_ext == "grv" else str(database.element.index(self.entity))
+        key = "1" if self.entity.file_ext == "grv" else str(sorted(database.element, key=lambda x: x.name).index(self.entity))    
         self.dataframe = BPY.plot_data[self.entity.file_ext][key].dropna(1, 'all')
         for i in range(self.dataframe.shape[1]):
             name = self.label_names.add()

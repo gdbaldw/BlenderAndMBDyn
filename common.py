@@ -31,6 +31,9 @@ else:
     import bpy
     from math import sqrt
     import bmesh
+    from socket import socket, AF_INET, SOCK_STREAM, SOL_SOCKET, SO_REUSEADDR, SHUT_RDWR
+    from struct import pack, unpack
+    from threading import Thread
 
 FORMAT = "{:.6g}".format
 
@@ -67,13 +70,16 @@ joint_types = [
     Type("Deformable displacement joint", 2),
     Type("Deformable hinge", 2),
     Type("Deformable joint", 2),
-    Type("Inline", 2),
-    Type("Inplane", 2),
+    Type("In line", 2),
+    Type("In plane", 2),
     Type("Revolute hinge", 2),
     Type("Rod", 2),
     Type("Spherical hinge", 2),
     Type("Total joint", 2),
     Type("Viscous body", 1)]
+output_types = [
+    "Stream animation",
+    "Stream output"]
 environment_types = [
     "Air properties",
     "Gravity"]
@@ -100,6 +106,57 @@ nonlinear_solver_types = [
     "Newton Raphston",
     "Line search",
     "Matrix free"]
+
+def create_stream_socket(host_name, port_number):
+    with socket(AF_INET, SOCK_STREAM) as sock:
+        sock.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
+        sock.bind((host_name, port_number))
+        sock.listen(5)
+        sock.settimeout(1.)
+        try:
+            streaming_socket, address = sock.accept()
+            return streaming_socket
+        except OSError as err:
+            print(err)
+
+class StreamSender:
+    def __init__(self, host_name=None, port_number=None):
+        self.socket = create_stream_socket(host_name if host_name is not None else "127.0.0.1", port_number if port_number is not None else 9012)
+    def send(self, floats):
+        self.socket.send(pack('d'*len(floats), *floats))
+    def close(self):
+        try:
+            self.socket.shutdown(SHUT_RDWR)
+        except OSError as err:
+            if err.errno != 107:
+                print(err)
+        self.socket.close()
+        del self.socket
+
+class StreamReceiver(Thread):
+    def __init__(self, fmt, initial_data=None, host_name=None, port_number=None):
+        Thread.__init__(self)
+        self.daemon = True
+        self.fmt = fmt
+        self.packed_data = pack(self.fmt, *initial_data)
+        self.recv_size = len(self.packed_data)
+        self.receiving = True
+        self.socket = create_stream_socket(host_name if host_name is not None else "127.0.0.1", port_number if port_number is not None else 9011)
+    def run(self):
+        while self.receiving:
+            self.packed_data += self.socket.recv(self.recv_size)
+            self.packed_data = self.packed_data[( (len(self.packed_data) // self.recv_size) - 1) * self.recv_size : ]
+        try:
+            self.socket.shutdown(SHUT_RDWR)
+        except OSError as err:
+            if err.errno != 107:
+                print(err)
+        self.socket.close()
+        del self.socket
+    def get_data(self):
+        return unpack(self.fmt, self.packed_data[:self.recv_size])
+    def close(self):
+        self.receiving = False
 
 def write_vector(f, v, end=""):
     f.write(", ".join([FORMAT(round(x, 6) if round(x, 6) != -0. else 0) for x in v]) + end)

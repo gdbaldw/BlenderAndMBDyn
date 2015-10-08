@@ -234,7 +234,7 @@ klasses[LinearElasticGenericOperator.bl_label] = LinearElasticGenericOperator
 
 class LinearElasticGenericAxialTorsionCoupling(Entity):
     def string(self):
-        return "linear elastic generic axial torsion coupling," + self.stiffness.string() + ",\n\t\t\t" + BPY.FORMAT(self.coupling_coefficient)
+        return "linear elastic generic axial torsion coupling," + self.stiffness.string() + ",\n\t\t" + BPY.FORMAT(self.coupling_coefficient)
                 
 class LinearElasticGenericAxialTorsionCouplingOperator(Stiffness):
     bl_label = "Linear elastic generic axial torsion coupling"
@@ -333,12 +333,12 @@ class LinearElasticBistop(Entity):
     def string(self):
         ret = "linear elastic bistop"
         if self.dimension == "1D":
-            ret += ",\n\t\t\t" + BPY.FORMAT(self.stiffness)
+            ret += ",\n\t\t" + BPY.FORMAT(self.stiffness)
         else:
             ret += ", " + self.stiffness.string()
-        ret += ",\n\t\t\tinitial status, " + self.initial_status
+        ret += ",\n\t\tinitial status, " + self.initial_status
         for drive in [self.activating_condition, self.activating_condition]:
-            ret += ",\n\t\t\t" + drive.string()
+            ret += ",\n\t\t" + drive.string()
         return ret
 
 class LinearElasticBistopOperator(Stiffness):
@@ -383,7 +383,7 @@ class DoubleLinearElastic(Entity):
             ret += ", " + BPY.FORMAT(self.stiffness[1])
         else:
             ret += "," + self.stiffness[0].string()
-            ret += ",\n\t\t\t" + BPY.FORMAT(self.upper_strain) + ", " + BPY.FORMAT(self.lower_strain)
+            ret += ",\n\t\t" + BPY.FORMAT(self.upper_strain) + ", " + BPY.FORMAT(self.lower_strain)
             ret += "," + self.stiffness[1].string()
         return ret
 
@@ -424,10 +424,10 @@ class IsotropicHardeningElastic(Entity):
     def string(self):
         ret = "isotropic hardening elastic"
         if self.dimension == "1D":
-            ret += ",\n\t\t\t" + BPY.FORMAT(self.stiffness)
+            ret += ",\n\t\t" + BPY.FORMAT(self.stiffness)
         else:
             ret += ", " + self.stiffness.string()
-        ret += ",\n\t\t\t" + BPY.FORMAT(self.reference_strain)
+        ret += ",\n\t\t" + BPY.FORMAT(self.reference_strain)
         if self.linear_stiffness is not None:
             ret += ", linear stiffness, " + BPY.FORMAT(self.linear_stiffness)
         return ret
@@ -496,9 +496,9 @@ class ScalarFunctionElasticOrthotropic(Entity):
             ret += " orthotropic"
         for i in range(int(self.dimension[0])):
             if self.function[i] is None:
-                ret += ",\n\t\t\tnull"
+                ret += ",\n\t\tnull"
             else:
-                ret += ",\n\t\t\t\"" + self.function[i].name + "\""
+                ret += ",\n\t\t\"" + self.function[i].name + "\""
         return ret
 
 class ScalarFunctionElasticOrthotropicOperator(Base):
@@ -672,10 +672,10 @@ class LinearViscoelasticGenericAxialTorsionCoupling(Entity):
         ret = "linear viscoelastic generic axial torsion coupling"
         ret += "," + self.stiffness.string()
         if self.proportional is not None:
-            ret += ",\n\t\t\tproportional, " + BPY.FORMAT(self.proportional)
+            ret += ",\n\t\tproportional, " + BPY.FORMAT(self.proportional)
         else:
             ret += "," + self.viscosity.string()
-        ret += ",\n\t\t\t" + BPY.FORMAT(self.coupling_coefficient)
+        ret += ",\n\t\t" + BPY.FORMAT(self.coupling_coefficient)
         return ret
 
 class LinearViscoelasticGenericAxialTorsionCouplingOperator(StiffnessViscosity):
@@ -757,7 +757,7 @@ class DoubleLinearViscoelastic(Entity):
                 ret += ", second damping, " + BPY.FORMAT(self.viscosity_2)
         else:
             ret += "," + self.stiffness[0].string()
-            ret += ",\n\t\t\t" + BPY.FORMAT(self.upper_strain) + ", " + BPY.FORMAT(self.lower_strain)
+            ret += ",\n\t\t" + BPY.FORMAT(self.upper_strain) + ", " + BPY.FORMAT(self.lower_strain)
             ret += "," + self.stiffness[1].string()
             ret += "," + self.viscosity_1.string()
             if self.viscosity_2 is not None:
@@ -861,12 +861,12 @@ class LinearViscoelasticBistop(Entity):
     def string(self):
         ret = "linear viscoelastic bistop"
         if self.dimension == "1D":
-            ret += ",\n\t\t\t" + BPY.FORMAT(self.stiffness) + ", " + BPY.FORMAT(self.viscosity)
+            ret += ",\n\t\t" + BPY.FORMAT(self.stiffness) + ", " + BPY.FORMAT(self.viscosity)
         else:
             ret += ", " + self.stiffness.string() + ", " + self.viscosity.string()
-        ret += ",\n\t\t\tinitial status, " + self.initial_status
+        ret += ",\n\t\tinitial status, " + self.initial_status
         for drive in [self.activating_condition, self.deactivating_condition]:
-            ret += ",\n\t\t\t" + drive.string()
+            ret += ",\n\t\t" + drive.string()
         return ret
 
 class LinearViscoelasticBistopOperator(Base):
