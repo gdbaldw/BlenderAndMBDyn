@@ -71,6 +71,17 @@ def update_drive(self, context, name, drive_type=None):
             entity = database.drive.get_by_name(name)
             context.scene.drive_index = database.drive.index(entity)
             entity.edit()
+def update_driver(self, context, name, driver_type=None):
+    if context.scene.popups_enabled:
+        if name == "New":
+            if driver_type:
+                exec("bpy.ops." + root_dot + "c_" + "_".join(driver_type.lower().split()) + "('INVOKE_DEFAULT')")
+            else:
+                bpy.ops.wm.call_menu(name=root_dot+"driver")
+        else:
+            entity = database.driver.get_by_name(name)
+            context.scene.driver_index = database.driver.index(entity)
+            entity.edit()
 def update_element(self, context, name):
     if context.scene.popups_enabled:
         entity = database.element.get_by_name(name)
@@ -141,6 +152,14 @@ def enum_drive(self, context, drive_type):
     return [(d.name, d.name, "") for i, d in enumerate(context.scene.drive_uilist)
         if not drive_type
         or (database.drive[i].type == drive_type)] + [("New", "New", "")]
+def enum_driver(self, context, driver_type):
+    ret = [(d.name, d.name, "") for i, d in enumerate(context.scene.driver_uilist)
+        if not driver_type
+        or (database.driver[i].type == driver_type)]
+    if driver_type == "Event stream" and ret:
+        return ret
+    else:
+        return ret + [("New", "New", "")]
 def enum_element(self, context):
     return [(e.name, e.name, "") for i, e in enumerate(context.scene.element_uilist)] # if not hasattr(database.element[i], "consumer")]
 def enum_function(self, context):
@@ -195,7 +214,7 @@ def save_pre(*args, **kwargs):
 class BPY:
     @classmethod
     def FORMAT(cls, prop):
-        return prop.safe_name() if isinstance(prop, Entity) else (prop if isinstance(prop, str) else FORMAT(prop))
+        return prop.safe_name() if isinstance(prop, Entity) else (("\"" + prop + "\"") if isinstance(prop, str) else FORMAT(prop))
     class Mode:
         mandatory = bpy.props.BoolProperty(default=False)
         select = bpy.props.BoolProperty(default=False, update=lambda self, context: self.set_check_select())
@@ -206,7 +225,7 @@ class BPY:
             return self.mandatory or self.select
         def to_be_assigned(self, arg):
             self.select = False if self.mandatory else arg is not None 
-            return self.select or self.mandatory
+            return arg is not None and (self.select or self.mandatory)
         def draw(self, layout, text="", prefix="Use"):
             row = layout.row()
             if not self.mandatory:
@@ -310,6 +329,15 @@ class BPY:
                 self.name = arg.name
         def store(self):
             return database.drive.get_by_name(self.name) if self.to_be_stored() else None
+    class Driver(bpy.types.PropertyGroup, Mode):
+        name = bpy.props.EnumProperty(items=lambda self, context: enum_driver(self, context, self.type), name="Name", description="Select a driver, or New to create one",
+            update=lambda self, context: update_driver(self, context, self.name, self.type))
+        type = bpy.props.StringProperty()
+        def assign(self, arg):
+            if self.to_be_assigned(arg):
+                self.name = arg.name
+        def store(self):
+            return database.driver.get_by_name(self.name) if self.to_be_stored() else None
     class Element(bpy.types.PropertyGroup, Mode):
         name = bpy.props.EnumProperty(items=enum_element, name="Name", description="Select an element, or New to create one",
             update=lambda self, context: update_element(self, context, self.name))
@@ -402,7 +430,7 @@ class BPY:
             ret = self.check_is_matrix_value
             self.check_is_matrix_value = False
             return ret or self.float.check(context) or self.matrix.check(context)
-    klasses = [InputCard, Constitutive, Definition, Drive, Element, Segment, Friction, Function, Matrix, Shape, Scene, Bool, Int, Float, Str, MatrixFloat]
+    klasses = [InputCard, Constitutive, Definition, Drive, Driver, Element, Segment, Friction, Function, Matrix, Shape, Scene, Bool, Int, Float, Str, MatrixFloat]
     mbdyn_path = None
     plot_data = dict()
     @classmethod
@@ -513,6 +541,7 @@ class SelectedObjects(list):
             self.clear()
 
 class Operator:
+    basis = None
     def general_data_exists(self, context):
         if enum_definition(self, context, "General data") == [("New", "New", "")]:
             exec("bpy.ops." + root_dot + "c_general_data()")
