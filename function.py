@@ -28,27 +28,9 @@ if "bpy" in locals():
     imp.reload(Operator)
     imp.reload(Entity)
 else:
-    from .base import bpy, database, Operator, Entity, Bundle, BPY, enum_function
-    from .base import update_function
+    from .base import bpy, database, Operator, Entity, Bundle, BPY
     from .common import FORMAT
-
-types = [
-    "Const",
-    "Exp",
-    "Log",
-    "Pow",
-    "Linear",
-    "Cubic natural spline",
-    "Multilinear",
-    "Chebychev",
-    "Sum",
-    "Sub",
-    "Mul",
-    "Div"]
-
-tree = ["Function", types]
-
-klasses = dict()
+    from .menu import default_klasses, function_tree
 
 class Base(Operator):
     bl_label = "Functions"
@@ -70,15 +52,7 @@ class Base(Operator):
     def set_index(self, context, value):
         context.scene.function_index = value
 
-for t in types:
-    class Tester(Base):
-        bl_label = t
-        @classmethod
-        def poll(cls, context):
-            return False
-        def create_entity(self):
-            return Entity(self.name)
-    klasses[t] = Tester
+klasses = default_klasses(function_tree, Base)
 
 class Const(Entity):
     def write(self, f):
@@ -416,4 +390,4 @@ class DivOperator(Binary):
 
 klasses[DivOperator.bl_label] = DivOperator
 
-bundle = Bundle(tree, Base, klasses, database.function)
+bundle = Bundle(function_tree, Base, klasses, database.function)

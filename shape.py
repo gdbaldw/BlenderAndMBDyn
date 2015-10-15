@@ -30,17 +30,7 @@ if "bpy" in locals():
 else:
     from .base import bpy, BPY, database, Operator, Entity, Bundle
     from .common import FORMAT
-
-types = [
-    "Const shape",
-    "Piecewise const shape",
-    "Linear shape",
-    "Piecewise linear shape",
-    "Parabolic shape"]
-
-tree = ["Shape", types]
-
-klasses = dict()
+    from .menu import default_klasses, shape_tree
 
 class Base(Operator):
     bl_label = "Shapes"
@@ -61,18 +51,8 @@ class Base(Operator):
         return context.scene.shape_index, context.scene.shape_uilist
     def set_index(self, context, value):
         context.scene.shape_index = value
-    def prereqs(self, context):
-        pass
 
-for t in types:
-    class Tester(Base):
-        bl_label = t
-        @classmethod
-        def poll(cls, context):
-            return False
-        def create_entity(self):
-            return Entity(self.name)
-    klasses[t] = Tester
+klasses = default_klasses(shape_tree, Base)
 
 class ConstShape(Entity):
     def string(self):
@@ -219,4 +199,4 @@ class ParabolicShapeOperator(Base):
 
 klasses[ParabolicShapeOperator.bl_label] = ParabolicShapeOperator
 
-bundle = Bundle(tree, Base, klasses, database.shape)
+bundle = Bundle(shape_tree, Base, klasses, database.shape)

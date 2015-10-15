@@ -29,16 +29,11 @@ if "bpy" in locals():
     imp.reload(Entity)
     imp.reload(subsurf)
 else:
-    from .base import bpy, BPY, root_dot, database, Operator, Entity, Bundle, SelectedObjects, update_matrix
-    from .common import RhombicPyramid, write_vector, write_matrix
+    from .base import bpy, BPY, root_dot, database, Operator, Entity, Bundle, SelectedObjects
+    from .menu import default_klasses, input_card_tree
+    from .common import RhombicPyramid, write_vector, write_orientation
     from mathutils import Vector
     from copy import copy
-
-types = ["c81 data", "Hydraulic fluid", "Include", "Module load", "Print symbol table", "Reference frame", "Remark", "Set", "Setenv"]
-
-tree = ["Input Card", types]
-
-klasses = dict()
 
 class Base(Operator):
     bl_label = "Input Cards"
@@ -68,15 +63,7 @@ class Base(Operator):
     def set_index(self, context, value):
         context.scene.input_card_index = value
 
-for t in types:
-    class Tester(Base):
-        bl_label = t
-        @classmethod
-        def poll(cls, context):
-            return False
-        def create_entity(self):
-            return Entity(self.name)
-    klasses[t] = Tester
+klasses = default_klasses(input_card_tree, Base)
 
 class ReferenceFrame(Entity):
     def write(self, f, parent):
@@ -90,8 +77,8 @@ class ReferenceFrame(Entity):
         orientation = rot_parent.transposed()*rot if parent else rot
         f.write("\treference: " + self.safe_name() + ",\n\t\treference, " + parent_label + ", ")
         write_vector(f, rot_parent.transposed()*location if parent else location, ",\n")
-        f.write("\t\treference, " + parent_label + ", matr,\n")
-        write_matrix(f, orientation, "\t\t\t")
+        f.write("\t\treference, " + parent_label)
+        write_orientation(f, orientation, "\t\t\t")
         f.write(",\n\t\treference, " + parent_label + ", ")
         write_vector(f, orientation*vectors[0], ",\n")
         f.write("\t\treference, " + parent_label + ", ")
@@ -176,4 +163,4 @@ class SetOperator(Base):
 
 klasses[SetOperator.bl_label] = SetOperator
 
-bundle = Bundle(tree, Base, klasses, database.input_card)
+bundle = Bundle(input_card_tree, Base, klasses, database.input_card)

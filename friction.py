@@ -28,15 +28,9 @@ if "bpy" in locals():
     imp.reload(Operator)
     imp.reload(Entity)
 else:
-    from .base import bpy, database, Operator, Entity, Bundle, enum_function
-    from .base import BPY, update_function
-    from .common import FORMAT
-
-types = ["Modlugre", "Discrete Coulomb"]
-
-tree = ["Friction", types]
-
-klasses = dict()
+    from .base import bpy, database, Operator, Entity, Bundle
+    from .base import BPY
+    from .menu import default_klasses, friction_tree
 
 class Base(Operator):
     bl_label = "Frictions"
@@ -60,15 +54,7 @@ class Base(Operator):
     def prereqs(self, context):
         pass
 
-for t in types:
-    class Tester(Base):
-        bl_label = t
-        @classmethod
-        def poll(cls, context):
-            return False
-        def create_entity(self):
-            return Entity(self.name)
-    klasses[t] = Tester
+klasses = default_klasses(friction_tree, Base)
 
 class Modlugre(Entity):
 	def string(self):
@@ -123,4 +109,4 @@ class ModlugreOperator(Base):
 
 klasses[ModlugreOperator.bl_label] = ModlugreOperator
 
-bundle = Bundle(tree, Base, klasses, database.friction)
+bundle = Bundle(friction_tree, Base, klasses, database.friction)

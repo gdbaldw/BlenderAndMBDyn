@@ -29,14 +29,7 @@ if "bpy" in locals():
     imp.reload(Entity)
 else:
     from .base import bpy, BPY, database, Operator, Entity, Bundle
-
-file_types = ["Fixed step", "Variable step", "Socket", "RTAI input", "Stream", "Event stream"]
-
-types = file_types
-
-tree = ["Driver",
-    ["File", file_types
-    ]]
+    from .menu import default_klasses, driver_tree
 
 class Base(Operator):
     bl_label = "Drivers"
@@ -58,17 +51,7 @@ class Base(Operator):
     def set_index(self, context, value):
         context.scene.driver_index = value
 
-klasses = dict()
-
-for t in types:
-    class Tester(Base):
-        bl_label = t
-        @classmethod
-        def poll(cls, context):
-            return False
-        def create_entity(self):
-            return Entity(self.name)
-    klasses[t] = Tester
+klasses = default_klasses(driver_tree, Base)
 
 class Stream(Entity):
     def write(self, f):
@@ -195,4 +178,4 @@ class EventStreamOperator(StreamOperator):
 
 klasses[EventStreamOperator.bl_label] = EventStreamOperator
 
-bundle = Bundle(tree, Base, klasses, database.driver)
+bundle = Bundle(driver_tree, Base, klasses, database.driver)

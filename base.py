@@ -30,12 +30,13 @@ else:
     import bpy
     import addon_utils
     from .database import Database, EntityLookupError
-    from .common import FORMAT, safe_name, method_types, nonlinear_solver_types, write_vector, write_matrix
+    from .common import FORMAT, safe_name, write_vector, write_orientation
     from collections import OrderedDict
     from copy import copy
     from sys import getrefcount
     import webbrowser, os
     from collections import defaultdict
+    from .menu import method, nonlinear_solver, Tree
 
 category = "MBDyn"
 root_dot = "_".join(category.lower().split()) + "."
@@ -60,13 +61,16 @@ def update_definition(self, context, name, definition_type):
             entity = database.definition.get_by_name(name)
             context.scene.definition_index = database.definition.index(entity)
             entity.edit()
-def update_drive(self, context, name, drive_type=None):
+def update_drive(self, context, name, drive_dimension, drive_type=None):
     if context.scene.popups_enabled:
         if name == "New":
             if drive_type:
                 exec("bpy.ops." + root_dot + "c_" + "_".join(drive_type.lower().split()) + "('INVOKE_DEFAULT')")
             else:
-                bpy.ops.wm.call_menu(name=root_dot+"drive")
+                if drive_dimension == "1D":
+                    bpy.ops.wm.call_menu(name=root_dot+"scalar_drive")
+                else:
+                    bpy.ops.wm.call_menu(name=root_dot+drive_dimension.lower()+"_drive")
         else:
             entity = database.drive.get_by_name(name)
             context.scene.drive_index = database.drive.index(entity)
@@ -146,12 +150,12 @@ def enum_constitutive(self, context, dimension):
 def enum_definition(self, context, definition_type):
     return [(d.name, d.name, "") for i, d in enumerate(context.scene.definition_uilist)
         if (database.definition[i].type == definition_type)
-            or (definition_type == "Method" and database.definition[i].type in method_types)
-            or (definition_type == "Nonlinear solver" and database.definition[i].type in nonlinear_solver_types)] + [("New", "New", "")]
-def enum_drive(self, context, drive_type):
+            or (definition_type == "Method" and database.definition[i].type in method)
+            or (definition_type == "Nonlinear solver" and database.definition[i].type in nonlinear_solver)] + [("New", "New", "")]
+def enum_drive(self, context, drive_type, drive_dimension="1D"):
     return [(d.name, d.name, "") for i, d in enumerate(context.scene.drive_uilist)
-        if not drive_type
-        or (database.drive[i].type == drive_type)] + [("New", "New", "")]
+        if (database.drive[i].dimension == drive_dimension)
+        and (not drive_type or (database.drive[i].type == drive_type))] + [("New", "New", "")]
 def enum_driver(self, context, driver_type):
     ret = [(d.name, d.name, "") for i, d in enumerate(context.scene.driver_uilist)
         if not driver_type
@@ -306,8 +310,8 @@ class BPY:
         dimension = bpy.props.StringProperty()
         def assign(self, arg):
             if self.to_be_assigned(arg):
-                self.name = arg.name
                 self.dimension = arg.dimension
+                self.name = arg.name
         def store(self):
             return database.constitutive.get_by_name(self.name) if self.to_be_stored() else None
     class Definition(bpy.types.PropertyGroup, Mode):
@@ -321,11 +325,13 @@ class BPY:
         def store(self):
             return database.definition.get_by_name(self.name) if self.to_be_stored() else None
     class Drive(bpy.types.PropertyGroup, Mode):
-        name = bpy.props.EnumProperty(items=lambda self, context: enum_drive(self, context, self.type), name="Name", description="Select a drive, or New to create one",
-            update=lambda self, context: update_drive(self, context, self.name, self.type))
+        name = bpy.props.EnumProperty(items=lambda self, context: enum_drive(self, context, self.type, self.dimension), name="Name", description="Select a drive, or New to create one",
+            update=lambda self, context: update_drive(self, context, self.name, self.dimension, self.type))
+        dimension = bpy.props.StringProperty(default="1D")
         type = bpy.props.StringProperty()
         def assign(self, arg):
             if self.to_be_assigned(arg):
+                self.dimension = arg.dimension
                 self.name = arg.name
         def store(self):
             return database.drive.get_by_name(self.name) if self.to_be_stored() else None
@@ -514,9 +520,8 @@ class Entity:
         if orientation:
             f.write(",\n\t\t\t")
             if o_label:
-                f.write(o_label + ", ")
-            f.write("matr,\n")
-            write_matrix(f, rot_i*rot, "\t\t\t\t")
+                f.write(o_label)
+            write_orientation(f, rot_i*rot, "\t\t\t\t")
 
 class SegmentList(list):
     def __init__(self, l=list()):
@@ -574,29 +579,28 @@ class Operator:
 
 class TreeMenu(list):
     def __init__(self, tree):
-        self.leaf_maker(tree[0], tree[1])
-    def leaf_maker(self, base, branch):
-        is_a_leaf = OrderedDict()
-        for i in range(len(branch)):
-            if isinstance(branch[i], list):
-                is_a_leaf[branch[i-1]] = False
-                self.leaf_maker(branch[i-1], branch[i])
-            else:
-                is_a_leaf[branch[i]] = True
-        class Menu(bpy.types.Menu):
-            bl_label = base
-            bl_description = " ".join(["New", base, "Menu"])
-            bl_idname = root_dot + "_".join(base.lower().split())
-            def draw(self, context):
-                layout = self.layout
-                layout.operator_context = 'INVOKE_DEFAULT'
-                for item, leaf in is_a_leaf.items():
-                    name, N = item, item.N if hasattr(item, "N") else None
-                    if leaf:
-                        layout.operator(root_dot + "c_" + "_".join(name.lower().split()), icon='OUTLINER_OB_MESH' if N == len(SelectedObjects(context)) + 1 else 'NONE')
-                    else:
-                        layout.menu(root_dot + "_".join(name.lower().split()))
-        self.append(Menu)
+        self.branches = OrderedDict()
+        self.menu_maker(tree)
+    def menu_maker(self, tree):
+        for key, value in tree.items():
+            if isinstance(value, OrderedDict):
+                self.menu_maker(value)
+                self.branches[key] = value
+                branches = self.branches
+                class Menu(bpy.types.Menu):
+                    bl_label = key
+                    bl_description = " ".join(["New", key, "Menu"])
+                    bl_idname = root_dot + "_".join(key.lower().split())
+                    def draw(self, context):
+                        layout = self.layout
+                        layout.operator_context = 'INVOKE_DEFAULT'
+                        for k, v in branches[self.bl_label].items():
+                            if isinstance(v, OrderedDict):
+                                layout.menu(root_dot + "_".join(k.lower().split()))
+                            else:
+                                layout.operator(root_dot + "c_" + "_".join(k.lower().split()), icon='OUTLINER_OB_MESH' if v == (len(SelectedObjects(context)) + 1) else 'NONE')
+                self.append(Menu)
+            
     def register(self):
         for klass in self:
             bpy.utils.register_class(klass)
@@ -797,7 +801,7 @@ class Operators(list):
 class UI(list):
     def __init__(self, entity_tree, klass, entity_list):
         module = klass.__module__.split(".")[1]
-        menu = root_dot + "_".join(entity_tree[0].lower().split())
+        menu = root_dot + "_".join(list(entity_tree.keys())[0].lower().split())
         self.make_list = klass.make_list
         self.delete_list = klass.delete_list
         def segments_maker(base, branch):
@@ -812,7 +816,15 @@ class UI(list):
                     segments[item] = [item]
             return segments
         klass.types_dict = OrderedDict()
-        klass.types_dict.update(segments_maker(entity_tree[0], entity_tree[1]))
+        for key, value in [v for v in entity_tree.values()][0].items():
+            if isinstance(value, Tree):
+                leaves = value.get_leaves()
+                klass.types_dict[key] = leaves
+                for leaf in leaves:
+                    klass.types_dict[leaf] = [leaf]
+            else:
+                klass.types_dict[key] = [key]
+        #klass.types_dict.update(segments_maker(entity_tree[0], entity_tree[1]))
         enum_types = [("All", "All", "All types", 'NONE', 0)] + [(key, key, ", ".join(value), ('RIGHTARROW_THIN' if 1 < len(value) else 'NONE'), i+1) for i, (key, value) in enumerate(klass.types_dict.items())]
         klass.types_dict["All"] = None
         class ListItem(bpy.types.PropertyGroup, klass):
@@ -842,7 +854,6 @@ class UI(list):
         class UIList(bpy.types.UIList, klass):
             bl_idname = module
             types = bpy.props.EnumProperty(items=enum_types, name="", description="Show only items of this type")
-            test = enum_types
             use_filter_consumed = bpy.props.BoolProperty(name="", description="Show consumed items", default=False)
             filter_name = bpy.props.StringProperty(name="", description="Only show items containing this string")
             def draw_item(self, context, layout, data, item, icon, active_data, active_property, index, flt_flag):

@@ -29,19 +29,64 @@ if "bpy" in locals():
     imp.reload(Entity)
 else:
     from .base import bpy, BPY, root_dot, database, Operator, Entity, Bundle
-    from .common import FORMAT, aerodynamic_types, beam_types, force_types, genel_types, joint_types, output_types, environment_types, node_types, rigid_body_types, structural_static_types, structural_dynamic_types, safe_name, write_vector, write_matrix, StreamSender, StreamReceiver
+    from .common import FORMAT, safe_name, write_vector, write_orientation, StreamSender, StreamReceiver
     from mathutils import Matrix
     import subprocess
     from tempfile import TemporaryFile
     import os
     from signal import SIGTERM
-    from mathutils import Vector, Euler
+    import math
+    from mathutils import Vector, Euler, Quaternion
+    from .menu import default_klasses, simulator_tree
 
-types = ["Initial value"]
+aerodynamic_types = [
+    "Aerodynamic body",
+    "Aerodynamic beam2",
+    "Aerodynamic beam3",
+    "Generic aerodynamic force",
+    "Induced velocity"]
+beam_types = [
+    "Beam segment",
+    "Three node beam"]
+force_types = [
+    "Structural force",
+    "Structural internal force",
+    "Structural couple",
+    "Structural internal couple",
+    "Total force",
+    "Total internal force"]
+genel_types = [
+    "Swashplate"]
+joint_types = [
+    "Axial rotation",
+    "Clamp",
+    "Distance",
+    "Deformable displacement joint",
+    "Deformable hinge",
+    "Deformable joint",
+    "In line",
+    "In plane",
+    "Revolute hinge",
+    "Rod",
+    "Spherical hinge",
+    "Total joint",
+    "Viscous body"]
+output_types = [
+    "Stream animation",
+    "Stream output"]
+environment_types = [
+    "Air properties",
+    "Gravity"]
+node_types = [
+    "Rigid offset",
+    "Dummy node",
+    "Feedback node"]
 
-tree = ["Simulator", types]
+rigid_body_types = ["Body"]
 
-klasses = dict()
+structural_static_types = aerodynamic_types + joint_types + ["Rotor"] + beam_types + force_types
+
+structural_dynamic_types = rigid_body_types
 
 class Base(Operator):
     bl_label = "Simulators"
@@ -74,15 +119,7 @@ class Base(Operator):
             if context.scene.clean_log:
                 layout.operator(root_dot + "write_keyframes")
 
-for t in types:
-    class Tester(Base):
-        bl_label = t
-        @classmethod
-        def poll(cls, context):
-            return False
-        def create_entity(self):
-            return Entity(self.name)
-    klasses[t] = Tester
+klasses = default_klasses(simulator_tree, Base)
 
 class InitialValue(Entity):
     def write_input_file(self, context, directory):
@@ -95,8 +132,8 @@ class InitialValue(Entity):
                 orientation = frame.objects[0].matrix_world.to_quaternion().to_matrix().transposed()*orientation
             f.write("\t\treference, " + frame_label + ", ")
             write_vector(f, location, ",\n")
-            f.write("\t\treference, " + frame_label + ", matr,\n")
-            write_matrix(f, orientation, "\t"*3)
+            f.write("\t\treference, " + frame_label)
+            write_orientation(f, orientation, "\t"*3)
             f.write(",\n" +
                 "\t\treference, " + frame_label + ", null,\n" +
                 "\t\treference, " + frame_label + ", null;\n")
@@ -285,8 +322,8 @@ class InitialValue(Entity):
                     rotT = node.matrix_world.to_quaternion().to_matrix()
                     f.write("\tstructural: " + str(database.node.index(node)) + ", dummy,\n\t\t" +
                         str(database.node.index(base_node)) + ", offset,\n\t\t\t")
-                    write_vector(f, localV, ",\n\t\t\tmatr,\n")
-                    write_matrix(f, rot*rotT, "\t\t\t\t")
+                    write_vector(f, localV)
+                    write_orientation(f, rot*rotT, "\t\t\t\t")
                     f.write(";\n")
                 """
                 for i, ns_node in enumerate(self.ns_node):
@@ -314,7 +351,11 @@ class InitialValue(Entity):
             if database.drive:
                 f.write("\n# Drives:\n")
                 for drive in database.drive:
-                    f.write("\tdrive caller: " + ", ".join([drive.safe_name(), drive.string()]) + ";\n")
+                    if drive.dimension == "1D":
+                        f.write("\tdrive caller: " + ", ".join([drive.safe_name(), drive.string()]) + ";\n")
+                    else:
+                        dim_name = {"3D": "\"3\"", "6D": "\"6\"", "3x3": "\"3x3\"", "6x6": "\"6x6\""}[drive.dimension]
+                        f.write("\ttemplate drive caller: " + ", ".join([drive.safe_name(), dim_name, drive.string()]) + ";\n")
             if database.constitutive:
                 f.write("\n# Constitutives:\n")
                 for constitutive in database.constitutive:
@@ -478,18 +519,22 @@ class Simulate(bpy.types.Operator, Base):
     bl_label = "Run simulation"
     bl_description = "Run MBDyn for the input file"
     def modal(self, context, event):
+        if not (event.type in ['ESC', 'TIMER'] or (hasattr(self, "channels") and event.type in self.channels)):
+            return {'PASS_THROUGH'}
         if event.type == 'ESC':
             return self.close(context)
         if hasattr(self, "sender") and event.type in self.channels:
             i, dv = self.channels[event.type]
             self.values[i] += dv
-            print(self.values)
-            self.sender.send(self.values)
+            try:
+                self.sender.send(self.values)
+            except BrokenPipeError:
+                return self.close(context)
         if hasattr(self, "receiver"):
             data = self.receiver.get_data()
             for i, node in enumerate(self.nodes):
                 node.location = Vector(data[12*i : 12*i+3])
-                node.rotation_euler = Matrix([data[12*i+3 : 12*i+6], data[12*i+6 : 12*i+9], data[12*i+9 : 12*i+12]]).to_euler()
+                node.rotation_euler = Matrix([data[12*i+3 : 12*i+6], data[12*i+6 : 12*i+9], data[12*i+9 : 12*i+12]]).to_euler(node.rotation_euler.order)
         if self.process.poll() == None:
             output = subprocess.check_output(("tail", "-n", "1", self.out_file))
             if output and 2 < len(output.split()):
@@ -549,7 +594,11 @@ class Simulate(bpy.types.Operator, Base):
                 for row in e.to_matrix():
                     initial_data.extend(row)
             self.receiver = StreamReceiver('d'*12*len(self.nodes), initial_data, host_name=host_name, port_number=port_number)
-            self.receiver.start()
+            if self.receiver.socket:
+                self.receiver.start()
+            else:
+                self.report({'INFO'}, "Animation stream socket failed to connect")
+                del self.receiver
         self.out_file = os.path.join(directory, context.scene.name + ".out")
         self.t_final = sim.final_time if sim.final_time is not None else float("inf")
         self.t_range = self.t_final - (sim.initial_time if sim.initial_time is not None else 0.0)
@@ -582,6 +631,9 @@ class WriteKeyframes(bpy.types.Operator, Base):
                 break
         return context.window_manager.invoke_props_dialog(self)
     def execute(self, context):
+        orientation = database.simulator[context.scene.simulator_index].job_control.default_orientation
+        if orientation == "euler313":
+            self.report({'ERROR'}, "euler313 cannot be imported. Simulate in another format, selected from Job Control -> Default Orientation")
         scene = context.scene
         frame_initial = scene.frame_current
         wm = context.window_manager
@@ -596,10 +648,20 @@ class WriteKeyframes(bpy.types.Operator, Base):
                 node_index = int(fields[0])
                 if node_index == self.marker:
                     scene.frame_current += 1
-                fields = [float(field) for field in fields[1:13]]
-                euler = Matrix([fields[3:6], fields[6:9], fields[9:12]]).to_euler()
+                fields = [float(field) for field in fields[1:]]
                 database.node[node_index].location = fields[:3]
-                database.node[node_index].rotation_euler = euler[0], euler[1], euler[2]
+                if orientation == "orientation matrix":
+                    euler = Matrix([fields[3:6], fields[6:9], fields[9:12]]).to_euler()
+                    database.node[node_index].rotation_euler = euler[0], euler[1], euler[2]
+                elif orientation == "euler321":
+                    database.node[node_index].rotation_euler = Euler((math.radians(fields[5]), math.radians(fields[4]), math.radians(fields[3])), 'XYZ')
+                    database.node[node_index].rotation_mode = 'XYZ'
+                elif orientation == "euler123":
+                    database.node[node_index].rotation_euler = Euler((math.radians(fields[3]), math.radians(fields[4]), math.radians(fields[5])), 'ZYX').to_quaternion().to_euler('XYZ')
+                    #database.node[node_index].rotation_mode = 'ZYX'
+                elif orientation == "orientation vector":
+                    #database.node[node_index].rotation_axis_angle = [math.sqrt(sum([x*x for x in fields[3:6]]))] + fields[3:6]
+                    database.node[node_index].rotation_euler = Quaternion(fields[3:6], math.sqrt(sum([x*x for x in fields[3:6]]))).to_euler('XYZ')
                 for data_path in "location rotation_euler".split():
                     database.node[node_index].keyframe_insert(data_path)
         scene.frame_current = frame_initial + 1
@@ -611,4 +673,4 @@ class WriteKeyframes(bpy.types.Operator, Base):
         layout.prop(self, "steps")
 BPY.klasses.append(WriteKeyframes)
 
-bundle = Bundle(tree, Base, klasses, database.simulator)
+bundle = Bundle(simulator_tree, Base, klasses, database.simulator)

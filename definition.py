@@ -29,31 +29,8 @@ if "bpy" in locals():
     imp.reload(Entity)
 else:
     from .base import bpy, BPY, root_dot, database, Operator, Entity, Bundle
-    from .common import FORMAT, method_types, nonlinear_solver_types
-
-problem_types = ["General data"] + method_types + nonlinear_solver_types + ["Eigenanalysis", "Abort after", "Linear solver", "Dummy steps", "Output data", "Real time"]
-
-control_types = ["Assembly", "Job control", "Default output", "Default aerodynamic output", "Default beam output", "Default scale", "Rigid body kinematics"]
-
-problem_tree = ["Problem",
-    ["General data",
-    "Method", method_types,
-    "Nonlinear solver", nonlinear_solver_types,
-    "Eigenanalysis",
-    "Abort after",
-    "Linear solver",
-    "Dummy steps",
-    "Output data",
-     "Real time"
-    ]]
-
-control_tree = ["Control", control_types]
-
-types = problem_types + control_types
-
-tree = ["Definition", problem_tree + control_tree]
-
-klasses = dict()
+    from .common import FORMAT
+    from .menu import default_klasses, definition_tree
 
 class Base(Operator):
     bl_label = "Definitions"
@@ -75,15 +52,7 @@ class Base(Operator):
     def set_index(self, context, value):
         context.scene.definition_index = value
 
-for t in types:
-    class Tester(Base):
-        bl_label = t
-        @classmethod
-        def poll(cls, context):
-            return False
-        def create_entity(self):
-            return Entity(self.name)
-    klasses[t] = Tester
+klasses = default_klasses(definition_tree, Base)
 
 class GeneralProblem(Entity):
     def write(self, f):
@@ -1507,4 +1476,4 @@ class DefaultBeamOutputOperator(Base):
 
 klasses[DefaultBeamOutputOperator.bl_label] = DefaultBeamOutputOperator
 
-bundle = Bundle(tree, Base, klasses, database.definition)
+bundle = Bundle(definition_tree, Base, klasses, database.definition)

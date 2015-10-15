@@ -30,42 +30,7 @@ if "bpy" in locals():
 else:
     from .base import bpy, root_dot, database, Operator, Entity, Bundle, BPY, SelectedObjects
     from .common import safe_name
-
-types = [
-    "Array drive",
-    "Constant drive",
-    "Cosine drive",
-    "Cubic drive",
-    "Direct drive",
-    "Dof drive",
-    "Double ramp drive",
-    "Double step drive",
-    "Drive drive",
-    "Element drive",
-    "Event drive",
-    "Exponential drive",
-    "File drive",
-    "Fourier series drive",
-    "Frequency sweep drive",
-    "Hints",
-    "Linear drive",
-    "Meter drive",
-    "Mult drive",
-    "Node drive",
-    "Null drive",
-    "Parabolic drive",
-    "Piecewise linear drive",
-    "Ramp drive",
-    "Random drive",
-    "Sine drive",
-    "Step drive",
-    "String drive",
-    "Tanh drive",
-    "Template drive",
-    "Time drive",
-    "Unit drive"]
-
-tree = ["Drive", types]
+    from .menu import default_klasses, drive_tree
 
 class Base(Operator):
     bl_label = "Drives"
@@ -87,19 +52,308 @@ class Base(Operator):
     def set_index(self, context, value):
         context.scene.drive_index = value
 
-klasses = dict()
+klasses = default_klasses(drive_tree, Base)
 
-for t in types:
-    class Tester(Base):
-        bl_label = t
-        @classmethod
-        def poll(cls, context):
-            return False
-        def create_entity(self):
-            return Entity(self.name)
-    klasses[t] = Tester
+class Array(Entity):
+    def string(self):
+        ret = "array, " + BPY.FORMAT(len(self.drives))
+        for d in self.drives:
+            ret += ",\n\t\treference, " + d.safe_name()
+        return ret
+
+class ArrayOperator(Base):
+    N = bpy.props.IntProperty(min=2, max=20, name="Number of drives")
+    drives = bpy.props.CollectionProperty(type = BPY.Drive)
+    dimension = None
+    def prereqs(self, context):
+        self.drives.clear()
+        for i in range(20):
+            d = self.drives.add()
+            d.mandatory = True
+            d.dimension = self.dimension
+    def assign(self, context):
+        for i, d in enumerate(self.entity.drives):
+            self.drives[i].assign(d)
+        self.N = len(self.entity.drives)
+    def store(self, context):
+        self.entity.drives = [d.store() for d in self.drives[:self.N]]
+    def draw(self, context):
+        self.basis = self.N
+        layout = self.layout
+        layout.prop(self, "N")
+        for d in self.drives[:self.N]:
+            d.draw(layout)
+    def check(self, context):
+        return (self.basis != self.N) or True in [d.check(context) for d in self.drives]
+
+class ArrayOfScalarsDrive(Array):
+    dimension = "1D"
+
+class ArrayOfScalarsDriveOperator(ArrayOperator):
+    bl_label = "Array of scalar drives"
+    dimension = "1D"
+    def create_entity(self):
+        return ArrayOfScalarsDrive(self.name)
+
+klasses[ArrayOfScalarsDriveOperator.bl_label] = ArrayOfScalarsDriveOperator
+
+class ArrayOf3DDrives(Array):
+    dimension = "3D"
+
+class ArrayOf3DDrivesOperator(ArrayOperator):
+    bl_label = "Array of 3D drives"
+    dimension = "3D"
+    def create_entity(self):
+        return ArrayOf3DDrives(self.name)
+
+klasses[ArrayOf3DDrivesOperator.bl_label] = ArrayOf3DDrivesOperator
+
+class ArrayOf6DDrives(Array):
+    dimension = "6D"
+
+class ArrayOf6DDrivesOperator(ArrayOperator):
+    bl_label = "Array of 6D drives"
+    dimension = "6D"
+    def create_entity(self):
+        return ArrayOf6DDrives(self.name)
+
+klasses[ArrayOf6DDrivesOperator.bl_label] = ArrayOf6DDrivesOperator
+
+class ArrayOf3x3Drive(Array):
+    dimension = "3x3"
+
+class ArrayOf3x3DriveOperator(ArrayOperator):
+    bl_label = "Array of 3x3 drives"
+    dimension = "3x3"
+    def create_entity(self):
+        return ArrayOf3x3Drive(self.name)
+
+klasses[ArrayOf3x3DriveOperator.bl_label] = ArrayOf3x3DriveOperator
+
+class ArrayOf6x6Drives(Array):
+    dimension = "6x6"
+
+class ArrayOf6x6DrivesOperator(ArrayOperator):
+    bl_label = "Array of 6x6 drives"
+    dimension = "6x6"
+    def create_entity(self):
+        return ArrayOf6x6Drives(self.name)
+
+klasses[ArrayOf6x6DrivesOperator.bl_label] = ArrayOf6x6DrivesOperator
+
+class TemplateBase(Base):
+    N = None
+    ordinals = {}
+    matrix_type = None
+    matrix = bpy.props.PointerProperty(type = BPY.Matrix)
+    subtype = bpy.props.EnumProperty(items=[
+        ("matr", "Matrix", "Matrix template"),
+        ("sym", "Symmetric", "Symmetric matrix template"),
+        ("diag", "Diagonal", "Diagonal matrix template")],
+        name="Subtype", default="matr")
+    drives = bpy.props.CollectionProperty(type = BPY.Drive)
+    def prereqs(self, context):
+        self.matrix.type = self.matrix_type
+        self.subtype = "matr"
+        self.drives.clear()
+        for i in range(self.N):
+            d = self.drives.add()
+    def assign(self, context):
+        self.matrix.assign(self.entity.matrix)
+        self.subtype = self.entity.subtype
+        for i, f in enumerate(self.entity.drives):
+            self.drives[i].assign(f)
+    def store(self, context):
+        self.entity.matrix = self.matrix.store()
+        self.entity.subtype = self.subtype
+        if self.matrix.select:
+            self.entity.drives = [self.drives[0].store()]
+        else:
+            self.entity.drives = [d.store() if i in self.ordinals[self.subtype] else None for i, d in enumerate(self.drives)]
+    def check(self, context):
+        return (self.basis != self.subtype) or self.matrix.check(context) or (True in [d.check(context) for d in self.drives])
+
+class Template3D(Entity):
+    dimension = "3D"
+    def string(self):
+        if self.matrix is None:
+            if not [drive for drive in self.drives if drive is not None]:
+                return "null"
+            else:
+                return "component,\n\t\t" + ",\n\t\t".join([("reference, " + drive.safe_name()) if drive is not None else "null" for drive in self.drives])
+        else:
+            return "single, " + self.matrix.string() + ",\n\t\treference, " + self.drives[0].safe_name()
+
+class Template3DOperator(TemplateBase):
+    bl_label = "Template 3D drive"
+    N = 3
+    ordinals = {
+        "matr": [i for i in range(3)]}
+    matrix_type = "3D"
+    def draw(self, context):
+        layout = self.layout
+        self.matrix.draw(layout, "Single")
+        if self.matrix.select:
+            self.drives[0].mandatory = True
+            self.drives[0].draw(layout, "Drive")
+        else:
+            self.drives[0].mandatory = False
+            for i in range(self.N):
+                self.drives[i].draw(layout, "Drive-" + str(i+1))
+    def create_entity(self):
+        return Template3D(self.name)
+
+
+klasses[Template3DOperator.bl_label] = Template3DOperator
+
+class Template6D(Template3D):
+    dimension = "6D"
+
+class Template6DOperator(Template3DOperator):
+    bl_label = "Template 6D drive"
+    N = 6
+    ordinals = {
+        "component": [i for i in range(6)],
+        "null": [],
+        "single": [0]}
+    def create_entity(self):
+        return Template6D(self.name)
+
+klasses[Template6DOperator.bl_label] = Template6DOperator
+
+class Template3x3(Entity):
+    dimension = "3x3"
+    def string(self):
+        if self.subtype == "matr":
+            ret = ("\n\t\t\tmatr,\n" +
+            "\t"*4 + ", ".join([BPY.FORMAT(prop) for prop in self.drives[0:3]]) + ",\n" +
+            "\t"*4 + ", ".join([BPY.FORMAT(prop) for prop in self.drives[3:6]]) + ",\n" +
+            "\t"*4 + ", ".join([BPY.FORMAT(prop) for prop in self.drives[6:9]]))
+        elif self.subtype == "sym":
+            ret = ("\n\t\t\tsym,\n" +
+            "\t"*4 + ", ".join([BPY.FORMAT(prop) for prop in self.drives[0:3]]) + ",\n" +
+            "\t"*5 + ", ".join([BPY.FORMAT(prop) for prop in self.drives[4:6]]) + ",\n" +
+            "\t"*6 + BPY.FORMAT(self.drives[8]))
+        elif self.subtype == "skew":
+            ret = "\n\t\t\tskew, " + ", ".join([BPY.FORMAT(self.drives[i]) for i in [7, 2, 3]])
+        elif self.subtype == "diag":
+            ret = "\n\t\t\tdiag, " + ", ".join([BPY.FORMAT(self.drives[i]) for i in [0, 4, 8]])
+        elif self.subtype == "eye":
+            ret = "\n\t\t\teye"
+        elif self.subtype == "null":
+            ret = "\n\t\t\tnull"
+        return ret
+
+class Template3x3Operator(TemplateBase):
+    bl_label = "Template 3x3 drive"
+    N = 9
+    subtype = bpy.props.EnumProperty(items=[
+        ("matr", "Matrix", "Matrix template"),
+        ("null", "Null", "Null template"),
+        ("sym", "Symmetric", "Symmetric matrix template"),
+        ("diag", "Diagonal", "Diagonal matrix template"),
+        ("single", "Single", "Single template")],
+        name="Subtype", default="single")
+    ordinals = {
+        "matr": [i for i in range(9)],
+        "null": [],
+        "sym": [0,1,2,4,5,8],
+        "diag": [0,4,8],
+        "single": [0]}
+    def draw(self, context):
+        self.basis = self.subtype
+        layout = self.layout
+        layout.prop(self, "subtype")
+        if self.subtype == "single":
+            self.drives[0].draw(layout, "Drive")
+        elif self.subtype in "matr sym diag".split():
+            for i in range(3):
+                row = layout.row()
+                for j in range(3):
+                    k = 3*i+j
+                    if k in self.ordinals[self.subtype]:
+                        self.drives[k].draw(row, "")
+                    else:
+                        row.label()
+    def create_entity(self):
+        return Template3x3(self.name)
+
+klasses[Template3x3Operator.bl_label] = Template3x3Operator
+
+class Template6x6(Entity):
+    dimension = "6x6"
+    def string(self):
+        if self.subtype == "matr":
+            ret = ("\n\t\t\tmatr,\n" +
+            "\t"*4 + ", ".join([BPY.FORMAT(prop) for prop in self.drives[0:6]]) + ",\n" +
+            "\t"*4 + ", ".join([BPY.FORMAT(prop) for prop in self.drives[6:12]]) + ",\n" +
+            "\t"*4 + ", ".join([BPY.FORMAT(prop) for prop in self.drives[12:18]]) + ",\n" +
+            "\t"*4 + ", ".join([BPY.FORMAT(prop) for prop in self.drives[18:24]]) + ",\n" +
+            "\t"*4 + ", ".join([BPY.FORMAT(prop) for prop in self.drives[24:30]]) + ",\n" +
+            "\t"*4 + ", ".join([BPY.FORMAT(prop) for prop in self.drives[30:36]]))
+        elif self.subtype == "sym":
+            ret = ("\n\t\t\tsym,\n" +
+            "\t"*4 + ", ".join([BPY.FORMAT(prop) for prop in self.drives[0:6]]) + ",\n" +
+            "\t"*5 + ", ".join([BPY.FORMAT(prop) for prop in self.drives[7:12]]) + ",\n" +
+            "\t"*6 + ", ".join([BPY.FORMAT(prop) for prop in self.drives[14:18]]) + ",\n" +
+            "\t"*7 + ", ".join([BPY.FORMAT(prop) for prop in self.drives[21:24]]) + ",\n" +
+            "\t"*8 + ", ".join([BPY.FORMAT(prop) for prop in self.drives[28:30]]) + ",\n" +
+            "\t"*9 + BPY.FORMAT(self.drives[35]))
+        elif self.subtype == "diag":
+            ret = "\n\t\t\tdiag, " + ", ".join([BPY.FORMAT(self.drives[i]) for i in [0,7,14,21,28,35]])
+        elif self.subtype == "eye":
+            ret = "\n\t\t\teye"
+        elif self.subtype == "null":
+            ret = "\n\t\t\tnull"
+        return ret
+
+class Template6x6Operator(TemplateBase):
+    bl_label = "Template 6x6 drive"
+    N = 36
+    subtype = bpy.props.EnumProperty(items=[
+        ("matr", "Matrix", "Matrix template"),
+        ("null", "Null", "Null template"),
+        ("sym", "Symmetric", "Symmetric matrix template"),
+        ("diag", "Diagonal", "Diagonal matrix template"),
+        ("single", "Single", "Single template")],
+        name="Subtype", default="single")
+    ordinals = {
+        "matr": [i for i in range(36)],
+        "null": [],
+        "sym": [0,1,2,3,4,5,7,8,9,10,11,14,15,16,17,21,22,23,28,29,35],
+        "diag": [0,7,14,21,28,35],
+        "single": [0]}
+    show_column = bpy.props.IntProperty(min=1, max=4, name="Show column", default=1)
+    def draw(self, context):
+        self.basis = (self.subtype, self.show_column)
+        layout = self.layout
+        layout.prop(self, "subtype")
+        if self.subtype == "single":
+            self.drives[0].draw(layout, "Drive")
+        elif self.subtype in "matr sym diag".split():
+            row = layout.row()
+            row.prop(self, "show_column")
+            row.label("to column: " + str(self.show_column +2))
+            row = layout.row()
+            for i in range(3):
+                row.label(str(self.show_column + i))
+            for i in range(6):
+                row = layout.row()
+                for j in range(self.show_column - 1, self.show_column + 2):
+                    k = 6*i+j
+                    if k in self.ordinals[self.subtype]:
+                        self.drives[k].draw(row, "")
+                    else:
+                        row.label()
+    def check(self, context):
+        return (self.basis != (self.subtype, self.show_column)) or (True in [d.check(context) for d in self.drives])
+    def create_entity(self):
+        return Template6x6(self.name)
+
+klasses[Template6x6Operator.bl_label] = Template6x6Operator
 
 class FileDrive(Entity):
+    dimension = "1D"
     def string(self):
         col = 1 + [d for d in database.drive if hasattr(d, "driver") and d.driver == self.driver].index(self)
         return ("file, " + self.driver.safe_name() + ", " + str(col) +
@@ -170,6 +424,7 @@ class EventDriveOperator(FileDriveOperator):
 klasses[EventDriveOperator.bl_label] = EventDriveOperator
 
 class NullDrive(Entity):
+    dimension = "1D"
     def string(self):
         return "null"
 
@@ -181,6 +436,7 @@ class NullDriveOperator(Base):
 klasses[NullDriveOperator.bl_label] = NullDriveOperator
 
 class DirectDrive(Entity):
+    dimension = "1D"
     def string(self):
         return "direct"
 
@@ -192,6 +448,7 @@ class DirectDriveOperator(Base):
 klasses[DirectDriveOperator.bl_label] = DirectDriveOperator
 
 class UnitDrive(Entity):
+    dimension = "1D"
     def string(self):
         return "unit"
 
@@ -203,6 +460,7 @@ class UnitDriveOperator(Base):
 klasses[UnitDriveOperator.bl_label] = UnitDriveOperator
 
 class ConstantDrive(Entity):
+    dimension = "1D"
     def string(self):
         return BPY.FORMAT(self.constant)
 
@@ -226,6 +484,7 @@ class ConstantDriveOperator(Base):
 klasses[ConstantDriveOperator.bl_label] = ConstantDriveOperator
 
 class TimeDrive(Entity):
+    dimension = "1D"
     def string(self):
         return "time"
 
@@ -237,6 +496,7 @@ class TimeDriveOperator(Base):
 klasses[TimeDriveOperator.bl_label] = TimeDriveOperator
 
 class LinearDrive(Entity):
+    dimension = "1D"
     def string(self):
         ret = "linear"
         for v in [self.constant, self.slope]:
@@ -268,6 +528,7 @@ class LinearDriveOperator(Base):
 klasses[LinearDriveOperator.bl_label] = LinearDriveOperator
 
 class ParabolicDrive(Entity):
+    dimension = "1D"
     def string(self):
         ret = "parabolic"
         for v in [self.constant, self.linear, self.parabolic]:
@@ -304,6 +565,7 @@ class ParabolicDriveOperator(Base):
 klasses[ParabolicDriveOperator.bl_label] = ParabolicDriveOperator
 
 class CubicDrive(Entity):
+    dimension = "1D"
     def string(self):
         ret = "cubic"
         for v in [self.constant, self.linear, self.parabolic, self.cubic]:
@@ -345,6 +607,7 @@ class CubicDriveOperator(Base):
 klasses[CubicDriveOperator.bl_label] = CubicDriveOperator
 
 class StepDrive(Entity):
+    dimension = "1D"
     def string(self):
         ret = "step"
         for v in [self.initial_time, self.step_value, self.initial_value]:
@@ -381,6 +644,7 @@ class StepDriveOperator(Base):
 klasses[StepDriveOperator.bl_label] = StepDriveOperator
 
 class DoubleStepDrive(Entity):
+    dimension = "1D"
     def string(self):
         ret = "double step"
         for v in [self.initial_time, self.final_time, self.step_value, self.initial_value]:
@@ -422,6 +686,7 @@ class DoubleStepDriveOperator(Base):
 klasses[DoubleStepDriveOperator.bl_label] = DoubleStepDriveOperator
 
 class RampDrive(Entity):
+    dimension = "1D"
     def string(self):
         ret = "ramp"
         for v in [self.slope, self.initial_time]:
@@ -467,10 +732,11 @@ class RampDriveOperator(Base):
 klasses[RampDriveOperator.bl_label] = RampDriveOperator
 
 class PiecewiseLinearDrive(Entity):
+    dimension = "1D"
     def string(self):
-        ret = "piecewise linear, " + BPY.FORMAT(self.N)
-        for i in range(self.N):
-            ret += ",\n\t\t" + BPY.FORMAT(self.T[i]) + ", " + BPY.FORMAT(self.X[i])
+        ret = "piecewise linear, " + BPY.FORMAT(len(self.T))
+        for t, x in zip(self.T, self.X):
+            ret += ",\n\t\t" + BPY.FORMAT(t) + ", " + BPY.FORMAT(x)
         return ret
 
 class PiecewiseLinearDriveOperator(Base):
@@ -487,15 +753,14 @@ class PiecewiseLinearDriveOperator(Base):
             x = self.X.add()
             x.mandatory = True
     def assign(self, context):
-        self.N = self.entity.N
         for i, t in enumerate(self.entity.T):
             self.T[i].assign(t)
         for i, x in enumerate(self.entity.X):
             self.X[i].assign(x)
+        self.N = len(self.entity.T)
     def store(self, context):
-        self.entity.N = self.N
-        self.entity.T = [t.store() for t in self.T][:self.entity.N]
-        self.entity.X = [x.store() for x in self.X][:self.entity.N]
+        self.entity.T = [t.store() for t in self.T][:self.N]
+        self.entity.X = [x.store() for x in self.X][:self.N]
     def draw(self, context):
         self.basis = self.N
         layout = self.layout
@@ -503,10 +768,10 @@ class PiecewiseLinearDriveOperator(Base):
         row = layout.row()
         row.label("Time")
         row.label("Value")
-        for i in range(self.N):
+        for t, x in zip(self.T[:self.N], self.X[:self.N]):
             row = layout.row()
-            self.T[i].draw(row, "")
-            self.X[i].draw(row, "")
+            t.draw(row, "")
+            x.draw(row, "")
     def check(self, context):
         return (self.basis != self.N) or True in [t.check(context) for t in self.T] + [x.check(context) for x in self.X]
     def create_entity(self):
@@ -515,6 +780,7 @@ class PiecewiseLinearDriveOperator(Base):
 klasses[PiecewiseLinearDriveOperator.bl_label] = PiecewiseLinearDriveOperator
 
 class SineDrive(Entity):
+    dimension = "1D"
     def string(self):
         ret = "sine"
         for v in [self.initial_time, self.omega, self.amplitude]:
@@ -586,6 +852,7 @@ class SineDriveOperator(SineCosine):
 klasses[SineDriveOperator.bl_label] = SineDriveOperator
 
 class CosineDrive(Entity):
+    dimension = "1D"
     def string(self):
         ret = "cosine"
         for v in [self.initial_time, self.omega, self.amplitude]:
@@ -605,6 +872,7 @@ class CosineDriveOperator(SineCosine):
 klasses[CosineDriveOperator.bl_label] = CosineDriveOperator
 
 class TanhDrive(Entity):
+    dimension = "1D"
     def string(self):
         return  "tanh, " + ", ".join([BPY.FORMAT(v) for v in [self.initial_time, self.amplitude, self.slope, self.initial_value]])
 
@@ -643,13 +911,14 @@ class TanhDriveOperator(Base):
 klasses[TanhDriveOperator.bl_label] = TanhDriveOperator
 
 class FourierSeriesDrive(Entity):
+    dimension = "1D"
     def string(self):
         ret = "fourier series"
-        for v in [self.initial_time, self.omega, self.N]:
+        for v in [self.initial_time, self.omega, len(self.A)]:
             ret += ", " + BPY.FORMAT(v)
         ret += ",\n\t\t" + BPY.FORMAT(self.A[0])
-        for i in range(1, self.N):
-            ret += ",\n\t\t" + BPY.FORMAT(self.A[i]) + ", " + BPY.FORMAT(self.B[i])
+        for a, b in zip(self.A[1:], self.B[1:]):
+            ret += ",\n\t\t" + BPY.FORMAT(a) + ", " + BPY.FORMAT(b)
         if self.duration == "cycles":
             ret += ",\n\t\t" + BPY.FORMAT(self.cycles)
         else:
@@ -672,16 +941,15 @@ class FourierSeriesDriveOperator(Periodic):
             b.mandatory = True
         super().prereqs(context)
     def assign(self, context):
-        self.N = self.entity.N
-        for i, t in enumerate(self.entity.A):
+        for i, a in enumerate(self.entity.A):
             self.A[i].assign(a)
-        for i, x in enumerate(self.entity.B):
+        for i, b in enumerate(self.entity.B):
             self.B[i].assign(b)
+        self.N = len(self.entity.A)
         super().assign(context)
     def store(self, context):
-        self.entity.N = self.N
-        self.entity.A = [a.store() for a in self.A][:self.entity.N]
-        self.entity.B = [b.store() for b in self.B][:self.entity.N]
+        self.entity.A = [a.store() for a in self.A[:self.N]]
+        self.entity.B = [b.store() for b in self.B[:self.N]]
         super().store(context)
     def draw(self, context):
         self.basis = (self.N, self.duration)
@@ -696,18 +964,22 @@ class FourierSeriesDriveOperator(Periodic):
         row = layout.row()
         row.label("Time")
         row.label("Value")
-        for i in range(self.N):
+        row = layout.row()
+        self.A[0].draw(row, "")
+        row.label("")
+        for a, b in zip(self.A[1:self.N], self.B[1:self.N]):
             row = layout.row()
-            self.A[i].draw(row, "")
-            self.B[i].draw(row, "")
+            a.draw(row, "")
+            b.draw(row, "")
     def check(self, context):
         return (self.basis != (self.N, self.duration)) or True in [a.check(context) for a in self.A] + [b.check(context) for b in self.B] or super().check(context)
     def create_entity(self):
         return FourierSeriesDrive(self.name)
 
-#klasses[FourierSeriesDriveOperator.bl_label] = FourierSeriesDriveOperator
+klasses[FourierSeriesDriveOperator.bl_label] = FourierSeriesDriveOperator
 
 class FrequencySweepDrive(Entity):
+    dimension = "1D"
     def string(self):
         ret = "frequency sweep, " + BPY.FORMAT(self.initial_time)
         ret += ",\n\t\treference, " + self.angular_velocity_drive.safe_name()
@@ -765,6 +1037,7 @@ class FrequencySweepDriveOperator(Base):
 klasses[FrequencySweepDriveOperator.bl_label] = FrequencySweepDriveOperator
 
 class ExponentialDrive(Entity):
+    dimension = "1D"
     def string(self):
         ret = "exponential"
         for v in [self.amplitude, self.time_constant, self.initial_time, self.initial_value]:
@@ -806,6 +1079,7 @@ class ExponentialDriveOperator(Base):
 klasses[ExponentialDriveOperator.bl_label] = ExponentialDriveOperator
 
 class RandomDrive(Entity):
+    dimension = "1D"
     def string(self):
         ret = "random"
         for v in [self.amplitude, self.mean, self.initial_time]:
@@ -871,6 +1145,7 @@ class RandomDriveOperator(Base):
 klasses[RandomDriveOperator.bl_label] = RandomDriveOperator
 
 class MeterDrive(Entity):
+    dimension = "1D"
     def string(self):
         ret = "meter, " + BPY.FORMAT(self.initial_time)
         if self.final_time is None:
@@ -910,6 +1185,7 @@ class MeterDriveOperator(Base):
 klasses[MeterDriveOperator.bl_label] = MeterDriveOperator
 
 class StringDrive(Entity):
+    dimension = "1D"
     def string(self):
         return "string, \"" + self.expression_string + "\""
 
@@ -933,6 +1209,7 @@ class StringDriveOperator(Base):
 klasses[StringDriveOperator.bl_label] = StringDriveOperator
 
 class MultDrive(Entity):
+    dimension = "1D"
     def string(self):
         ret = "mult"
         ret += ",\n\t\treference, " + self.drive_1.safe_name()
@@ -964,6 +1241,7 @@ class MultDriveOperator(Base):
 klasses[MultDriveOperator.bl_label] = MultDriveOperator
 
 class NodeDrive(Entity):
+    dimension = "1D"
     def string(self):
         ret = "node"
         if self.objects[0] in database.node:
@@ -1013,6 +1291,7 @@ class NodeDriveOperator(Base):
 klasses[NodeDriveOperator.bl_label] = NodeDriveOperator
 
 class ElementDrive(Entity):
+    dimension = "1D"
     def string(self):
         ret = "element, " + self.element.safe_name() + ", " + self.element.type
         if self.symbolic_name:
@@ -1050,6 +1329,7 @@ class ElementDriveOperator(Base):
 klasses[ElementDriveOperator.bl_label] = ElementDriveOperator
 
 class DriveDrive(Entity):
+    dimension = "1D"
     def string(self):
         ret = "drive"
         ret += ",\n\t\treference, " + self.drive_1.safe_name()
@@ -1063,41 +1343,4 @@ class DriveDriveOperator(MultDriveOperator):
 
 klasses[DriveDriveOperator.bl_label] = DriveDriveOperator
 
-class ArrayDrive(Entity):
-    def string(self):
-        ret = "array, " + BPY.FORMAT(self.N)
-        for i in range(self.N):
-            ret += ",\n\t\treference, " + self.drives[i].safe_name()
-        return ret
-
-class ArrayDriveOperator(Base):
-    bl_label = "Array drive"
-    N = bpy.props.IntProperty(min=2, max=20)
-    drives = bpy.props.CollectionProperty(type = BPY.Drive)
-    def prereqs(self, context):
-        self.drives.clear()
-        self.N = 2
-        for i in range(20):
-            d = self.drives.add()
-            d.mandatory = True
-    def assign(self, context):
-        self.N = self.entity.N
-        for i, d in enumerate(self.entity.drives):
-            self.drives[i].assign(d)
-    def store(self, context):
-        self.entity.N = self.N
-        self.entity.drives = [d.store() for d in self.drives][:self.entity.N]
-    def draw(self, context):
-        self.basis = self.N
-        layout = self.layout
-        layout.prop(self, "N")
-        for i in range(self.N):
-            self.drives[i].draw(layout)
-    def check(self, context):
-        return (self.basis != self.N) or True in [d.check(context) for d in self.drives]
-    def create_entity(self):
-        return ArrayDrive(self.name)
-
-klasses[ArrayDriveOperator.bl_label] = ArrayDriveOperator
-
-bundle = Bundle(tree, Base, klasses, database.drive)
+bundle = Bundle(drive_tree, Base, klasses, database.drive)

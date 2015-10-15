@@ -29,46 +29,7 @@ if "bpy" in locals():
     imp.reload(Entity)
 else:
     from .base import bpy, root_dot, database, Operator, Entity, Bundle, BPY
-
-types = [
-    "Linear elastic",
-    "Linear elastic generic",
-    "Linear elastic generic axial torsion coupling",
-    "Cubic elastic generic",
-    "Inverse square elastic",
-    "Log elastic",
-    "Linear elastic bistop",
-    "Double linear elastic",
-    "Isotropic hardening elastic",
-    "Scalar function elastic isotropic",
-    "Scalar function elastic orthotropic",
-    "Linear viscous",
-    "Linear viscous generic",
-    "Linear viscoelastic",
-    "Linear viscoelastic generic",
-    "Linear time variant viscoelastic generic",
-    "Linear viscoelastic generic axial torsion couple",
-    "Cubic viscoelastic generic",
-    "Double linear viscoelastic",
-    "Turbulent viscoelastic",
-    "Linear viscoelastic bistop",
-    "Shock absorber",
-    "Symbolic elastic",
-    "Symbolic viscous",
-    "Symbolic viscoelastic",
-    "ann elastic",
-    "ann viscoelastic",
-    "nlsf elastic",
-    "nlsf viscous",
-    "nlsf viscoelastic",
-    "nlp elastic",
-    "nlp viscous",
-    "nlp viscoelastic",
-    ]
-
-tree = ["Constitutive", types]
-
-klasses = dict()
+    from .menu import default_klasses, constitutive_tree
 
 class Base(Operator):
     bl_label = "Constitutives"
@@ -100,15 +61,7 @@ class Base(Operator):
             row.label(self.dimension)
             row.label()
 
-for t in types:
-    class Tester(Base):
-        bl_label = t
-        @classmethod
-        def poll(cls, context):
-            return False
-        def create_entity(self):
-            return Entity(self.name)
-    klasses[t] = Tester
+klasses = default_klasses(constitutive_tree, Base)
 
 class Stiffness(Base):
     stiffness = bpy.props.PointerProperty(type = BPY.MatrixFloat)
@@ -916,16 +869,16 @@ klasses[LinearViscoelasticBistopOperator.bl_label] = LinearViscoelasticBistopOpe
 
 for dimension in "1D 3D 6D".split():
     class Menu(bpy.types.Menu):
-        bl_label = tree[0] + " " + dimension
-        bl_idname = root_dot + "_".join(tree[0].lower().split()) + dimension
+        bl_label = "Constitutive " + dimension
+        bl_idname = root_dot + "constitutive" + dimension
         dimension = dimension
         def draw(self, context):
             layout = self.layout
             layout.operator_context = 'INVOKE_DEFAULT'
-            for key in types:
-                if [d for d in klasses[key].dimension_items if self.dimension in d[0]]:
-                    op = layout.operator(root_dot + "c_" + "_".join(key.lower().split()))
+            for bl_label, klass in klasses.items():
+                if [d for d in klass.dimension_items if self.dimension in d[0]]:
+                    op = layout.operator(root_dot + "c_" + "_".join(bl_label.lower().split()))
                     op.dimension = self.dimension
     BPY.klasses.append(Menu)
 
-bundle = Bundle(tree, Base, klasses, database.constitutive)
+bundle = Bundle(constitutive_tree, Base, klasses, database.constitutive)

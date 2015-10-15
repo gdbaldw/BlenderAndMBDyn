@@ -46,67 +46,6 @@ class Type(str):
     def __init__(self, data='', N=None):
         self.N = N
 
-aerodynamic_types = [
-    Type("Aerodynamic body", 1),
-    Type("Aerodynamic beam2", 2),
-    "Aerodynamic beam3",
-    "Generic aerodynamic force",
-    "Induced velocity"]
-beam_types = [
-    Type("Beam segment", 2),
-    "Three node beam"]
-force_types = [
-    "Abstract force",
-    Type("Structural force", 1),
-    Type("Structural internal force", 2),
-    Type("Structural couple", 1),
-    Type("Structural internal couple", 2)]
-genel_types = [
-    "Swashplate"]
-joint_types = [
-    Type("Axial rotation", 2),
-    Type("Clamp", 1),
-    Type("Distance", 2),
-    Type("Deformable displacement joint", 2),
-    Type("Deformable hinge", 2),
-    Type("Deformable joint", 2),
-    Type("In line", 2),
-    Type("In plane", 2),
-    Type("Revolute hinge", 2),
-    Type("Rod", 2),
-    Type("Spherical hinge", 2),
-    Type("Total joint", 2),
-    Type("Viscous body", 1)]
-output_types = [
-    "Stream animation",
-    "Stream output"]
-environment_types = [
-    "Air properties",
-    "Gravity"]
-node_types = [
-    Type("Rigid offset", 2),
-    Type("Dummy node", 2),
-    "Feedback node"]
-
-rigid_body_types = ["Body"]
-
-structural_static_types = aerodynamic_types + joint_types + ["Rotor"] + beam_types + force_types
-
-structural_dynamic_types = rigid_body_types
-
-method_types = [
-    "Crank Nicolson",
-    "ms",
-    "Hope",
-    "Third order",
-    "bdf",
-    "Implicit Euler"]
-
-nonlinear_solver_types = [
-    "Newton Raphston",
-    "Line search",
-    "Matrix free"]
-
 def create_stream_socket(host_name, port_number):
     with socket(AF_INET, SOCK_STREAM) as sock:
         sock.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
@@ -161,8 +100,10 @@ class StreamReceiver(Thread):
 def write_vector(f, v, end=""):
     f.write(", ".join([FORMAT(round(x, 6) if round(x, 6) != -0. else 0) for x in v]) + end)
 
-def write_matrix(f, m, pad=""):
-    f.write(",\n".join([pad + ", ".join(FORMAT(round(x, 6) if round(x, 6) != -0. else 0) for x in r) for r in m]))
+def write_orientation(f, m, pad=""):
+    f.write(", euler, ")
+    write_vector(f, m.to_euler('ZYX'))
+    #f.write(", matr,\n" + ",\n".join([pad + ", ".join(FORMAT(round(x, 6) if round(x, 6) != -0. else 0) for x in r) for r in m]))
 
 def subsurf(obj):
     subsurf = [m for m in obj.modifiers if m.type == 'SUBSURF']
@@ -211,6 +152,36 @@ def RhombicPyramid(obj):
     if hasattr(bm.verts, "ensure_lookup_table"):
         bm.verts.ensure_lookup_table()
     for f in [(3,2,1,0),(0,1,4),(1,2,4),(2,3,4),(3,0,4)]:
+        bm.faces.new([bm.verts[i] for i in f])
+    crease = bm.edges.layers.crease.new()
+    for e in bm.edges:
+        e[crease] = 1.0
+    bm.to_mesh(obj.data)
+    subsurf(obj)
+    bm.free()
+
+def TriPyramid(obj):
+    bm = bmesh.new()
+    for v in [(0.,0.,0.),(.333,0.,0.),(0.,.666,0.),(0.,0.,1.)]:
+        bm.verts.new(v)
+    if hasattr(bm.verts, "ensure_lookup_table"):
+        bm.verts.ensure_lookup_table()
+    for f in [(0,1,2),(0,1,3),(0,2,3),(1,2,3)]:
+        bm.faces.new([bm.verts[i] for i in f])
+    crease = bm.edges.layers.crease.new()
+    for e in bm.edges:
+        e[crease] = 1.0
+    bm.to_mesh(obj.data)
+    subsurf(obj)
+    bm.free()
+
+def Octahedron(obj):
+    bm = bmesh.new()
+    for v in [(.5,0.,0.),(0.,.5,0.),(-.5,0.,0.),(0.,-.5,0.),(0.,0.,.5),(0.,0.,-.5)]:
+        bm.verts.new(v)
+    if hasattr(bm.verts, "ensure_lookup_table"):
+        bm.verts.ensure_lookup_table()
+    for f in [(0,1,4),(1,2,4),(2,3,4),(3,0,4),(0,1,5),(1,2,5),(2,3,5),(3,0,5)]:
         bm.faces.new([bm.verts[i] for i in f])
     crease = bm.edges.layers.crease.new()
     for e in bm.edges:

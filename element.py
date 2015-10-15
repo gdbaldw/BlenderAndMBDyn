@@ -28,29 +28,14 @@ if "bpy" in locals():
     imp.reload(Operator)
     imp.reload(Entity)
 else:
-    from .common import (safe_name, Type, aerodynamic_types, beam_types, force_types, genel_types, joint_types, output_types, environment_types, node_types,
-        structural_static_types, structural_dynamic_types, Ellipsoid, RhombicPyramid, Teardrop, Cylinder, Sphere, RectangularCuboid, write_vector, write_matrix)
+    from .common import (safe_name, Ellipsoid, RhombicPyramid, TriPyramid, Octahedron, Teardrop, Cylinder, Sphere, RectangularCuboid, write_vector, write_orientation)
     from .base import bpy, BPY, root_dot, database, Operator, Entity, Bundle, SelectedObjects, SegmentList
     from mathutils import Vector
     from copy import copy
     import os
     import subprocess
     from tempfile import TemporaryFile
-
-types = aerodynamic_types + beam_types + ["Body"] + force_types + genel_types + joint_types + output_types + environment_types + ["Driven"] + node_types
-
-tree = ["Element",
-    ["Aerodynamic", aerodynamic_types,
-    "Beam", beam_types,
-    Type("Body", 1),
-    "Force", force_types,
-    "GENEL", genel_types,
-    "Joint", joint_types,
-    "Output", output_types,
-    "Environment", environment_types,
-    "Driven",
-    "Node", node_types,
-    ]]
+    from .menu import default_klasses, element_tree
 
 class Base(Operator):
     bl_label = "Elements"
@@ -115,6 +100,8 @@ class Base(Operator):
                 layout.operator_context = 'EXEC_DEFAULT'
                 layout.operator("object.delete")
 
+klasses = default_klasses(element_tree, Base)
+
 class Constitutive(Base):
     constitutive = bpy.props.PointerProperty(type = BPY.Constitutive)
     def prereqs(self, context):
@@ -156,138 +143,102 @@ class Friction(Base):
     def check(self, context):
         return self.friction.check(context)
 
-klasses = dict()
-
 class StructuralForce(Entity):
     elem_type = "force"
     file_ext = "frc"
     labels = "node Fx Fy Fz X Y Z".split()
     def write(self, f):
         rot_0, globalV_0, Node_0 = self.rigid_offset(0)
-        rotT_0 = self.objects[0].matrix_world.to_quaternion().to_matrix()
-        relative_dir = rot_0*rotT_0*Vector((0., 0., 1.))
-        relative_arm_0 = rot_0*globalV_0
-        string = "\tforce: " + self.safe_name() + ", " + self.orientation
-        if self.orientation == "follower":
-            relative_dir = rot_0*rotT_0*Vector((0., 0., 1.))
-        else:
-            relative_dir = rotT_0*Vector((0., 0., 1.))
-        f.write(string +
-        ",\n\t\t" + safe_name(Node_0.name) +
-        ",\n\t\t\tposition, ")
-        write_vector(f, relative_arm_0, ",\n\t\t\t")
-        write_vector(f, relative_dir, ",\n\t\t")
-        f.write("reference, " + self.drive.safe_name() + ";\n")
+        localV_0 = rot_0*globalV_0
+        rotT = self.objects[0].matrix_world.to_quaternion().to_matrix()
+        f.write("\t" + self.elem_type + ": " + self.safe_name() + ", " + self.force_type +
+            ",\n\t\t" + safe_name(Node_0.name) + ", position, ")
+        write_vector(f, localV_0)
+        if self.force_type == "follower" and self.orientation:
+            f.write(",\n\t\torientation")
+            write_orientation(f, rot_0*rotT, "\t\t\t")
+        f.write(",\n\t\t" + self.drive.string() + ";\n")
     def remesh(self):
-        RhombicPyramid(self.objects[0])
+        if self.force_type == "absolute":
+            Octahedron(self.objects[0])
+        else:
+            TriPyramid(self.objects[0])
 
-class Force(Drive):
-    orientation = bpy.props.EnumProperty(items=[("follower", "Follower", ""), ("absolute", "Absolute", "")], name="Orientation", default="follower")
+class StructuralForceOperator(Drive):
+    bl_label = "Structural force"
+    N_objects = 1
+    force_type = bpy.props.EnumProperty(items=[("follower", "Follower", ""), ("absolute", "Absolute", "")], name="Force type", default="follower")
+    orientation = bpy.props.BoolProperty(name="Has orientation patch")
+    def prereqs(self, context):
+        self.drive.mandatory = True
+        self.drive.dimension = "3D"
     def assign(self, context):
+        self.force_type = self.entity.force_type
         self.orientation = self.entity.orientation
         super().assign(context)
     def store(self, context):
+        self.entity.force_type = self.force_type
         self.entity.orientation = self.orientation
         super().store(context)
     def draw(self, context):
-        layout = self.layout
-        layout.prop(self, "orientation")
-        self.drive.draw(layout, "Drive")
-
-class StructuralForceOperator(Force):
-    bl_label = "Structural force"
-    N_objects = 1
+        self.layout.prop(self, "force_type")
+        if self.force_type == "follower":
+            self.layout.prop(self, "orientation")
+        super().draw(context)
     def create_entity(self):
         return StructuralForce(self.name)
 
 klasses[StructuralForceOperator.bl_label] = StructuralForceOperator
 
-class StructuralInternalForce(Entity):
-    elem_type = "force"
-    file_ext = "frc"
-    labels = "node1 F1x F1y F1z X1 Y1 Z1 node2 F2x F2y F2z X2 Y2 Z2".split()
-    def write(self, f):
-        rot_0, globalV_0, Node_0 = self.rigid_offset(0)
-        rotT_0 = self.objects[0].matrix_world.to_quaternion().to_matrix()
-        relative_arm_0 = rot_0*globalV_0
-        rot_1, globalV_1, Node_1 = self.rigid_offset(1)
-        relative_arm_1 = rot_1*globalV_1
-        string = "\tforce: " + self.safe_name() + ", "
-        if self.orientation == "follower":
-            string += "follower internal"
-            relative_dir = rot_0*rotT_0*Vector((0., 0., 1.))
-        else:
-            string += "absolute internal"
-            relative_dir = rotT_0*Vector((0., 0., 1.))
-        f.write(string+
-        ",\n\t\t" + safe_name(Node_0.name) + ",\n\t\t\t")
-        write_vector(f, relative_dir, ",\n\t\t\t")
-        write_vector(f, relative_arm_0, ",\n\t\t")
-        f.write(safe_name(Node_1.name) + ",\n\t\t\t")
-        write_vector(f, relative_arm_1, ",\n\t\t")
-        f.write("reference, " + self.drive.safe_name() + ";\n")
-    def remesh(self):
-        RhombicPyramid(self.objects[0])
-
-class StructuralInternalForceOperator(Force):
-    bl_label = "Structural internal force"
-    def create_entity(self):
-        return StructuralInternalForce(self.name)
-
-klasses[StructuralInternalForceOperator.bl_label] = StructuralInternalForceOperator
-
-class StructuralCouple(Entity):
+class StructuralCouple(StructuralForce):
     elem_type = "couple"
-    file_ext = "frc"
     labels = "node Mx My Mz".split()
-    def write(self, f):
-        rot_0, globalV_0, Node_0 = self.rigid_offset(0)
-        rotT_0 = self.objects[0].matrix_world.to_quaternion().to_matrix()
-        string = "\tcouple: " + self.safe_name() + ", "
-        if self.orientation == "follower":
-            string += "follower"
-            relative_dir = rot_0*rotT_0*Vector((0., 0., 1.))
-        else:
-            string += "absolute"
-            relative_dir = rotT_0*Vector((0., 0., 1.))
-        f.write(string+
-        ",\n\t\t" + safe_name(Node_0.name) + ",\n\t\t\t")
-        write_vector(f, relative_dir, ",\n\t\t")
-        f.write("reference, " + self.drive.safe_name() + ";\n")
-    def remesh(self):
-        RhombicPyramid(self.objects[0])
 
-class StructuralCoupleOperator(Force):
+class StructuralCoupleOperator(StructuralForceOperator):
     bl_label = "Structural couple"
-    N_objects = 1
     def create_entity(self):
         return StructuralCouple(self.name)
 
 klasses[StructuralCoupleOperator.bl_label] = StructuralCoupleOperator
 
-class StructuralInternalCouple(Entity):
-    elem_type = "couple"
+class StructuralInternalForce(Entity):
+    elem_type = "force"
     file_ext = "frc"
-    labels = "node1 M1x M1y M1z node2 M2x M2y M2z".split()
+    labels = "node Fx Fy Fz X Y Z".split()
     def write(self, f):
         rot_0, globalV_0, Node_0 = self.rigid_offset(0)
-        rotT_0 = self.objects[0].matrix_world.to_quaternion().to_matrix()
+        localV_0 = rot_0*globalV_0
+        rotT = self.objects[0].matrix_world.to_quaternion().to_matrix()
         rot_1, globalV_1, Node_1 = self.rigid_offset(1)
-        string = "\tcouple: " + self.safe_name() + ", "
-        if self.orientation == "follower":
-            string += "follower internal"
-            relative_dir = rot_0*rotT_0*Vector((0., 0., 1.))
-        else:
-            string += "absolute internal"
-            relative_dir = rotT_0*Vector((0., 0., 1.))
-        f.write(string+
-        ",\n\t\t" + safe_name(Node_0.name) + ",\n\t\t\t")
-        write_vector(f, relative_dir, ",\n\t\t")
-        f.write(safe_name(Node_1.name) + ",\n\t\treference, " + self.drive.safe_name() + ";\n")
+        localV_1 = rot_1*globalV_1
+        f.write("\t" + self.elem_type + ": " + self.safe_name() + ", " + self.force_type + " internal" +
+            ",\n\t\t" + safe_name(Node_0.name) + ", position, ")
+        write_vector(f, localV_0)
+        if self.force_type == "follower" and self.orientation:
+            f.write(",\n\t\torientation")
+            write_orientation(f, rot_0*rotT, "\t\t\t")
+        f.write(",\n\t\t" + safe_name(Node_1.name) + ", position, ")
+        write_vector(f, localV_1)
+        f.write(",\n\t\t" + self.drive.string() + ";\n")
     def remesh(self):
-        RhombicPyramid(self.objects[0])
+        if self.force_type == "absolute":
+            Octahedron(self.objects[0])
+        else:
+            TriPyramid(self.objects[0])
 
-class StructuralInternalCoupleOperator(Force):
+class StructuralInternalForceOperator(StructuralForceOperator):
+    bl_label = "Structural internal force"
+    N_objects = 2
+    def create_entity(self):
+        return StructuralInternalForce(self.name)
+
+klasses[StructuralInternalForceOperator.bl_label] = StructuralInternalForceOperator
+
+class StructuralInternalCouple(StructuralInternalForce):
+    elem_type = "couple"
+    labels = "node1 M1x M1y M1z node2 M2x M2y M2z".split()
+
+class StructuralInternalCoupleOperator(StructuralInternalForceOperator):
     bl_label = "Structural internal couple"
     def create_entity(self):
         return StructuralInternalCouple(self.name)
@@ -313,15 +264,15 @@ class Hinge(Joint):
             f.write(", ")
             write_vector(f, localV_0)
         if M1:
-            f.write(",\n\t\t\thinge, matr,\n")
-            write_matrix(f, rot_0*rotT, "\t\t\t\t")
+            f.write(",\n\t\t\thinge")
+            write_orientation(f, rot_0*rotT, "\t\t\t\t")
         f.write(", \n\t\t" + safe_name(Node_1.name))
         if V2:
             f.write(", ")
             write_vector(f, to_hinge)
         if M2:
-            f.write(",\n\t\t\thinge, matr,\n")
-            write_matrix(f, rot_1*rotT, "\t\t\t\t")
+            f.write(",\n\t\t\thinge")
+            write_orientation(f, rot_1*rotT, "\t\t\t\t")
 
 class AxialRotation(Hinge):
     def write(self, f):
@@ -438,7 +389,8 @@ class InLineOperator(Base):
     def create_entity(self):
         return InLine(self.name)
 
-klasses[InLineOperator.bl_label] = InLineOperator
+# MBDyn's In line joint is unstable
+#klasses[InLineOperator.bl_label] = InLineOperator
 
 class InPlane(Joint):
     def write(self, f):
@@ -557,21 +509,21 @@ class TotalJoint(Joint):
         f.write("\tjoint: " + self.safe_name() + ", total joint")
         if self.first == "rotate":
             f.write(",\n\t\t" + safe_name(Node_0.name) + ", position, ")
-            write_vector(f, localV_0, ",\n\t\t\tposition orientation, matr,\n")
-            write_matrix(f, rot_0*rot_position, "\t\t\t\t")
-            f.write(",\n\t\t\trotation orientation, matr,\n")
-            write_matrix(f, rot_0*rot, "\t\t\t\t")
+            write_vector(f, localV_0, ",\n\t\t\tposition orientation")
+            write_orientation(f, rot_0*rot_position, "\t\t\t\t")
+            f.write(",\n\t\t\trotation orientation")
+            write_orientation(f, rot_0*rot, "\t\t\t\t")
         f.write(",\n\t\t" + safe_name(Node_1.name) + ", position, ")
-        write_vector(f, to_joint, ",\n\t\t\tposition orientation, matr,\n")
-        write_matrix(f, rot_1*rot_position, "\t\t\t\t")
-        f.write(",\n\t\t\trotation orientation, matr,\n")
-        write_matrix(f, rot_1*rot, "\t\t\t\t")
+        write_vector(f, to_joint, ",\n\t\t\tposition orientation")
+        write_orientation(f, rot_1*rot_position, "\t\t\t\t")
+        f.write(",\n\t\t\trotation orientation")
+        write_orientation(f, rot_1*rot, "\t\t\t\t")
         if self.first == "displace":
             f.write(",\n\t\t" + safe_name(Node_0.name) + ", position, ")
-            write_vector(f, localV_0, ",\n\t\t\tposition orientation, matr,\n")
-            write_matrix(f, rot_0*rot_position, "\t\t\t\t")
-            f.write(",\n\t\t\trotation orientation, matr,\n")
-            write_matrix(f, rot_0*rot, "\t\t\t\t")
+            write_vector(f, localV_0, ",\n\t\t\tposition orientation")
+            write_orientation(f, rot_0*rot_position, "\t\t\t\t")
+            f.write(",\n\t\t\trotation orientation")
+            write_orientation(f, rot_0*rot, "\t\t\t\t")
         f.write(",\n\t\t\tposition constraint")
         for d in self.drives[:3]: 
             if d:
@@ -1043,30 +995,18 @@ class Gravity(Entity):
     file_ext = "grv"
     labels = "X_dotdot Y_dotdot Z_dotdot".split()
     def write(self, f):
-        f.write("\tgravity: " + self.matrix.string() + ", reference, " + self.drive.safe_name() + ";\n")
+        f.write("\tgravity: uniform, " + self.drive.string() + ";\n")
 
 class GravityOperator(Drive):
     bl_label = "Gravity"
-    matrix = bpy.props.PointerProperty(type = BPY.Matrix)
     @classmethod
     def poll(cls, context):
         return cls.bl_idname.startswith(root_dot+"e_") or not database.element.filter("Gravity")
     def prereqs(self, context):
-        self.matrix.mandatory = True
-        self.matrix.type = "3x1"
         super().prereqs(context)
-    def assign(self, context):
-        self.matrix.assign(self.entity.matrix)
-        super().assign(context)
+        self.drive.dimension = "3D"
     def store(self, context):
-        self.entity.matrix = self.matrix.store()
         self.entity.drive = self.drive.store()
-    def draw(self, context):
-        layout = self.layout
-        self.matrix.draw(layout, "Vector")
-        self.drive.draw(layout, "Drive")
-    def check(self, context):
-        return self.matrix.check(context) or super().check(context)
     def create_entity(self):
         return Gravity(self.name)
 
@@ -1191,7 +1131,7 @@ class PlotNode(bpy.types.Operator, Plot):
         node_label = str(database.node.index(SelectedObjects(context)[0]))
         self.dataframe = BPY.plot_data['mov'][node_label].dropna(1, 'all')
         #self.dataframe.columns = "X Y Z Phi_x Phi_y Phi_z U V W Omega_x Omega_y Omeda_z dU/dt dV/dt dW/dt dOmega_x/dt dOmega_y/dt dOmega_z/dt 20 21 22 23 24 25".split()[:self.dataframe.shape[1]]
-        self.dataframe.columns = "X Y Z".split() + [str(i) for i in range(5, self.dataframe.shape[1] + 2)]
+        self.dataframe.columns = "X Y Z".split() + [str(i) for i in range(1, self.dataframe.shape[1] - 2)]
         if node_label in BPY.plot_data['ine']:
             df = BPY.plot_data['ine'][node_label].dropna(1, 'all')
             df.columns = "px py pz Lx Ly Lz dpx/dt dpy/dt dpz/dt dLx/dt dLy/dt dLz/dt".split()
@@ -1373,15 +1313,4 @@ class Menu(bpy.types.Menu):
         layout.operator(root_dot + "plot_node")
 BPY.klasses.append(Menu)
 
-for t in types:
-    class Tester(Base):
-        bl_label = t[0] if isinstance(t, tuple) else t
-        @classmethod
-        def poll(cls, context):
-            return False
-        def create_entity(self):
-            return Entity(self.name)
-    if Tester.bl_label not in klasses:
-        klasses[Tester.bl_label] = Tester
-
-bundle = Bundle(tree, Base, klasses, database.element)
+bundle = Bundle(element_tree, Base, klasses, database.element)
