@@ -139,6 +139,21 @@ def Sphere(obj):
     subsurf(obj)
     bm.free()
 
+def Cube(obj):
+    bm = bmesh.new()
+    for v in [(x, y, z) for z in [-0.5, 0.5] for y in [-0.5, 0.5] for x in [-0.5, 0.5]]:
+        bm.verts.new(v)
+    if hasattr(bm.verts, "ensure_lookup_table"):
+        bm.verts.ensure_lookup_table()
+    for f in [(1,0,2,3),(4,5,7,6),(0,1,5,4),(1,3,7,5),(3,2,6,7),(2,0,4,6)]:
+        bm.faces.new([bm.verts[i] for i in f])
+    crease = bm.edges.layers.crease.new()
+    for e in bm.edges:
+        e[crease] = 1.0
+    bm.to_mesh(obj.data)
+    subsurf(obj)
+    bm.free()
+
 def RhombicPyramid(obj):
     bm = bmesh.new()
     for v in [(.333,0.,0.),(0.,.666,0.),(-.333,0.,0.),(0.,-.666,0.),(0.,0.,1.)]:

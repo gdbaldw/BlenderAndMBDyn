@@ -30,7 +30,7 @@ else:
     import bpy
     import addon_utils
     from .database import Database, EntityLookupError
-    from .common import FORMAT, safe_name, write_vector, write_orientation
+    from .common import FORMAT, safe_name, write_vector, write_orientation, Cube
     from collections import OrderedDict
     from copy import copy
     from sys import getrefcount
@@ -920,6 +920,8 @@ class UI(list):
                 for attr in vars(entity).values():
                     if isinstance(attr, SegmentList):
                         attr.clear()
+                if hasattr(entity, "objects"):
+                    Cube(entity.objects[0])
                 context.scene.dirty_simulator = True
                 self.set_index(context, 0 if index == 0 and 0 < len(uilist) else index-1)
                 index, uilist = self.get_uilist(context)
