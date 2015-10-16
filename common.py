@@ -40,12 +40,6 @@ FORMAT = "{:.6g}".format
 def safe_name(name):
     return "_".join("_".join(name.split(".")).split())
 
-class Type(str):
-    def __new__(cls, data='', N=None):
-        return super(Type, cls).__new__(cls, data)
-    def __init__(self, data='', N=None):
-        self.N = N
-
 def create_stream_socket(host_name, port_number):
     with socket(AF_INET, SOCK_STREAM) as sock:
         sock.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)

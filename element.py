@@ -1130,8 +1130,13 @@ class PlotNode(bpy.types.Operator, Plot):
         self.load(context, "ine mov".split(), pd)
         node_label = str(database.node.index(SelectedObjects(context)[0]))
         self.dataframe = BPY.plot_data['mov'][node_label].dropna(1, 'all')
-        #self.dataframe.columns = "X Y Z Phi_x Phi_y Phi_z U V W Omega_x Omega_y Omeda_z dU/dt dV/dt dW/dt dOmega_x/dt dOmega_y/dt dOmega_z/dt 20 21 22 23 24 25".split()[:self.dataframe.shape[1]]
-        self.dataframe.columns = "X Y Z".split() + [str(i) for i in range(1, self.dataframe.shape[1] - 2)]
+        columns = "X Y Z".split() + {
+            "orientation matrix": ["R" + str(1 + int(i/3)) + str(1 + int(i%3)) for i in range(9)],
+            "orientation vector": "v1 v2 v3".split(),
+            "euler123": "e1 e2 e3".split(),
+            "euler321": "e3 e2 e1".split(),
+            "euler313": "e3 e1 e3".split()}[context.scene.mbdyn_default_orientation]
+        self.dataframe.columns = columns + ["u v w omega-1 omega-2 omega-3 u_dot v_dot w_dot omega-1_dot omega-2_dot omega-3_dot".split()[i] for i in range(self.dataframe.shape[1] - len(columns))]
         if node_label in BPY.plot_data['ine']:
             df = BPY.plot_data['ine'][node_label].dropna(1, 'all')
             df.columns = "px py pz Lx Ly Lz dpx/dt dpy/dt dpz/dt dLx/dt dLy/dt dLz/dt".split()

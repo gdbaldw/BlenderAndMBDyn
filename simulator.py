@@ -507,6 +507,9 @@ class Save(bpy.types.Operator, Base):
         if not os.path.exists(directory):
             os.mkdir(directory)
         database.simulator[context.scene.simulator_index].write_input_file(context, directory)
+        bpy.ops.object.select_all(action='DESELECT')
+        for node in database.node:
+            node.select = True
         bpy.ops.wm.save_mainfile(filepath=self.filepath)
         context.scene.dirty_simulator = False
         context.scene.clean_log = False
@@ -565,6 +568,7 @@ class Simulate(bpy.types.Operator, Base):
         if hasattr(self, "sender"):
             self.sender.close()
         context.scene.clean_log = True
+        context.scene.mbdyn_default_orientation = database.simulator[context.scene.simulator_index].job_control.default_orientation
         BPY.plot_data.clear()
         wm.progress_end()
         return {'FINISHED'}
@@ -655,7 +659,6 @@ class WriteKeyframes(bpy.types.Operator, Base):
                     database.node[node_index].rotation_euler = euler[0], euler[1], euler[2]
                 elif orientation == "euler321":
                     database.node[node_index].rotation_euler = Euler((math.radians(fields[5]), math.radians(fields[4]), math.radians(fields[3])), 'XYZ')
-                    database.node[node_index].rotation_mode = 'XYZ'
                 elif orientation == "euler123":
                     database.node[node_index].rotation_euler = Euler((math.radians(fields[3]), math.radians(fields[4]), math.radians(fields[5])), 'ZYX').to_quaternion().to_euler('XYZ')
                     #database.node[node_index].rotation_mode = 'ZYX'
@@ -664,6 +667,8 @@ class WriteKeyframes(bpy.types.Operator, Base):
                     database.node[node_index].rotation_euler = Quaternion(fields[3:6], math.sqrt(sum([x*x for x in fields[3:6]]))).to_euler('XYZ')
                 for data_path in "location rotation_euler".split():
                     database.node[node_index].keyframe_insert(data_path)
+        for node in database.node:
+            node.rotation_mode = 'XYZ'
         scene.frame_current = frame_initial + 1
         wm.progress_end()
         return{'FINISHED'}

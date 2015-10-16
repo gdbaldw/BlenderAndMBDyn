@@ -453,6 +453,7 @@ class BPY:
         bpy.types.Scene.dirty_simulator = bpy.props.BoolProperty(default=True)
         bpy.types.Scene.hash = bpy.props.StringProperty()
         bpy.types.Scene.clean_log = bpy.props.BoolProperty(default=False)
+        bpy.types.Scene.mbdyn_default_orientation = bpy.props.StringProperty()
         bpy.types.Scene.mbdyn_name = bpy.props.StringProperty()
         bpy.types.Scene.popups_enabled = bpy.props.BoolProperty(default=False)
         bpy.types.Object.mbdyn_name = bpy.props.StringProperty()
@@ -469,6 +470,7 @@ class BPY:
         del bpy.types.Scene.dirty_simulator
         del bpy.types.Scene.hash
         del bpy.types.Scene.clean_log
+        del bpy.types.Scene.mbdyn_default_orientation
         del bpy.types.Scene.mbdyn_name
         del bpy.types.Scene.popups_enabled
         del bpy.types.Object.mbdyn_name
