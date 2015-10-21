@@ -23,19 +23,22 @@
 
 if "bpy" in locals():
     import imp
-    imp.reload(bpy)
-    imp.reload(root_dot)
-    imp.reload(Operator)
-    imp.reload(Entity)
+    for x in [user_defined_element, common, base, menu]:
+        imp.reload(x)
 else:
-    from .common import (safe_name, Ellipsoid, RhombicPyramid, TriPyramid, Octahedron, Teardrop, Cylinder, Sphere, RectangularCuboid, write_vector, write_orientation)
-    from .base import bpy, BPY, root_dot, database, Operator, Entity, Bundle, SelectedObjects, SegmentList
-    from mathutils import Vector
-    from copy import copy
-    import os
-    import subprocess
-    from tempfile import TemporaryFile
-    from .menu import default_klasses, element_tree
+    from . import user_defined_element
+    from . import common
+    from . import base
+    from . import menu
+from .user_defined_element import klass_list
+from .common import (safe_name, Ellipsoid, RhombicPyramid, TriPyramid, Octahedron, Teardrop, Cylinder, Sphere, RectangularCuboid, write_vector, write_orientation)
+from .base import bpy, BPY, root_dot, database, Operator, Entity, Bundle, SelectedObjects, SegmentList
+from .menu import default_klasses, element_tree
+from mathutils import Vector
+from copy import copy
+import os
+import subprocess
+from tempfile import TemporaryFile
 
 class Base(Operator):
     bl_label = "Elements"
@@ -101,6 +104,10 @@ class Base(Operator):
                 layout.operator("object.delete")
 
 klasses = default_klasses(element_tree, Base)
+for e, o in klass_list:
+    class O(o, Base):
+        pass
+    klasses[O.bl_label] = O
 
 class Constitutive(Base):
     constitutive = bpy.props.PointerProperty(type = BPY.Constitutive)
@@ -152,11 +159,11 @@ class StructuralForce(Entity):
         localV_0 = rot_0*globalV_0
         rotT = self.objects[0].matrix_world.to_quaternion().to_matrix()
         f.write("\t" + self.elem_type + ": " + self.safe_name() + ", " + self.force_type +
-            ",\n\t\t" + safe_name(Node_0.name) + ", position, ")
+            ",\n\t\t" + safe_name(Node_0.name) + ", position")
         write_vector(f, localV_0)
         if self.force_type == "follower" and self.orientation:
             f.write(",\n\t\torientation")
-            write_orientation(f, rot_0*rotT, "\t\t\t")
+            write_orientation(f, rot_0*rotT, "\t\t")
         f.write(",\n\t\t" + self.drive.string() + ";\n")
     def remesh(self):
         if self.force_type == "absolute":
@@ -212,12 +219,12 @@ class StructuralInternalForce(Entity):
         rot_1, globalV_1, Node_1 = self.rigid_offset(1)
         localV_1 = rot_1*globalV_1
         f.write("\t" + self.elem_type + ": " + self.safe_name() + ", " + self.force_type + " internal" +
-            ",\n\t\t" + safe_name(Node_0.name) + ", position, ")
+            ",\n\t\t" + safe_name(Node_0.name) + ", position")
         write_vector(f, localV_0)
         if self.force_type == "follower" and self.orientation:
             f.write(",\n\t\torientation")
-            write_orientation(f, rot_0*rotT, "\t\t\t")
-        f.write(",\n\t\t" + safe_name(Node_1.name) + ", position, ")
+            write_orientation(f, rot_0*rotT, "\t\t")
+        f.write(",\n\t\t" + safe_name(Node_1.name) + ", position")
         write_vector(f, localV_1)
         f.write(",\n\t\t" + self.drive.string() + ";\n")
     def remesh(self):
@@ -257,22 +264,18 @@ class Hinge(Joint):
         rot_1, globalV_1, Node_1 = self.rigid_offset(1)
         to_hinge = rot_1*(globalV_1 + self.objects[0].matrix_world.translation - self.objects[1].matrix_world.translation)
         rotT = self.objects[0].matrix_world.to_quaternion().to_matrix()
-        f.write(
-        "\tjoint: " + self.safe_name() + ", " + name + ",\n" +
-        "\t\t" + safe_name(Node_0.name))
+        f.write("\tjoint: " + self.safe_name() + ", " + name + ",\n\t\t" + safe_name(Node_0.name))
         if V1:
-            f.write(", ")
             write_vector(f, localV_0)
         if M1:
             f.write(",\n\t\t\thinge")
-            write_orientation(f, rot_0*rotT, "\t\t\t\t")
+            write_orientation(f, rot_0*rotT, "\t\t\t")
         f.write(", \n\t\t" + safe_name(Node_1.name))
         if V2:
-            f.write(", ")
             write_vector(f, to_hinge)
         if M2:
             f.write(",\n\t\t\thinge")
-            write_orientation(f, rot_1*rotT, "\t\t\t\t")
+            write_orientation(f, rot_1*rotT, "\t\t\t")
 
 class AxialRotation(Hinge):
     def write(self, f):
@@ -354,14 +357,13 @@ klasses[DeformableJointOperator.bl_label] = DeformableJointOperator
 
 class Distance(Joint):
     def write(self, f):
-        f.write("\tjoint: " + self.safe_name() + ", distance,\n")
+        f.write("\tjoint: " + self.safe_name() + ", distance")
         for i in range(2):
             self.write_node(f, i, node=True, position=True, p_label="position")
-            f.write(",\n")
         if self.drive is None:
-            f.write("\t\tfrom nodes;\n")
+            f.write(",\n\t\tfrom nodes;\n")
         else:
-            f.write("\t\treference, " + self.drive.safe_name() + ";\n")
+            f.write(",\n\t\treference, " + self.drive.safe_name() + ";\n")
 
 class DistanceOperator(Drive):
     bl_label = "Distance"
@@ -377,10 +379,11 @@ class InLine(Joint):
     def write(self, f):
         rot_1, globalV_1, Node_1 = self.rigid_offset(1)
         localV_1 = rot_1*globalV_1
-        f.write("\tjoint: " + self.safe_name() + ", in line,\n")
+        f.write("\tjoint: " + self.safe_name() + ", in line")
         self.write_node(f, 0, node=True, position=True, orientation=True)
-        f.write(",\n\t\t" + safe_name(Node_1.name) + ",\n\t\t\toffset, ")
-        write_vector(f, localV_1, ";\n")
+        f.write(",\n\t\t" + safe_name(Node_1.name) + ",\n\t\t\toffset")
+        write_vector(f, localV_1)
+        f.write(";\n")
     def remesh(self):
         RhombicPyramid(self.objects[0])
 
@@ -402,12 +405,14 @@ class InPlane(Joint):
         rot = self.objects[0].matrix_world.to_quaternion().to_matrix()
         normal = rot*rot_0*Vector((0., 0., 1.))
         f.write(
-        "\tjoint: " + self.safe_name() + ", in plane,\n" +
-        "\t\t" + safe_name(Node_0.name) + ",\n\t\t\t")
-        write_vector(f, localV_0, ",\n\t\t\t")
-        write_vector(f, normal, ",\n\t\t")
-        f.write(safe_name(Node_1.name) + ",\n\t\t\toffset, ")
-        write_vector(f, localV_1, ";\n")
+        "\tjoint: " + self.safe_name() + ", in plane" +
+        ",\n\t\t" + safe_name(Node_0.name) + ",\n\t\t\t")
+        write_vector(f, localV_0, prepend=False)
+        f.write(",\n\t\t\t")
+        write_vector(f, normal, prepend=False)
+        f.write(",\n\t\t" + safe_name(Node_1.name) + ",\n\t\t\toffset")
+        write_vector(f, localV_1)
+        f.write(";\n")
     def remesh(self):
         RhombicPyramid(self.objects[0])
 
@@ -464,11 +469,10 @@ klasses[RevoluteHingeOperator.bl_label] = RevoluteHingeOperator
 class Rod(Joint):
     labels = "Fx Fy Fz Mx My Mz FX FY FZ MX MY MZ l ux uy uz l_dot".split()
     def write(self, f):
-        f.write("\tjoint: " + self.safe_name() + ", rod,\n")
+        f.write("\tjoint: " + self.safe_name() + ", rod")
         for i in range(2):
             self.write_node(f, i, node=True, position=True, p_label="position")
-            f.write(",\n")
-        f.write("\t\tfrom nodes,\n\t\treference, " + self.constitutive.safe_name() + ";\n")
+        f.write(",\n\t\tfrom nodes,\n\t\treference, " + self.constitutive.safe_name() + ";\n")
 
 class RodOperator(Constitutive):
     bl_label = "Rod"
@@ -508,22 +512,25 @@ class TotalJoint(Joint):
             rot_position = self.objects[1].matrix_world.to_quaternion().to_matrix()
         f.write("\tjoint: " + self.safe_name() + ", total joint")
         if self.first == "rotate":
-            f.write(",\n\t\t" + safe_name(Node_0.name) + ", position, ")
-            write_vector(f, localV_0, ",\n\t\t\tposition orientation")
-            write_orientation(f, rot_0*rot_position, "\t\t\t\t")
+            f.write(",\n\t\t" + safe_name(Node_0.name) + ", position")
+            write_vector(f, localV_0)
+            f.write(",\n\t\t\tposition orientation")
+            write_orientation(f, rot_0*rot_position, "\t\t\t")
             f.write(",\n\t\t\trotation orientation")
-            write_orientation(f, rot_0*rot, "\t\t\t\t")
-        f.write(",\n\t\t" + safe_name(Node_1.name) + ", position, ")
-        write_vector(f, to_joint, ",\n\t\t\tposition orientation")
-        write_orientation(f, rot_1*rot_position, "\t\t\t\t")
+            write_orientation(f, rot_0*rot, "\t\t\t")
+        f.write(",\n\t\t" + safe_name(Node_1.name) + ", position")
+        write_vector(f, to_joint)
+        f.write(",\n\t\t\tposition orientation")
+        write_orientation(f, rot_1*rot_position, "\t\t\t")
         f.write(",\n\t\t\trotation orientation")
-        write_orientation(f, rot_1*rot, "\t\t\t\t")
+        write_orientation(f, rot_1*rot, "\t\t\t")
         if self.first == "displace":
-            f.write(",\n\t\t" + safe_name(Node_0.name) + ", position, ")
-            write_vector(f, localV_0, ",\n\t\t\tposition orientation")
-            write_orientation(f, rot_0*rot_position, "\t\t\t\t")
+            f.write(",\n\t\t" + safe_name(Node_0.name) + ", position")
+            write_vector(f, localV_0)
+            f.write(",\n\t\t\tposition orientation")
+            write_orientation(f, rot_0*rot_position, "\t\t\t")
             f.write(",\n\t\t\trotation orientation")
-            write_orientation(f, rot_0*rot, "\t\t\t\t")
+            write_orientation(f, rot_0*rot, "\t\t\t")
         f.write(",\n\t\t\tposition constraint")
         for d in self.drives[:3]: 
             if d:
@@ -809,10 +816,10 @@ klasses[StreamAnimationOperator.bl_label] = StreamAnimationOperator
 class Body(Entity):
     elem_type = "body"
     def write(self, f):
-        f.write("\tbody: " + self.safe_name() + ",\n")
+        f.write("\tbody: " + self.safe_name())
         self.write_node(f, 0, node=True)
-        f.write("\t\t\t" + BPY.FORMAT(self.mass) + ",\n")
-        self.write_node(f, 0, position=True, p_label="")
+        f.write(",\n\t\t\t" + BPY.FORMAT(self.mass))
+        self.write_node(f, 0, position=True)
         if self.inertial_matrix is not None:
             f.write(", " + self.inertial_matrix.string())
             self.write_node(f, 0, orientation=True, o_label="inertial")
@@ -887,10 +894,9 @@ class BeamSegment(Entity):
     def write(self, f):
         if hasattr(self, "consumer"):
             return
-        f.write("\tbeam2: " + self.safe_name() + ",\n")
+        f.write("\tbeam2: " + self.safe_name())
         for i in range(len(self.objects)):
             self.write_node(f, i, node=True, position=True, orientation=True, p_label="position", o_label="orientation")
-            f.write(",\n")
         f.write("\t\tfrom nodes, reference, " + self.constitutive.safe_name() + ";\n")
     def remesh(self):
         for obj in self.objects:
@@ -970,11 +976,10 @@ class ThreeNodeBeam(Entity):
     file_ext = "act"
     labels = "F1x F1y F1z M1x M1y M1z F2x F2y F2z M2x M2y M2z".split()
     def write(self, f):
-        f.write("\tbeam3: " + self.safe_name() + ",\n")
+        f.write("\tbeam3: " + self.safe_name())
         self.objects = self.segments[0].objects + self.segments[1].objects[1:]
         for i in range(3):
             self.write_node(f, i, node=True, position=True, orientation=True, p_label="position", o_label="orientation")
-            f.write(",\n")
         f.write("\t\tfrom nodes, reference, " + self.segments[0].constitutive.safe_name())
         f.write(",\n\t\tfrom nodes, reference, " + self.segments[1].constitutive.safe_name() + ";\n")
         del self.objects

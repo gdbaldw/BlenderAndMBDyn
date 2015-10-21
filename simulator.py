@@ -24,20 +24,23 @@
 
 if "bpy" in locals():
     import imp
-    imp.reload(bpy)
-    imp.reload(Operator)
-    imp.reload(Entity)
+    for x in [base, menu, common, user_defined_common]:
+        imp.reload(x)
 else:
-    from .base import bpy, BPY, root_dot, database, Operator, Entity, Bundle
-    from .common import FORMAT, safe_name, write_vector, write_orientation, StreamSender, StreamReceiver
-    from mathutils import Matrix
-    import subprocess
-    from tempfile import TemporaryFile
-    import os
-    from signal import SIGTERM
-    import math
-    from mathutils import Vector, Euler, Quaternion
-    from .menu import default_klasses, simulator_tree
+    from . import base
+    from . import menu
+    from . import common
+    from . import user_defined_common
+from .base import bpy, BPY, root_dot, database, Operator, Entity, Bundle
+from .common import FORMAT, safe_name, write_vector, write_orientation, StreamSender, StreamReceiver
+from .menu import default_klasses, simulator_tree
+from mathutils import Matrix
+import subprocess
+from tempfile import TemporaryFile
+import os
+from signal import SIGTERM
+import math
+from mathutils import Vector, Euler, Quaternion
 
 aerodynamic_types = [
     "Aerodynamic body",
@@ -124,19 +127,18 @@ klasses = default_klasses(simulator_tree, Base)
 class InitialValue(Entity):
     def write_input_file(self, context, directory):
         def write_structural_node(f, structural_type, node, frame):
-            f.write("\tstructural: " + ", ".join([safe_name(node.name), structural_type]) + ",\n")
+            f.write("\tstructural: " + ", ".join([safe_name(node.name), structural_type]))
             frame_label = frame.safe_name() if frame else "global"
             location, orientation = node.matrix_world.translation, node.matrix_world.to_quaternion().to_matrix()
             if frame:
                 location = location - frame.objects[0].matrix_world.translation
                 orientation = frame.objects[0].matrix_world.to_quaternion().to_matrix().transposed()*orientation
-            f.write("\t\treference, " + frame_label + ", ")
-            write_vector(f, location, ",\n")
-            f.write("\t\treference, " + frame_label)
-            write_orientation(f, orientation, "\t"*3)
-            f.write(",\n" +
-                "\t\treference, " + frame_label + ", null,\n" +
-                "\t\treference, " + frame_label + ", null;\n")
+            f.write(",\n\t\treference, " + frame_label)
+            write_vector(f, location)
+            f.write(",\n\t\treference, " + frame_label)
+            write_orientation(f, orientation, "\t\t")
+            f.write(",\n\t\treference, " + frame_label + ", null" +
+                ",\n\t\treference, " + frame_label + ", null;\n")
         with open(os.path.join(directory, context.scene.name + ".mbd"), "w") as f:
             f.write("# MBDyn v1.6 input file generated using BlenderAndMBDyn v2.0\n\n")
             frame_for, frames, parent_of = dict(), list(), dict()
@@ -163,16 +165,16 @@ class InitialValue(Entity):
             structural_dynamic_nodes = set()
             structural_static_nodes = set()
             structural_dummy_nodes = set()
-            database.rigid_dict = {e.objects[0] : e.objects[1] for e in database.element.filter("Rigid offset")}
+            database.rigid_dict = {e.objects[0] : e.objects[1] for e in database.element.filter("Rigid offset") + database.element.filter(user_defined_common.offset_types)}
             names = [e.name for e in database.all_entities()]
             for e in (e for e in database.element + database.drive if hasattr(e, "objects")):
                 ob = database.rigid_dict[e.objects[0]] if e.objects[0] in database.rigid_dict else e.objects[0]
                 if ob.name in names:
                     ob.name = "Node"
                 nodes |= set([ob])
-                if e.type in structural_dynamic_types:
+                if e.type in structural_dynamic_types + user_defined_common.structural_dynamic_types:
                     structural_dynamic_nodes |= set([ob])
-                elif e.type in structural_static_types:
+                elif e.type in structural_static_types + user_defined_common.structural_static_types:
                     structural_static_nodes |= set([ob])
                 elif e.type == "Dummy":
                     structural_dummy_nodes |= set([ob])
@@ -217,6 +219,13 @@ class InitialValue(Entity):
                     set_card.write(f)
             else:
                 f.write("\n# Parameters: none\n")
+            module_load_cards = database.input_card.filter("Module load")
+            if module_load_cards:
+                f.write("\n# Modules:\n")
+                for module_load_card in module_load_cards:
+                    module_load_card.write(f)
+            else:
+                f.write("\n# Modules: none\n")
             structural_node_count = len(structural_static_nodes | structural_dynamic_nodes | structural_dummy_nodes)
             joint_count = len([e for e in database.element if e.type in joint_types])
             output_count = len([e for e in database.element if e.type in output_types])
@@ -228,33 +237,10 @@ class InitialValue(Entity):
             beam_count = len([e for e in database.element if e.type in beam_types and not hasattr(e, "consumer")])
             air_properties = bool([e for e in database.element if e.type in ["Air properties"]])
             gravity = bool([e for e in database.element if e.type in ["Gravity"]])
+            loadable_element_count = len([e for e in database.element if e.type in user_defined_common.loadable_element_types])
             file_driver_count = len(database.driver)
             bailout_upper = False
             upper_bailout_time = 0.0
-            """
-            for driver in database.driver:
-                driver.columns = list()
-            for drive in database.drive:
-                if drive.type == "File drive":
-                    drive.links[0].columns.append(drive)
-            for driver in database.driver:
-                if driver.columns:
-                    file_driver_count += 1
-                    if driver.bailout_upper:
-                        if driver.filename:
-                            name = driver.filename.replace(" ", "")
-                        else:
-                            name = driver.name.replace(" ", "")
-                        command = "tail -n 1 " + os.path.splitext(context.blend_data.filepath)[0] + ".echo_" + name + " | awk '{print $1}'"
-                        f1 = TemporaryFile()
-                        call(command, shell=True, stdout=f1)
-                        try:
-                            f1.seek(0)
-                            upper_bailout_time = min(upper_bailout_time, float(f1.read()) - 1e-3)
-                        except:
-                            pass
-                        f1.close()
-            """
 #            electric_node_count = len([e for e in database.ns_node if e.type in ["Electric"]])
 #            abstract_node_count = len([e for e in database.ns_node if e.type in ["Abstract"]])
 #            hydraulic_node_count = len([e for e in database.ns_node if e.type in ["Hydraulic"]])
@@ -307,6 +293,8 @@ class InitialValue(Entity):
                 f.write("\trotors: " + str(rotor_count) + ";\n")
             if file_driver_count:
                 f.write("\tfile drivers: " + str(file_driver_count) + ";\n")
+            if loadable_element_count:
+                f.write("\tloadable elements: " + str(loadable_element_count) + ";\n")
             f.write("end: control data;\n")
             if database.node:
                 f.write("\nbegin: nodes;\n")
@@ -322,8 +310,8 @@ class InitialValue(Entity):
                     rotT = node.matrix_world.to_quaternion().to_matrix()
                     f.write("\tstructural: " + str(database.node.index(node)) + ", dummy,\n\t\t" +
                         str(database.node.index(base_node)) + ", offset,\n\t\t\t")
-                    write_vector(f, localV)
-                    write_orientation(f, rot*rotT, "\t\t\t\t")
+                    write_vector(f, localV, prepend=False)
+                    write_orientation(f, rot*rotT, "\t\t\t")
                     f.write(";\n")
                 """
                 for i, ns_node in enumerate(self.ns_node):
@@ -367,7 +355,7 @@ class InitialValue(Entity):
             if database.element:
                 f.write("\nbegin: elements;\n")
                 try:
-                    for element_type in aerodynamic_types + beam_types + ["Body"] + force_types + genel_types + joint_types + ["Rotor"] + environment_types + ["Driven"] + output_types:
+                    for element_type in aerodynamic_types + beam_types + ["Body"] + force_types + genel_types + joint_types + ["Rotor"] + environment_types + user_defined_common.loadable_element_types + ["Driven"] + output_types:
                         for element in database.element:
                             if element.type == element_type:
                                 element.write(f)
@@ -526,6 +514,7 @@ class Simulate(bpy.types.Operator, Base):
             return {'PASS_THROUGH'}
         if event.type == 'ESC':
             return self.close(context)
+        #self.report({'INFO'}, self.process.stdout.read().decode())
         if hasattr(self, "sender") and event.type in self.channels:
             i, dv = self.channels[event.type]
             self.values[i] += dv
@@ -584,7 +573,7 @@ class Simulate(bpy.types.Operator, Base):
             self.values = [d.initial_value for d in drives]
             self.channels = {d.increment : (i, 1) for i, d in enumerate(drives)}
             self.channels.update({d.decrement : (i, -1) for i, d in enumerate(drives)})
-        self.process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        self.process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         if events:
             host_name, port_number = events[0].host_name, events[0].port_number
             self.sender = StreamSender(host_name=host_name, port_number=port_number)

@@ -24,13 +24,15 @@
 
 if "bpy" in locals():
     import imp
-    imp.reload(bpy)
-    imp.reload(Operator)
-    imp.reload(Entity)
+    for x in [base, common, menu]:
+        imp.reload(x)
 else:
-    from .base import bpy, database, Operator, Entity, Bundle, BPY
-    from .common import FORMAT
-    from .menu import default_klasses, function_tree
+    from . import base
+    from . import common
+    from . import menu
+from .base import bpy, database, Operator, Entity, Bundle, BPY
+from .common import FORMAT
+from .menu import default_klasses, function_tree
 
 class Base(Operator):
     bl_label = "Functions"
@@ -297,15 +299,14 @@ class ChebychevOperator(Base):
         self.lower_bound.assign(self.entity.lower_bound)
         self.upper_bound.assign(self.entity.upper_bound)
         self.extrapolate = self.entity.extrapolate
-        self.N = self.entity.N
+        self.N = len(self.entity.C)
         for i, value in enumerate(self.entity.C):
             self.C[i].assign(value)
     def store(self, context):
         self.entity.lower_bound = self.lower_bound.store()
         self.entity.upper_bound = self.upper_bound.store()
         self.entity.extrapolate = self.extrapolate
-        self.entity.N = self.N
-        self.entity.C = [c.store() for c in self.C][:self.entity.N]
+        self.entity.C = [c.store() for c in self.C][:self.N]
     def draw(self, context):
         self.basis = self.N
         layout = self.layout

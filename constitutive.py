@@ -24,12 +24,13 @@
 
 if "bpy" in locals():
     import imp
-    imp.reload(bpy)
-    imp.reload(Operator)
-    imp.reload(Entity)
+    for x in [base, menu]:
+        imp.reload(x)
 else:
-    from .base import bpy, root_dot, database, Operator, Entity, Bundle, BPY
-    from .menu import default_klasses, constitutive_tree
+    from . import base
+    from . import menu
+from .base import bpy, root_dot, database, Operator, Entity, Bundle, BPY
+from .menu import default_klasses, constitutive_tree
 
 class Base(Operator):
     bl_label = "Constitutives"

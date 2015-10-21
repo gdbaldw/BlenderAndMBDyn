@@ -1,3 +1,34 @@
+# --------------------------------------------------------------------------
+# BlenderAndMBDyn
+# Copyright (C) 2015 G. Douglas Baldwin - http://www.baldwintechnology.com
+# --------------------------------------------------------------------------
+# ***** BEGIN GPL LICENSE BLOCK *****
+#
+#    This file is part of BlenderAndMBDyn.
+#
+#    BlenderAndMBDyn is free software: you can redistribute it and/or modify
+#    it under the terms of the GNU General Public License as published by
+#    the Free Software Foundation, either version 3 of the License, or
+#    (at your option) any later version.
+#
+#    BlenderAndMBDyn is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    GNU General Public License for more details.
+#
+#    You should have received a copy of the GNU General Public License
+#    along with BlenderAndMBDyn.  If not, see <http://www.gnu.org/licenses/>.
+#
+# ***** END GPL LICENCE BLOCK *****
+# -------------------------------------------------------------------------- 
+
+if "user_defined_common" in locals():
+    import imp
+    for x in [user_defined_common, common]:
+        imp.reload(x)
+else:
+    from . import user_defined_common
+    from .common import Tree
 from collections import OrderedDict
 
 def default_klasses(tree, base_klass):
@@ -17,16 +48,6 @@ def default_klasses(tree, base_klass):
                 klasses[key] = Default
     find_leaves(tree)
     return klasses
-
-class Tree(OrderedDict):
-    def get_leaves(self):
-        ret = list()
-        for key, value in self.items():
-            if isinstance(value, Tree):
-                ret.extend(value.get_leaves())
-            else:
-                ret.append(key)
-        return ret
 
 constitutive = Tree((t, None) for t in [
     "Linear elastic",
@@ -232,6 +253,7 @@ element = Tree([
     ("Force", force),
     ("GENEL", genel),
     ("Joint", joint),
+    ("User defined", user_defined_common.tree),
     ("Output", output),
     ("Environment", environment),
     ("Driven", None),

@@ -22,18 +22,23 @@
 # ***** END GPL LICENCE BLOCK *****
 # -------------------------------------------------------------------------- 
 
-if "bpy" in locals():
-    import imp
-    imp.reload(bpy)
-    imp.reload(sqrt)
-    imp.reload(bmesh)
-else:
-    import bpy
-    from math import sqrt
-    import bmesh
-    from socket import socket, AF_INET, SOCK_STREAM, SOL_SOCKET, SO_REUSEADDR, SHUT_RDWR
-    from struct import pack, unpack
-    from threading import Thread
+import bpy
+from math import sqrt
+import bmesh
+from socket import socket, AF_INET, SOCK_STREAM, SOL_SOCKET, SO_REUSEADDR, SHUT_RDWR
+from struct import pack, unpack
+from threading import Thread
+from collections import OrderedDict
+
+class Tree(OrderedDict):
+    def get_leaves(self):
+        ret = list()
+        for key, value in self.items():
+            if isinstance(value, Tree):
+                ret.extend(value.get_leaves())
+            else:
+                ret.append(key)
+        return ret
 
 FORMAT = "{:.6g}".format
 
@@ -91,13 +96,13 @@ class StreamReceiver(Thread):
     def close(self):
         self.receiving = False
 
-def write_vector(f, v, end=""):
-    f.write(", ".join([FORMAT(round(x, 6) if round(x, 6) != -0. else 0) for x in v]) + end)
+def write_vector(f, v, prepend=True):
+    f.write((", " if prepend else "") + ", ".join([FORMAT(round(x, 6) if round(x, 6) != -0. else 0) for x in v]))
 
 def write_orientation(f, m, pad=""):
-    f.write(", euler, ")
+    f.write(",\n" + pad + "euler")
     write_vector(f, m.to_euler('ZYX'))
-    #f.write(", matr,\n" + ",\n".join([pad + ", ".join(FORMAT(round(x, 6) if round(x, 6) != -0. else 0) for x in r) for r in m]))
+    #f.write(",\n" + pad +"matr,\n" + ",\n\t".join([pad + ", ".join(FORMAT(round(x, 6) if round(x, 6) != -0. else 0) for x in r) for r in m]))
 
 def subsurf(obj):
     subsurf = [m for m in obj.modifiers if m.type == 'SUBSURF']

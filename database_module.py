@@ -51,8 +51,10 @@ class EntityLookupError(LookupError):
     pass
 
 class Entities(list):
-    def filter(self, type_name, obj=None):
-        return [e for e in self if e.type == type_name and 
+    def filter(self, types, obj=None):
+        if isinstance(types, str):
+            types = [types,]
+        return [e for e in self if e.type in types and 
             (not obj or (hasattr(e, "objects") and e.objects[0] == obj))]
     def get_by_name(self, name):
         if name != "New":
