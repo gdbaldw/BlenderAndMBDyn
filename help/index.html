@@ -191,6 +191,12 @@ The clamp element is used to rigidly fixed a node in space. Use this element to 
 
 <h2><a class="title" name="DeformableDisplacementJoint">DeformableDisplacementJoint</a>:</h2>
 <p>
+This joint implements a configuration dependent force that is exchanged between two points associated
+to two nodes with an offset. The force may depend, by way of a generic 3D constitutive law, on the
+relative position and velocity of the two points, expressed in the reference frame of node 1.
+The constitutive law is attached to the reference frame of node 1 (TODO: selected last?), so the sequence of the connections
+may matter in case of anisotropic constitutive laws, if the relative orientation of the two nodes changes
+during the analysis.
 
 </p>
 
@@ -337,6 +343,9 @@ The Gravity element is used to add a gravity force to the simulation. Many times
 
 <h2><a class="title" name="DummyNode">DummyNode</a>:</h2>
 <p>
+The dummy structural node has been added to ease the visualization of the kinematics of arbitrary points
+of the system during the simulation. It does not provide any degrees of freedom, and it must be attached
+to another node.
 
 </p>
 
@@ -366,6 +375,42 @@ The Gravity element is used to add a gravity force to the simulation. Many times
 <p>
 </p>
 -->
+
+
+<h2><a class="title" name="file_drive">file drive</a>:</h2>
+<p>
+The file format is<br>
+# an arbitrary number of comment lines starting with '#'<br>
+#<br>
+# comment lines may provide special parameters<br>
+# like "initial time", "time step" as indicated above; for example<br>
+#<br>
+# initial time: 0<br>
+# time step: 0.01<br>
+#<br>
+# channel #1 channel #2 ... channel #n<br>
+1.     2. ... 100.<br>
+...<br>
+Example.<br>
+begin: drivers;<br>
+file: 100,<br>
+fixed step,<br>
+100, # n. steps<br>
+1, # n. channels<br>
+0, # initial_time<br>
+0.01, # time_step<br>
+"input.dat";<br>
+file: 200,<br>
+fixed step,<br>
+count, # n. steps<br>
+1, # n. channels<br>
+from file, # initial_time<br>
+from file, # time_step<br>
+"input.dat";<br>
+end: drivers;
+
+</p>
+
 
 <h1><a class="title" name="input_card">Input card</a></h1>
 <p>
