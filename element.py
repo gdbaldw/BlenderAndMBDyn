@@ -572,7 +572,7 @@ class TotalJointOperator(Base):
                 self.titles.append(t1 + t2)
     def assign(self, context):
         self.first = self.entity.first
-        for i, d in enumerate(self.entity.drive):
+        for i, d in enumerate(self.entity.drives):
             self.drives[i].assign(d)
     def store(self, context):
         self.entity.first = self.first
