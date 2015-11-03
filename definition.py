@@ -912,7 +912,7 @@ class OutputData(Entity):
             (self.iterations, "iterations"),
             (self.residual, "residual"),
             (self.solution, "solution"),
-            (self.jacobian_matrix, "jacobian_matrix"),
+            (self.jacobian_matrix, "jacobian matrix"),
             (self.messages, "messages"),
             (self.counter, "counter"),
             (self.bailout, "bailout"),

@@ -472,13 +472,29 @@ class Rod(Joint):
         f.write("\tjoint: " + self.safe_name() + ", rod")
         for i in range(2):
             self.write_node(f, i, node=True, position=True, p_label="position")
-        f.write(",\n\t\tfrom nodes,\n\t\treference, " + self.constitutive.safe_name() + ";\n")
+        if self.length is not None:
+            f.write(",\n\t\t" + BPY.FORMAT(self.length))
+        else:
+            f.write(",\n\t\tfrom nodes")
+        f.write(",\n\t\treference, " + self.constitutive.safe_name() + ";\n")
 
 class RodOperator(Constitutive):
     bl_label = "Rod"
+    length = bpy.props.PointerProperty(type = BPY.Float)
     def prereqs(self, context):
         self.constitutive.mandatory = True
         self.constitutive.dimension = "1D"
+    def assign(self, context):
+        self.length.assign(self.entity.length)
+        super().assign(context)
+    def store(self, context):
+        self.entity.length = self.length.store()
+        super().store(context)
+    def draw(self, context):
+        super().draw(context)
+        self.length.draw(self.layout, text="Length")
+    def check(self, context):
+        return self.length.check(context) or super().check(context)
     def create_entity(self):
         return Rod(self.name)
 

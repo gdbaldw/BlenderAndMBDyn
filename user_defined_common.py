@@ -34,10 +34,12 @@ collision_tree = Tree([
 # Each module
 tree = Tree([
     ("Module load", None),
+    ("Sandbox", 2),
     ("Collision", collision_tree)])
 
 # Types in this list will become MBDyn elements, in order
 loadable_element_types = [
+    "Sandbox",
     "Box",
     "Capsule",
     "Cone",

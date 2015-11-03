@@ -97,7 +97,7 @@ class ReferenceFrameOperator(Base):
     def poll(self, context):
         frames = copy(database.input_card.filter("Reference frame"))
         if self.bl_idname.startswith(root_dot + "e_"):
-            frames.pop(context.scene.input_card_index)
+            frames.remove(database.input_card[context.scene.input_card_index])
         selected = SelectedObjects(context)
         overlapped = False in [set(selected[1:]).isdisjoint(set(f.objects[1:])) for f in frames]
         duplicate = True in [selected[0] == f.objects[0] for f in frames if hasattr(f, "objects")]
@@ -185,20 +185,26 @@ def enum_loadable_module(self, context):
 
 class ModuleLoadOperator(Base):
     bl_label = "Module load"
-    value_type = bpy.props.EnumProperty(items=enum_loadable_module, name="File name", description="Select from the list of available loadable modules")
+    loadable_module = bpy.props.EnumProperty(items=enum_loadable_module, name="File name", description="Select from the list of available loadable modules")
     args = bpy.props.StringProperty()
     @classmethod
     def poll(cls, context):
-        return enum_loadable_module(cls, context)
+        return enum_loadable_module(cls, context) or cls.bl_idname.endswith("e_module_load")
+    def prereqs(self, context):
+        if self.bl_idname.endswith("c_module_load"):
+            self.loadable_module = enum_loadable_module(self, context)[0][0]
     def assign(self, context):
-        self.value_type = self.entity.value_type
         self.args = self.entity.args
     def store(self, context):
-        self.entity.value_type = self.value_type
+        if self.bl_idname.endswith("c_module_load"):
+            self.entity.value_type = self.loadable_module
         self.entity.args = self.args
     def draw(self, context):
         layout = self.layout
-        layout.prop(self, "value_type")
+        if self.bl_idname.endswith("c_module_load"):
+            layout.prop(self, "loadable_module")
+        else:
+            layout.label("Module: " + self.entity.value_type)
         layout.prop(self, "args")
     def create_entity(self):
         return ModuleLoad(self.name)

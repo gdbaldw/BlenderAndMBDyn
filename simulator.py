@@ -131,8 +131,8 @@ class InitialValue(Entity):
             frame_label = frame.safe_name() if frame else "global"
             location, orientation = node.matrix_world.translation, node.matrix_world.to_quaternion().to_matrix()
             if frame:
-                location = location - frame.objects[0].matrix_world.translation
                 orientation = frame.objects[0].matrix_world.to_quaternion().to_matrix().transposed()*orientation
+                location = orientation * (location - frame.objects[0].matrix_world.translation)
             f.write(",\n\t\treference, " + frame_label)
             write_vector(f, location)
             f.write(",\n\t\treference, " + frame_label)
@@ -296,6 +296,10 @@ class InitialValue(Entity):
             if loadable_element_count:
                 f.write("\tloadable elements: " + str(loadable_element_count) + ";\n")
             f.write("end: control data;\n")
+            if frames_to_write:
+                f.write("\n# Frames:\n")
+                for frame in frames_to_write:
+                    frame.write(f, parent_of[frame] if frame in parent_of else None)
             if database.node:
                 f.write("\nbegin: nodes;\n")
                 for node in structural_static_nodes:
@@ -348,10 +352,6 @@ class InitialValue(Entity):
                 f.write("\n# Constitutives:\n")
                 for constitutive in database.constitutive:
                     f.write("\tconstitutive law: " + ", ".join([constitutive.safe_name(), constitutive.dimension[0], constitutive.string()]) + ";\n")
-            if frames_to_write:
-                f.write("\n# Frames:\n")
-                for frame in frames_to_write:
-                    frame.write(f, parent_of[frame] if frame in parent_of else None)
             if database.element:
                 f.write("\nbegin: elements;\n")
                 try:

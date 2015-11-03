@@ -930,13 +930,14 @@ class UI(list):
                 index, uilist = self.get_uilist(context)
                 uilist.remove(index)
                 entity = entity_list.pop(index)
-                if entity.type == "Rigid offset":
-                    entity.objects[0].parent = None
                 for attr in vars(entity).values():
                     if isinstance(attr, SegmentList):
                         attr.clear()
                 if hasattr(entity, "objects"):
                     Cube(entity.objects[0])
+                    for ob in entity.objects:
+                        if ob.parent in entity.objects:
+                            ob.parent = None
                 context.scene.dirty_simulator = True
                 self.set_index(context, 0 if index == 0 and 0 < len(uilist) else index-1)
                 index, uilist = self.get_uilist(context)

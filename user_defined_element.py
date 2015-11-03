@@ -35,12 +35,40 @@ import bmesh, mathutils, math
 
 klass_list = list()
 
-class Collision:
+class Sandbox(Entity):
+    def write(self, f):
+        f.write(
+        "\tuser defined: " + self.safe_name() + ", sandbox")
+        f.write(";\n")
+
+class Constitutive:
+    constitutive = bpy.props.PointerProperty(type = BPY.Constitutive)
+    def prereqs(self, context):
+        self.constitutive.mandatory = True
+        self.constitutive.dimension = "3D"
+    def assign(self, context):
+        self.constitutive.assign(self.entity.constitutive)
+    def store(self, context):
+        self.entity.constitutive = self.constitutive.store()
+        self.entity.objects = self.sufficient_objects(context)
+    def draw(self, context):
+        self.constitutive.draw(self.layout, text="Constitutive")
+    def check(self, context):
+        return self.constitutive.check(context)
+
+class SandboxOperator:
+    bl_label = "Sandbox"
     @classmethod
     def poll(cls, context):
-        return super().poll(context) and "libmodule-collision" in [x.value_type for x in database.input_card.filter("Module load")]
+        return super().poll(context) and "libmodule-sandbox" in [x.value_type for x in database.input_card.filter("Module load")]
+    def create_entity(self):
+        return Sandbox(self.name)
+
+klass_list.append((Sandbox, SandboxOperator))
 
 class CollisionWorld(Entity):
+    file_ext = "usr"
+    labels = "F_x F_X F_Y F_Z dL unit_X unit_Y unit_Z dL_dt".split()
     def write(self, f):
         f.write("\tuser defined: " + self.safe_name() + ", collision world, " + str(len(self.first)))
         for i, x in enumerate(self.first):
@@ -84,6 +112,10 @@ class CollisionWorldOperator:
         self.entity.second = [x.store() for x in self.second][:self.N_pairs]
         self.entity.constitutive = [x.store() for x in self.constitutive][:self.N_pairs]
         self.entity.objects = [e.objects[0] for e in self.entity.first + self.entity.second]
+        self.entity.labels = list()
+        for i in range(self.N_pairs):
+            for x in CollisionWorld.labels:
+                self.entity.labels.append("_".join([x, str(i + 1)]))
     def draw(self, context):
         super().draw(context)
         self.basis = self.N_pairs
@@ -120,6 +152,15 @@ class Box(CollisionObject):
             v.co[2] = math.copysign(self.z, v.co[2])
         bm.to_mesh(self.objects[0].data)
         bm.free()
+
+class Collision:
+    @classmethod
+    def poll(cls, context):
+        return super().poll(context) and "libmodule-collision" in [x.value_type for x in database.input_card.filter("Module load")]
+    def store(self, context):
+        super().store(context)
+        self.entity.objects[0].parent = self.entity.objects[1]
+        self.entity.objects[0].matrix_parent_inverse = self.entity.objects[1].matrix_basis.inverted()
 
 class BoxOperator(Collision):
     bl_label = "Box"
