@@ -1068,14 +1068,8 @@ klasses[DrivenOperator.bl_label] = DrivenOperator
 
 class Plot:
     bl_options = {'REGISTER', 'INTERNAL'}
-    prereqs_met = bpy.props.BoolProperty(default=False)
     label_names = bpy.props.CollectionProperty(type=BPY.Str)
     def load(self, context, exts, pd):
-        if not self.prereqs_met:
-            for prereq in "pandas matplotlib.pyplot".split():
-                if subprocess.call(("python", "-c", "import " + prereq)):
-                    raise ImportError("No module named " + prereq)
-            self.prereqs_met = True
         self.base = os.path.join(os.path.splitext(context.blend_data.filepath)[0], context.scene.name)
         if 'frequency' not in BPY.plot_data:
             with open(".".join((self.base, "log")), 'r') as f:
@@ -1105,7 +1099,7 @@ class Plot:
                 f.write(self.entity.name + "\n")
                 dataframe.to_csv(f)
                 f.seek(0)
-                subprocess.Popen(("python", plot_script), stdin=f)
+                subprocess.Popen(("python3", plot_script), stdin=f)
         elif self.label_names:
             self.report({'ERROR'}, "None selected.")
         return{'FINISHED'}

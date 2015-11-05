@@ -193,6 +193,9 @@ def load_post(*args, **kwargs):
     database.unpickle()
     for scene in bpy.data.scenes:
         scene.dirty_simulator = True
+        scene.hash = repr(hash(scene))
+        for ob in scene.objects:
+            ob.hash = repr(hash(ob))
 
 entity_obs = defaultdict(list)
 
