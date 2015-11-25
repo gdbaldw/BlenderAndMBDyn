@@ -392,8 +392,7 @@ class InLineOperator(Base):
     def create_entity(self):
         return InLine(self.name)
 
-# MBDyn's In line joint is unstable
-#klasses[InLineOperator.bl_label] = InLineOperator
+klasses[InLineOperator.bl_label] = InLineOperator
 
 class InPlane(Joint):
     def write(self, f):
@@ -443,6 +442,8 @@ class RevoluteHingeOperator(Friction):
     theta = bpy.props.PointerProperty(type = BPY.Float)
     average_radius = bpy.props.PointerProperty(type = BPY.Float)
     preload = bpy.props.PointerProperty(type = BPY.Float)
+    def prereqs(self, context):
+        self.friction.mandatory = True
     def assign(self, context):
         self.theta.assign(self.entity.theta)
         self.average_radius.assign(self.entity.average_radius)
@@ -452,6 +453,8 @@ class RevoluteHingeOperator(Friction):
         self.entity.theta = self.theta.store()
         self.entity.average_radius = self.average_radius.store()
         self.entity.preload = self.preload.store()
+        if self.entity.average_radius is None:
+            self.friction.mandatory = False
         super().store(context)
     def draw(self, context):
         self.theta.draw(self.layout, text="Theta")

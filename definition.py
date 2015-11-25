@@ -62,7 +62,7 @@ class GeneralProblem(Entity):
         if self.strategy == "factor":
             f.write(", " + ", ".join([BPY.FORMAT(x) for x in (self.reduction_factor, self.steps_before_reduction,
                 self.raise_factor, self.steps_before_raise, self.factor_min_iterations)])
-                + (", " + BPY.FORMAT(self.factor_max_iterations) if self.factor_max_iterations is not None else ""))
+                + (", " + (BPY.FORMAT(self.factor_max_iterations) if self.factor_max_iterations is not None else BPY.FORMAT(self.max_iterations))))
         elif self.strategy == "change":
             f.write(", " + self.time_step_pattern_drive.string())
         if self.strategy != "no change":
