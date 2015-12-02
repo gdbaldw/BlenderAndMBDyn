@@ -38,6 +38,7 @@ from mathutils import Matrix
 import subprocess
 from tempfile import TemporaryFile
 import os
+import sys
 from signal import SIGTERM
 import math
 from mathutils import Vector, Euler, Quaternion
@@ -528,10 +529,11 @@ class Simulate(bpy.types.Operator, Base):
                 node.location = Vector(data[12*i : 12*i+3])
                 node.rotation_euler = Matrix([data[12*i+3 : 12*i+6], data[12*i+6 : 12*i+9], data[12*i+9 : 12*i+12]]).to_euler(node.rotation_euler.order)
         if self.process.poll() == None:
-            output = subprocess.check_output(("tail", "-n", "1", self.out_file))
-            if output and 2 < len(output.split()):
-                percent = 100.*(1.-(self.t_final - float(output.split()[2]))/self.t_range)
-                context.window_manager.progress_update(percent)
+            if self.platform != "win32":
+                output = subprocess.check_output(("tail", "-n", "1", self.out_file))
+                if output and 2 < len(output.split()):
+                    percent = 100.*(1.-(self.t_final - float(output.split()[2]))/self.t_range)
+                    context.window_manager.progress_update(percent)
             return {'PASS_THROUGH'}
         else:
             return self.close(context)
@@ -601,6 +603,7 @@ class Simulate(bpy.types.Operator, Base):
         wm.progress_begin(0., 100.)
         self.timer = wm.event_timer_add(1./24., context.window)
         wm.modal_handler_add(self)
+        self.platform = sys.platform
         return{'RUNNING_MODAL'}
 BPY.klasses.append(Simulate)
 
