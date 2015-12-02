@@ -33,6 +33,7 @@ else:
 from .base import bpy, BPY, root_dot, database, Operator, Entity, Bundle
 from .common import FORMAT
 from .menu import default_klasses, definition_tree
+import sys
 
 class Base(Operator):
     bl_label = "Definitions"
@@ -1152,10 +1153,11 @@ class JobControl(Entity):
                 ("element connection, " if self.element_connection else "") +
                 ("node connection, " if self.node_connection else ""))
             f.write(s[:-2] + ";\n")
-        if self.select_timeout is not None:
-            f.write("\tselect timeout: " + BPY.FORMAT(self.select_timeout) + ";\n")
-        else:
-            f.write("\tselect timeout: forever;\n")
+        if sys.platform != "win32":
+            if self.select_timeout is not None:
+                f.write("\tselect timeout: " + BPY.FORMAT(self.select_timeout) + ";\n")
+            else:
+                f.write("\tselect timeout: forever;\n")
         f.write("\tdefault orientation: " + self.default_orientation + ";\n")
         f.write("\toutput meter: " + self.meter_drive.string() +
             ";\n\toutput precision: " + FORMAT(self.output_precision) + ";\n" +
@@ -1217,7 +1219,10 @@ class JobControlOperator(Base):
             row = layout.split(.1)
             row.label()
             row.prop(self, attribute)
-        self.select_timeout.draw(layout, "Select timeout", "Set")
+        if sys.platform != "win32":
+            self.select_timeout.draw(layout, "Select timeout", "Set")
+        else:
+            layout.label("Select timeout is disabled on win32 platforms")
         self.meter_drive.draw(self.layout, "Output meter drive", "Set")
         layout.prop(self, "default_orientation")
         layout.prop(self, "output_precision")
