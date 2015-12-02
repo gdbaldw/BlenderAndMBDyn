@@ -152,8 +152,7 @@ klass_list.append((CollisionWorld, CollisionWorldOperator))
 class CollisionObject(Entity):
     group = "Collision object"
     def write(self, f):
-        f.write(
-        "\tuser defined: " + self.safe_name() + ", collision object")
+        f.write("\tuser defined: " + self.safe_name() + ", collision object, " + BPY.FORMAT(self.material))
         self.write_node(f, 0, node=True, position=True, orientation=True)
 
 class Box(CollisionObject):
@@ -170,13 +169,25 @@ class Box(CollisionObject):
         bm.free()
 
 class Collision:
+    material = bpy.props.PointerProperty(type = BPY.Str)
     @classmethod
     def poll(cls, context):
         return super().poll(context) and "libmodule-collision" in [x.value_type for x in database.input_card.filter("Module load")]
+    def prereqs(self, context):
+        self.material.mandatory = True
+        self.material.is_card = True
+    def assign(self, context):
+        self.material.assign(self.entity.material)
     def store(self, context):
         super().store(context)
         self.entity.objects[0].parent = self.entity.objects[1]
         self.entity.objects[0].matrix_parent_inverse = self.entity.objects[1].matrix_basis.inverted()
+        self.entity.material = self.material.store()
+        self.entity.objects = self.sufficient_objects(context)
+    def draw(self, context):
+        self.material.draw(self.layout, "Material", "Set")
+    def check(self, context):
+        return self.material.check(context)
 
 class BoxOperator(Collision):
     bl_label = "Box"
@@ -189,6 +200,7 @@ class BoxOperator(Collision):
         self.y = self.entity.y
         self.z = self.entity.z
         self.margin = self.entity.margin
+        super().assign(context)
     def store(self, context):
         self.entity.x = self.x
         self.entity.y = self.y
@@ -202,6 +214,7 @@ class BoxOperator(Collision):
         layout.prop(self, "y")
         layout.prop(self, "z")
         layout.prop(self, "margin")
+        super().draw(context)
     def create_entity(self):
         return Box(self.name)
 
@@ -244,6 +257,7 @@ class CapsuleOperator(Collision):
         self.radius = self.entity.radius
         self.height = self.entity.height
         self.margin = self.entity.margin
+        super().assign(context)
     def store(self, context):
         self.entity.radius = self.radius
         self.entity.height = self.height
@@ -254,6 +268,7 @@ class CapsuleOperator(Collision):
         layout.prop(self, "radius")
         layout.prop(self, "height")
         layout.prop(self, "margin")
+        super().draw(context)
     def create_entity(self):
         return Capsule(self.name)
 
@@ -300,11 +315,13 @@ class SphereOperator(Collision):
     radius = bpy.props.FloatProperty(min=0.0, default=1.0, name="Radius")
     def assign(self, context):
         self.radius = self.entity.radius
+        super().assign(context)
     def store(self, context):
         self.entity.radius = self.radius
         super().store(context)
     def draw(self, context):
         self.layout.prop(self, "radius")
+        super().draw(context)
     def create_entity(self):
         return Sphere(self.name)
 

@@ -595,7 +595,8 @@ class Simulate(bpy.types.Operator, Base):
         self.out_file = os.path.join(directory, context.scene.name + ".out")
         self.t_final = sim.final_time if sim.final_time is not None else float("inf")
         self.t_range = self.t_final - (sim.initial_time if sim.initial_time is not None else 0.0)
-        subprocess.call(("touch", self.out_file))
+        with open(self.out_file) as f:
+            pass
         wm = context.window_manager
         wm.progress_begin(0., 100.)
         self.timer = wm.event_timer_add(1./24., context.window)

@@ -92,16 +92,18 @@ class Base(Operator):
         context.scene.element_index = value
     def draw_panel_post(self, context, layout):
         selected_obs = set(SelectedObjects(context))
+        row = layout.row()
+        row.operator_context = 'EXEC_DEFAULT'
         if selected_obs:
             used_obs = set()
             for e in database.element + database.drive + database.input_card:
                 if hasattr(e, "objects"):
                     used_obs.update(set(e.objects))
             if selected_obs.intersection(used_obs):
-                layout.menu(root_dot + "selected_objects")
+                row.menu(root_dot + "selected_objects")
             else:
-                layout.operator_context = 'EXEC_DEFAULT'
-                layout.operator("object.delete")
+                row.operator("object.delete")
+        row.operator(root_dot + "select_all_filtered")
 
 klasses = default_klasses(element_tree, Base)
 for e, o in klass_list:
@@ -1322,6 +1324,20 @@ class ObjectSpecifications(bpy.types.Operator):
     def check(self, context):
         return self.basis != [obj.rotation_mode for obj in self.objects]
 BPY.klasses.append(ObjectSpecifications)
+
+class SelecteAllFiltered(bpy.types.Operator):
+    bl_label = "Select all filtered"
+    bl_description = "Select and remesh all filtered element objects"
+    bl_idname = root_dot + "select_all_filtered"
+    bl_options = {'REGISTER', 'INTERNAL'}
+    def execute(self, context):
+        bpy.ops.object.select_all(action='DESELECT')
+        for i, element in enumerate(database.element):
+            if database.element.flags[i] and hasattr(element, "objects"):
+                element.remesh()
+                element.objects[0].select = True
+        return {'FINISHED'}
+BPY.klasses.append(SelecteAllFiltered)
 
 class Menu(bpy.types.Menu):
     bl_label = "Selected Objects"
