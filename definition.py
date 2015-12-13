@@ -1179,7 +1179,7 @@ class JobControlOperator(Base):
         ("euler321", "Euler321", ""),
         ("orientation vector", "Orientation vector", ""),
         ("orientation matrix", "Orientation matrix", ""),
-        ], name="Default orientation", default="orientation matrix")
+        ], name="Default orientation", default="euler123")
     output_precision = bpy.props.IntProperty(name="Output precision", default=6, min=1)
     static_model = bpy.props.BoolProperty(name="Static model", description="Set model type to static")
     def prereqs(self, context):
