@@ -29,8 +29,8 @@ collision_tree = Tree([
     ("Box", 2),
     ("Capsule", 2),
     ("Cone", 2),
-    ("Sphere", 2),
-    ("Static plane", 2)])
+    ("Plane", 2),
+    ("Sphere", 2)])
 
 # Each module
 tree = Tree([
@@ -44,8 +44,8 @@ loadable_element_types = [
     "Box",
     "Capsule",
     "Cone",
+    "Plane",
     "Sphere",
-    "Static plane",
     "Collision world"]
 
 # Types in these lists will become MBDyn nodes
@@ -54,4 +54,4 @@ structural_static_types = []
 structural_dynamic_types = []
 
 # Types in this list will be be handled like a Rigid offset
-offset_types = ["Box", "Cone", "Capsule", "Sphere", "Static plane"]
+offset_types = ["Box", "Cone", "Capsule", "Plane", "Sphere"]

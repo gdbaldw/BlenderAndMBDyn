@@ -68,15 +68,15 @@ klass_list.append((Sandbox, SandboxOperator))
 
 class CollisionWorld(Entity):
     file_ext = "usr"
-    #labels = "F M F_X F_Y F_Z M_X M_Y M_Z".split()
     labels = "Node1 Node2 f1x f1y f1z f2x f2y f2z Ftx Fty Ftz Fn".split()
     def write(self, f):
-        f.write("\tuser defined: " + self.safe_name() + ", collision world, " + ", ".join([str(len(x)) for x in [self.first, self.collision_objects]]))
+        f.write("\tuser defined: " + self.safe_name() + ", collision world,\n\t\t" + str(len(self.first)))
         for i, x in enumerate(self.first):
-            f.write(",\n\t\t" + ", ".join([BPY.FORMAT(x), BPY.FORMAT(self.second[i]), "reference, " + self.constitutive[i].safe_name()]))
-            f.write((",\n\t\tfriction function, \"" + self.function[i].name + "\", " + BPY.FORMAT(self.penetration[i])) if self.function[i] else "")
+            f.write(",\n\t\t\t" + ", ".join([BPY.FORMAT(x), BPY.FORMAT(self.second[i]), "reference, " + self.constitutive[i].safe_name()]))
+            f.write((",\n\t\t\t\tfriction function, \"" + self.function[i].name + "\",\n\t\t\t\tpenetration ratio, " + BPY.FORMAT(self.penetration[i])) if self.function[i] else "")
+        f.write(",\n\t\t" + str(len(self.collision_objects)))
         for co in self.collision_objects:
-            f.write(",\n\t\t" + BPY.FORMAT(co))
+            f.write(",\n\t\t\t" + BPY.FORMAT(co))
         f.write(";\n")
 
 class CollisionWorldOperator:
@@ -91,7 +91,7 @@ class CollisionWorldOperator:
     N_pairs = bpy.props.IntProperty(min=1, max=50, name="Material pairs", default=1)
     @classmethod
     def poll(cls, context):
-        ob_set = set([e.objects[0] for e in database.element.filter(["Box", "Capsule", "Cone", "Sphere", "Static plane"])])
+        ob_set = set([e.objects[0] for e in database.element.filter(["Box", "Capsule", "Cone", "Plane", "Sphere"])])
         return set([o for o in context.selected_objects if o.type == 'MESH']) <= ob_set
     def prereqs(self, context):
         super().prereqs(context)
@@ -127,11 +127,11 @@ class CollisionWorldOperator:
         self.entity.constitutive = [x.store() for x in self.constitutive][:self.N_pairs]
         self.entity.penetration = [x.store() for x in self.penetration][:self.N_pairs]
         self.entity.function = [x.store() for x in self.function][:self.N_pairs]
-        self.entity.collision_objects = [e for e in database.element.filter(["Box", "Capsule", "Cone", "Sphere", "Static plane"])
+        self.entity.collision_objects = [e for e in database.element.filter(["Box", "Capsule", "Cone", "Plane", "Sphere"])
             if e.objects[0] in [o for o in context.selected_objects if o.type == 'MESH']]
         self.entity.objects = [e.objects[0] for e in self.entity.collision_objects]
         self.entity.labels = list()
-        for i in range(int(((len(self.entity.objects) - 1) * len(self.entity.objects)) / 2)):
+        for i in range(4 * int(((len(self.entity.objects) - 1) * len(self.entity.objects)) / 2)):
             for x in CollisionWorld.labels:
                 self.entity.labels.append("_".join([x, str(i + 1)]))
     def draw(self, context):
@@ -185,7 +185,7 @@ class Collision:
 class Box(CollisionObject):
     def write(self, f):
         super().write(f)
-        f.write(",\n\t\tbtBoxShape, " + ", ".join([BPY.FORMAT(x) for x in [self.x, self.y, self.z,]]) + ", margin, " + BPY.FORMAT(self.margin) + ";\n")
+        f.write(",\n\t\tBox, " + ", ".join([BPY.FORMAT(x) for x in [self.x, self.y, self.z,]]) + ";\n")
     def remesh(self):
         bm = bmesh.new()
         bmesh.ops.create_cube(bm, size=2.0*self.x)
@@ -200,18 +200,15 @@ class BoxOperator(Collision):
     x = bpy.props.FloatProperty(precision=6, min=0.0, default=1.0, name="x")
     y = bpy.props.FloatProperty(precision=6, min=0.0, default=1.0, name="y")
     z = bpy.props.FloatProperty(precision=6, min=0.0, default=1.0, name="z")
-    margin = bpy.props.FloatProperty(precision=6, min=0.0, default=0.0, name="Collision margin")
     def assign(self, context):
         self.x = self.entity.x
         self.y = self.entity.y
         self.z = self.entity.z
-        self.margin = self.entity.margin
         super().assign(context)
     def store(self, context):
         self.entity.x = self.x
         self.entity.y = self.y
         self.entity.z = self.z
-        self.entity.margin = self.margin
         super().store(context)
     def draw(self, context):
         layout = self.layout
@@ -219,17 +216,16 @@ class BoxOperator(Collision):
         layout.prop(self, "x")
         layout.prop(self, "y")
         layout.prop(self, "z")
-        layout.prop(self, "margin")
         super().draw(context)
     def create_entity(self):
         return Box(self.name)
 
-klass_list.append((Box, BoxOperator))
+#klass_list.append((Box, BoxOperator))
 
 class Capsule(CollisionObject):
     def write(self, f):
         super().write(f)
-        f.write(",\n\t\tbtCapsuleShape, " + ", ".join([BPY.FORMAT(x) for x in [self.radius, self.height]]) + ", margin, " + BPY.FORMAT(self.margin) + ";\n")
+        f.write(",\n\t\tCapsule, " + ", ".join([BPY.FORMAT(x) for x in [self.radius, self.height]]) + ";\n")
     def remesh(self):
         bm = bmesh.new()
         bmesh.ops.create_uvsphere(bm, u_segments=16, v_segments=32, diameter=self.radius)
@@ -258,32 +254,28 @@ class CapsuleOperator(Collision):
     bl_label = "Capsule"
     radius = bpy.props.FloatProperty(precision=6, min=0.0, default=1.0, name="Radius")
     height = bpy.props.FloatProperty(precision=6, min=0.0, default=1.0, name="Height")
-    margin = bpy.props.FloatProperty(precision=6, min=0.0, default=0.0, name="Collision margin")
     def assign(self, context):
         self.radius = self.entity.radius
         self.height = self.entity.height
-        self.margin = self.entity.margin
         super().assign(context)
     def store(self, context):
         self.entity.radius = self.radius
         self.entity.height = self.height
-        self.entity.margin = self.margin
         super().store(context)
     def draw(self, context):
         layout = self.layout
         layout.prop(self, "radius")
         layout.prop(self, "height")
-        layout.prop(self, "margin")
         super().draw(context)
     def create_entity(self):
         return Capsule(self.name)
 
-klass_list.append((Capsule, CapsuleOperator))
+#klass_list.append((Capsule, CapsuleOperator))
 
 class Cone(CollisionObject):
     def write(self, f):
         super().write(f)
-        f.write(",\n\t\tbtConeShape, " + ", ".join([BPY.FORMAT(x) for x in [self.radius, self.height]]) + ", margin, " + BPY.FORMAT(self.margin) + ";\n")
+        f.write(",\n\t\tCone, " + ", ".join([BPY.FORMAT(x) for x in [self.radius, self.height]]) + ";\n")
     def remesh(self):
         bm = bmesh.new()
         bmesh.ops.create_cone(bm, diameter1=self.radius, diameter2=0, segments=32, depth=self.height)
@@ -303,12 +295,12 @@ class ConeOperator(CapsuleOperator):
     def create_entity(self):
         return Cone(self.name)
 
-klass_list.append((Cone, ConeOperator))
+#klass_list.append((Cone, ConeOperator))
 
 class Sphere(CollisionObject):
     def write(self, f):
         super().write(f)
-        f.write(",\n\t\tbtSphereShape, " + BPY.FORMAT(self.radius) +";\n")
+        f.write(",\n\t\tSphere, " + BPY.FORMAT(self.radius) +";\n")
     def remesh(self):
         bm = bmesh.new()
         bmesh.ops.create_icosphere(bm, subdivisions=3, diameter=self.radius)
@@ -332,10 +324,10 @@ class SphereOperator(Collision):
 
 klass_list.append((Sphere, SphereOperator))
 
-class StaticPlane(CollisionObject):
+class Plane(CollisionObject):
     def write(self, f):
         super().write(f)
-        f.write(",\n\t\tbtStaticPlaneShape;\n")
+        f.write(",\n\t\tPlane;\n")
     def remesh(self):
         bm = bmesh.new()
         for v in [(10.,10.,0.),(-10.,10.,0.),(-10.,-10.,0.),(10.,-10.,0.)]:
@@ -346,9 +338,9 @@ class StaticPlane(CollisionObject):
         bm.to_mesh(self.objects[0].data)
         bm.free()
 
-class StaticPlaneOperator(Collision):
-    bl_label = "Static plane"
+class PlaneOperator(Collision):
+    bl_label = "Plane"
     def create_entity(self):
-        return StaticPlane(self.name)
+        return Plane(self.name)
 
-klass_list.append((StaticPlane, StaticPlaneOperator))
+klass_list.append((Plane, PlaneOperator))
