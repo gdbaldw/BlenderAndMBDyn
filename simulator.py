@@ -141,7 +141,7 @@ class InitialValue(Entity):
             f.write(",\n\t\treference, " + frame_label + ", null" +
                 ",\n\t\treference, " + frame_label + ", null;\n")
         with open(os.path.join(directory, context.scene.name + ".mbd"), "w") as f:
-            f.write("# MBDyn v1.6 input file generated using BlenderAndMBDyn v2.0\n\n")
+            f.write("# MBDyn v1.7 input file generated using BlenderAndMBDyn v2.0\n\n")
             frame_for, frames, parent_of = dict(), list(), dict()
             reference_frames = database.input_card.filter("Reference frame")
             for frame in reference_frames:

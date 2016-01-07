@@ -70,11 +70,11 @@ class CollisionWorld(Entity):
     file_ext = "usr"
     labels = "Node1 Node2 f1x f1y f1z f2x f2y f2z Ftx Fty Ftz Fn".split()
     def write(self, f):
-        f.write("\tuser defined: " + self.safe_name() + ", collision world,\n\t\t" + str(len(self.first)))
+        f.write("\tuser defined: " + self.safe_name() + ", collision world,\n\t\tmaterial pairs, " + str(len(self.first)))
         for i, x in enumerate(self.first):
             f.write(",\n\t\t\t" + ", ".join([BPY.FORMAT(x), BPY.FORMAT(self.second[i]), "reference, " + self.constitutive[i].safe_name()]))
             f.write((",\n\t\t\t\tfriction function, \"" + self.function[i].name + "\",\n\t\t\t\tpenetration ratio, " + BPY.FORMAT(self.penetration[i])) if self.function[i] else "")
-        f.write(",\n\t\t" + str(len(self.collision_objects)))
+        f.write(",\n\t\tcollision objects, " + str(len(self.collision_objects)))
         for co in self.collision_objects:
             f.write(",\n\t\t\t" + BPY.FORMAT(co))
         f.write(";\n")
@@ -185,7 +185,7 @@ class Collision:
 class Box(CollisionObject):
     def write(self, f):
         super().write(f)
-        f.write(",\n\t\tBox, " + ", ".join([BPY.FORMAT(x) for x in [self.x, self.y, self.z,]]) + ";\n")
+        f.write(", box, " + ", ".join([BPY.FORMAT(x) for x in [self.x, self.y, self.z,]]) + ";\n")
     def remesh(self):
         bm = bmesh.new()
         bmesh.ops.create_cube(bm, size=2.0*self.x)
@@ -225,7 +225,7 @@ class BoxOperator(Collision):
 class Capsule(CollisionObject):
     def write(self, f):
         super().write(f)
-        f.write(",\n\t\tCapsule, " + ", ".join([BPY.FORMAT(x) for x in [self.radius, self.height]]) + ";\n")
+        f.write(", capsule, " + ", ".join([BPY.FORMAT(x) for x in [self.radius, self.height]]) + ";\n")
     def remesh(self):
         bm = bmesh.new()
         bmesh.ops.create_uvsphere(bm, u_segments=16, v_segments=32, diameter=self.radius)
@@ -275,7 +275,7 @@ class CapsuleOperator(Collision):
 class Cone(CollisionObject):
     def write(self, f):
         super().write(f)
-        f.write(",\n\t\tCone, " + ", ".join([BPY.FORMAT(x) for x in [self.radius, self.height]]) + ";\n")
+        f.write(", cone, " + ", ".join([BPY.FORMAT(x) for x in [self.radius, self.height]]) + ";\n")
     def remesh(self):
         bm = bmesh.new()
         bmesh.ops.create_cone(bm, diameter1=self.radius, diameter2=0, segments=32, depth=self.height)
@@ -300,7 +300,7 @@ class ConeOperator(CapsuleOperator):
 class Sphere(CollisionObject):
     def write(self, f):
         super().write(f)
-        f.write(",\n\t\tSphere, " + BPY.FORMAT(self.radius) +";\n")
+        f.write(", sphere, " + BPY.FORMAT(self.radius) +";\n")
     def remesh(self):
         bm = bmesh.new()
         bmesh.ops.create_icosphere(bm, subdivisions=3, diameter=self.radius)
@@ -327,7 +327,7 @@ klass_list.append((Sphere, SphereOperator))
 class Plane(CollisionObject):
     def write(self, f):
         super().write(f)
-        f.write(",\n\t\tPlane;\n")
+        f.write(", plane;\n")
     def remesh(self):
         bm = bmesh.new()
         for v in [(10.,10.,0.),(-10.,10.,0.),(-10.,-10.,0.),(10.,-10.,0.)]:
