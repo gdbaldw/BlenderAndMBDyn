@@ -1087,7 +1087,7 @@ class Plot:
             BPY.plot_data['timeseries'] = BPY.plot_data['out']['Time'][::BPY.plot_data['frequency']]
         for ext in exts:
             if ext not in BPY.plot_data:
-                df = pd.read_csv(".".join((self.base, ext)), sep=" ", header=None, skipinitialspace=True, names=[i for i in range(50)], lineterminator="\n")
+                df = pd.read_csv(".".join((self.base, ext)), sep=" ", header=None, skipinitialspace=True, names=[i for i in range(1000)], lineterminator="\n")
                 value_counts = df[0].value_counts()
                 p = dict()
                 for node_label in df[0].unique():
